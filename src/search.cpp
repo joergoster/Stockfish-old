@@ -89,6 +89,7 @@ namespace {
   HistoryStats History;
   GainsStats Gains;
   CountermovesStats Countermoves;
+  int contempt = 0;
 
   template <NodeType NT>
   Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth, bool cutNode);
