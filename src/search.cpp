@@ -171,7 +171,7 @@ static size_t perft(Position& pos, Depth depth) {
 
   for (MoveList<LEGAL> it(pos); *it; ++it)
   {
-      pos.do_move(*it, st, ci, pos.move_gives_check(*it, ci));
+      pos.do_move(*it, st, ci, pos.gives_check(*it, ci));
       cnt += leaf ? MoveList<LEGAL>(pos).size() : ::perft(pos, depth - ONE_PLY);
       pos.undo_move(*it);
   }
@@ -237,7 +237,7 @@ void Search::think() {
   }
 
   // Reset the threads, still sleeping: will be wake up at split time
-  for (size_t i = 0; i < Threads.size(); i++)
+  for (size_t i = 0; i < Threads.size(); ++i)
       Threads[i]->maxPly = 0;
 
   Threads.sleepWhileIdle = Options["Idle Threads Sleep"];
@@ -338,7 +338,7 @@ namespace {
 
         // Save last iteration's scores before first PV line is searched and all
         // the move scores but the (new) PV are set to -VALUE_INFINITE.
-        for (size_t i = 0; i < RootMoves.size(); i++)
+        for (size_t i = 0; i < RootMoves.size(); ++i)
             RootMoves[i].prevScore = RootMoves[i].score;
 
         // MultiPV loop. We perform a full root search for each PV line
@@ -372,7 +372,7 @@ namespace {
 
                 // Write PV back to transposition table in case the relevant
                 // entries have been overwritten during the search.
-                for (size_t i = 0; i <= PVIdx; i++)
+                for (size_t i = 0; i <= PVIdx; ++i)
                     RootMoves[i].insert_pv_in_tt(pos);
 
                 // If search has been stopped return immediately. Sorting and
@@ -589,7 +589,7 @@ namespace {
 
         if (    ttValue >= beta
             &&  ttMove
-            && !pos.is_capture_or_promotion(ttMove)
+            && !pos.capture_or_promotion(ttMove)
             &&  ttMove != ss->killers[0])
         {
             ss->killers[1] = ss->killers[0];
@@ -614,8 +614,7 @@ namespace {
 
         // Can ttValue be used as a better position evaluation?
         if (ttValue != VALUE_NONE)
-            if (   ((tte->bound() & BOUND_LOWER) && ttValue > eval)
-                || ((tte->bound() & BOUND_UPPER) && ttValue < eval))
+            if (tte->bound() & (ttValue > eval ? BOUND_LOWER : BOUND_UPPER))
                 eval = ttValue;
     }
     else
@@ -744,10 +743,10 @@ namespace {
         CheckInfo ci(pos);
 
         while ((move = mp.next_move<false>()) != MOVE_NONE)
-            if (pos.pl_move_is_legal(move, ci.pinned))
+            if (pos.legal(move, ci.pinned))
             {
                 ss->currentMove = move;
-                pos.do_move(move, st, ci, pos.move_gives_check(move, ci));
+                pos.do_move(move, st, ci, pos.gives_check(move, ci));
                 value = -search<NonPV>(pos, ss+1, -rbeta, -rbeta+1, rdepth, !cutNode);
                 pos.undo_move(move);
                 if (value >= rbeta)
@@ -809,7 +808,7 @@ moves_loop: // When in check and at SpNode search starts from here
       if (SpNode)
       {
           // Shared counter cannot be decremented later if move turns out to be illegal
-          if (!pos.pl_move_is_legal(move, ci.pinned))
+          if (!pos.legal(move, ci.pinned))
               continue;
 
           moveCount = ++splitPoint->moveCount;
@@ -829,18 +828,15 @@ moves_loop: // When in check and at SpNode search starts from here
       }
 
       ext = DEPTH_ZERO;
-      captureOrPromotion = pos.is_capture_or_promotion(move);
-      givesCheck = pos.move_gives_check(move, ci);
+      captureOrPromotion = pos.capture_or_promotion(move);
+      givesCheck = pos.gives_check(move, ci);
       dangerous =   givesCheck
-                 || pos.is_passed_pawn_push(move)
+                 || pos.passed_pawn_push(move)
                  || type_of(move) == CASTLE;
 
-      // Step 12. Extend checks and, in PV nodes, also dangerous moves
-      if (PvNode && dangerous)
+      // Step 12. Extend checks
+      if (givesCheck && pos.see_sign(move) >= 0)
           ext = ONE_PLY;
-
-      else if (givesCheck && pos.see_sign(move) >= 0)
-          ext = ONE_PLY / 2;
 
       // Singular extension search. If all moves but one fail low on a search of
       // (alpha-s, beta-s), and just one fails high on (alpha, beta), then that move
@@ -850,7 +846,7 @@ moves_loop: // When in check and at SpNode search starts from here
       if (    singularExtensionNode
           &&  move == ttMove
           && !ext
-          &&  pos.pl_move_is_legal(move, ci.pinned)
+          &&  pos.legal(move, ci.pinned)
           &&  abs(ttValue) < VALUE_KNOWN_WIN)
       {
           assert(ttValue != VALUE_NONE);
@@ -893,7 +889,7 @@ moves_loop: // When in check and at SpNode search starts from here
           // but fixing this made program slightly weaker.
           Depth predictedDepth = newDepth - reduction<PvNode>(improving, depth, moveCount);
           futilityValue =  ss->staticEval + ss->evalMargin + futility_margin(predictedDepth, moveCount)
-                         + Gains[pos.piece_moved(move)][to_sq(move)];
+                         + Gains[pos.moved_piece(move)][to_sq(move)];
 
           if (futilityValue < beta)
           {
@@ -926,7 +922,7 @@ moves_loop: // When in check and at SpNode search starts from here
           ss->futilityMoveCount = 0;
 
       // Check for legality only before to do the move
-      if (!RootNode && !SpNode && !pos.pl_move_is_legal(move, ci.pinned))
+      if (!RootNode && !SpNode && !pos.legal(move, ci.pinned))
       {
           moveCount--;
           continue;
@@ -954,8 +950,11 @@ moves_loop: // When in check and at SpNode search starts from here
           if (!PvNode && cutNode)
               ss->reduction += ONE_PLY;
 
+          else if (History[pos.piece_on(to_sq(move))][to_sq(move)] < 0)
+              ss->reduction += ONE_PLY / 2;
+
           if (move == countermoves[0] || move == countermoves[1])
-              ss->reduction = std::max(DEPTH_ZERO, ss->reduction-ONE_PLY);
+              ss->reduction = std::max(DEPTH_ZERO, ss->reduction - ONE_PLY);
 
           Depth d = std::max(newDepth - ss->reduction, ONE_PLY);
           if (SpNode)
@@ -1094,7 +1093,7 @@ moves_loop: // When in check and at SpNode search starts from here
 
     // Quiet best move: update killers, history and countermoves
     if (    bestValue >= beta
-        && !pos.is_capture_or_promotion(bestMove)
+        && !pos.capture_or_promotion(bestMove)
         && !inCheck)
     {
         if (ss->killers[0] != bestMove)
@@ -1106,11 +1105,11 @@ moves_loop: // When in check and at SpNode search starts from here
         // Increase history value of the cut-off move and decrease all the other
         // played non-capture moves.
         Value bonus = Value(int(depth) * int(depth));
-        History.update(pos.piece_moved(bestMove), to_sq(bestMove), bonus);
-        for (int i = 0; i < quietCount - 1; i++)
+        History.update(pos.moved_piece(bestMove), to_sq(bestMove), bonus);
+        for (int i = 0; i < quietCount - 1; ++i)
         {
             Move m = quietsSearched[i];
-            History.update(pos.piece_moved(m), to_sq(m), -bonus);
+            History.update(pos.moved_piece(m), to_sq(m), -bonus);
         }
 
         if (is_ok((ss-1)->currentMove))
@@ -1226,7 +1225,7 @@ moves_loop: // When in check and at SpNode search starts from here
     {
       assert(is_ok(move));
 
-      givesCheck = pos.move_gives_check(move, ci);
+      givesCheck = pos.gives_check(move, ci);
 
       // Futility pruning
       if (   !PvNode
@@ -1235,7 +1234,7 @@ moves_loop: // When in check and at SpNode search starts from here
           &&  move != ttMove
           &&  type_of(move) != PROMOTION
           &&  futilityBase > -VALUE_KNOWN_WIN
-          && !pos.is_passed_pawn_push(move))
+          && !pos.passed_pawn_push(move))
       {
           futilityValue =  futilityBase
                          + PieceValue[EG][pos.piece_on(to_sq(move))]
@@ -1260,7 +1259,7 @@ moves_loop: // When in check and at SpNode search starts from here
       // Detect non-capture evasions that are candidate to be pruned
       evasionPrunable =    InCheck
                        &&  bestValue > VALUE_MATED_IN_MAX_PLY
-                       && !pos.is_capture(move)
+                       && !pos.capture(move)
                        && !pos.can_castle(pos.side_to_move());
 
       // Don't search moves with negative SEE values
@@ -1272,7 +1271,7 @@ moves_loop: // When in check and at SpNode search starts from here
           continue;
 
       // Check for legality only before to do the move
-      if (!pos.pl_move_is_legal(move, ci.pinned))
+      if (!pos.legal(move, ci.pinned))
           continue;
 
       ss->currentMove = move;
@@ -1412,7 +1411,7 @@ moves_loop: // When in check and at SpNode search starts from here
 
     // If the threatened piece has value less than or equal to the value of the
     // threat piece, don't prune moves which defend it.
-    if (    pos.is_capture(second)
+    if (    pos.capture(second)
         && (   PieceValue[MG][pos.piece_on(m2from)] >= PieceValue[MG][pos.piece_on(m2to)]
             || type_of(pos.piece_on(m2from)) == KING))
     {
@@ -1461,7 +1460,7 @@ moves_loop: // When in check and at SpNode search starts from here
     // Choose best move. For each move score we add two terms both dependent on
     // weakness, one deterministic and bigger for weaker moves, and one random,
     // then we choose the move with the resulting highest score.
-    for (size_t i = 0; i < PVSize; i++)
+    for (size_t i = 0; i < PVSize; ++i)
     {
         int s = RootMoves[i].score;
 
@@ -1494,11 +1493,11 @@ moves_loop: // When in check and at SpNode search starts from here
     size_t uciPVSize = std::min((size_t)Options["MultiPV"], RootMoves.size());
     int selDepth = 0;
 
-    for (size_t i = 0; i < Threads.size(); i++)
+    for (size_t i = 0; i < Threads.size(); ++i)
         if (Threads[i]->maxPly > selDepth)
             selDepth = Threads[i]->maxPly;
 
-    for (size_t i = 0; i < uciPVSize; i++)
+    for (size_t i = 0; i < uciPVSize; ++i)
     {
         bool updated = (i <= PVIdx);
 
@@ -1553,8 +1552,8 @@ void RootMove::extract_pv_from_tt(Position& pos) {
       tte = TT.probe(pos.key());
 
   } while (   tte
-           && pos.is_pseudo_legal(m = tte->move()) // Local copy, TT could change
-           && pos.pl_move_is_legal(m, pos.pinned_pieces())
+           && pos.pseudo_legal(m = tte->move()) // Local copy, TT could change
+           && pos.legal(m, pos.pinned_pieces())
            && ply < MAX_PLY
            && (!pos.is_draw() || ply < 2));
 
@@ -1735,7 +1734,7 @@ void check_time() {
 
       // Loop across all split points and sum accumulated SplitPoint nodes plus
       // all the currently active positions nodes.
-      for (size_t i = 0; i < Threads.size(); i++)
+      for (size_t i = 0; i < Threads.size(); ++i)
           for (int j = 0; j < Threads[i]->splitPointsSize; j++)
           {
               SplitPoint& sp = Threads[i]->splitPoints[j];
