@@ -177,8 +177,12 @@ namespace {
         if (doubled)
             value -= Doubled[opposed][f];
 
-        if (backward)
-            value -= Backward[opposed][f];
+        if (backward)   
+        {
+           if ( relative_rank(Us, s) == (RANK_2 || RANK_3))  // Only consider pawns on rank 2 or 3 as fully backward
+                value -= Backward[opposed][f];
+           else value -= Backward[opposed][f] / 2;
+        }
 
         if (chain)
             value += ChainMember[f][relative_rank(Us, s)];
