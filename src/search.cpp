@@ -454,11 +454,10 @@ namespace {
                    stop = true;
 
             // Stop search early if one move seems to be much better than others
-            if (    depth >= 14  // don't check too early
+            if (    depth == 18  // don't check too early
                 && !stop
                 &&  PVSize == 1
-                &&  bestValue > VALUE_MATED_IN_MAX_PLY
-                &&  Time::now() - SearchTime > (TimeMgr.available_time() * 5) / 100)
+                &&  bestValue > VALUE_MATED_IN_MAX_PLY)
             {
                 Value rBeta = bestValue - KnightValueMg;
                 ss->excludedMove = RootMoves[0].pv[0];
