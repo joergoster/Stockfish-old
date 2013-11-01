@@ -459,7 +459,7 @@ namespace {
                 &&  PVSize == 1
                 &&  bestValue > VALUE_MATED_IN_MAX_PLY)
             {
-                Value rBeta = bestValue - KnightValueMg;
+                Value rBeta = bestValue - 2 * PawnValueMg;
                 ss->excludedMove = RootMoves[0].pv[0];
                 ss->skipNullMove = true;
                 Value v = search<NonPV>(pos, ss, rBeta - 1, rBeta, (depth - 3) * ONE_PLY, true);
