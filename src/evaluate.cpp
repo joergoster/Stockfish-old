@@ -223,6 +223,20 @@ namespace {
     15, 15, 15, 15, 15, 15, 15, 15
   };
 
+  // FiftyMoveScale[move] by Ryan Taker
+  const int FiftyMoveScale[] = {
+    0,  3,  5,  7,  9,  10, 13, 16, 19, 25,
+    30, 33, 35, 40, 41, 41, 42, 43, 44, 45,
+    46, 46, 46, 47, 47, 47, 48, 48, 49, 49,
+    50, 50, 50, 51, 52, 53, 54, 55, 55, 56,
+    56, 56, 57, 58, 59, 60, 62, 63, 64, 65,
+    65, 66, 67, 68, 69, 70, 72, 74, 78, 79,
+    80, 80, 80, 80, 80, 80, 80, 80, 80, 80,
+    80, 80, 80, 80, 80, 80, 80, 80, 80, 80,
+    90, 90, 90, 90, 90, 90, 90, 90, 90, 90,
+    95, 95, 95, 95, 95, 95, 95, 95, 95, 100,
+  };
+
   // KingDanger[Color][attackUnits] contains the actual king danger weighted
   // scores, indexed by color and by a calculated integer number.
   Score KingDanger[COLOR_NB][128];
@@ -392,6 +406,10 @@ Value do_evaluate(const Position& pos) {
           // a bit drawish, but not as drawish as with only the two bishops.
            sf = ScaleFactor(50);
   }
+
+  // FiftyMoveScale
+  double scalePercent = (double)FiftyMoveScale[pos.fifty_move_rule()] / 100;
+  sf = ScaleFactor((int)sf - int(scalePercent * (double)sf));
 
   Value v = interpolate(score, ei.mi->game_phase(), sf);
 
