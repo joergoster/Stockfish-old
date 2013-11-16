@@ -433,18 +433,20 @@ namespace {
                 stop = true;
 
             // Stop search early if only one move
-            if (   depth == 10   // to be sure to have a ponder move
-                && RootMoves.size() == 1)
-                   stop = true;
+            if (    RootMoves.size() == 1
+                && (Time::now() - SearchTime > (TimeMgr.available_time() * 10) / 100))
+                    stop = true;
 
             // Stop search early if one move seems to be much better than others
             if (    depth >= 12
                 &&  BestMoveChanges <= DBL_EPSILON
                 && !stop
-                &&  PVSize == 1
-                &&  bestValue > VALUE_MATED_IN_MAX_PLY)
+                &&  PVSize == 1)
             {
-                Value rBeta = bestValue - 2 * PawnValueMg;
+                Value rBeta = (Time::now() - SearchTime > (TimeMgr.available_time() * 20) / 100) ? 
+                               bestValue - 2 * PawnValueMg :
+                              (Time::now() - SearchTime > (TimeMgr.available_time() * 10) / 100) ?
+                               bestValue - KnightValueMg : bestValue - RookValueMg;
                 ss->excludedMove = RootMoves[0].pv[0];
                 ss->skipNullMove = true;
                 Value v = search<NonPV>(pos, ss, rBeta - 1, rBeta, (depth - 3) * ONE_PLY, true);
