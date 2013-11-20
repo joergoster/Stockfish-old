@@ -84,6 +84,7 @@ namespace {
   HistoryStats History;
   GainsStats Gains;
   CountermovesStats Countermoves;
+  int contempt = 0;
 
   template <NodeType NT>
   Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth, bool cutNode);
@@ -344,6 +345,10 @@ namespace {
             {
                 bestValue = search<Root>(pos, ss, alpha, beta, depth * ONE_PLY, false);
 
+                if (bestValue > Value(120)) contempt = 60;
+                else if (bestValue > Value(-60)) contempt = 24;
+                else contempt = -50;
+
                 // Bring to front the best move. It is critical that sorting is
                 // done with a stable algorithm because all the values but the first
                 // and eventually the new best one are set to -VALUE_INFINITE and
@@ -530,7 +535,7 @@ namespace {
     {
         // Step 2. Check for aborted search and immediate draw
         if (Signals.stop || pos.is_draw() || ss->ply > MAX_PLY)
-            return DrawValue[pos.side_to_move()];
+            return pos.side_to_move() == RootColor ? VALUE_DRAW - Value(contempt) : VALUE_DRAW + Value(contempt);
 
         // Step 3. Mate distance pruning. Even if we mate at the next move our score
         // would be at best mate_in(ss->ply+1), but if alpha is already bigger because
@@ -1125,7 +1130,7 @@ moves_loop: // When in check and at SpNode search starts from here
 
     // Check for an instant draw or maximum ply reached
     if (pos.is_draw() || ss->ply > MAX_PLY)
-        return DrawValue[pos.side_to_move()];
+        return pos.side_to_move() == RootColor ? VALUE_DRAW - Value(contempt) : VALUE_DRAW + Value(contempt);
 
     // Decide whether or not to include checks, this fixes also the type of
     // TT entry depth that we are going to use. Note that in qsearch we use
