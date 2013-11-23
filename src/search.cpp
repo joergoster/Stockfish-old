@@ -1025,8 +1025,11 @@ moves_loop: // When in check and at SpNode search starts from here
       }
 
       // Step 19. Check for splitting the search
+      Depth dyn_msd = Material::game_phase(pos) / PHASE_MIDGAME < 0.5 ? 2 * ONE_PLY : 
+                      Material::game_phase(pos) / PHASE_MIDGAME < 0.9 ? ONE_PLY : DEPTH_ZERO;
+
       if (   !SpNode
-          &&  depth >= Threads.minimumSplitDepth
+          &&  depth >= Threads.minimumSplitDepth + dyn_msd
           &&  Threads.available_slave(thisThread)
           &&  thisThread->splitPointsSize < MAX_SPLITPOINTS_PER_THREAD)
       {
