@@ -653,7 +653,7 @@ namespace {
         Depth R = 3 * ONE_PLY + depth / 4;
 
         // Null move dynamic reduction based on value
-        Value t = Material::game_phase(pos) < PHASE_MIDGAME / 3 ? BishopValueMg : PawnValueMg;
+        Value t = Material::game_phase(pos) == PHASE_ENDGAME ? BishopValueMg : PawnValueMg;
         if (eval - t > beta)
             R += ONE_PLY;
 
