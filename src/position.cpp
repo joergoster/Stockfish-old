@@ -1231,6 +1231,31 @@ Value Position::compute_non_pawn_material(Color c) const {
   return value;
 }
 
+/// Check for wrong bishop endgame
+bool Position::wrong_bishop_draw(Color c) const {
+
+  Bitboard pawns = pieces(c, PAWN);
+  File pawnFile = file_of(list<PAWN>(c)[0]);
+
+  // All pawns are on a single rook file ?
+  if (    (pawnFile == FILE_A || pawnFile == FILE_H)
+      && !(pawns & ~file_bb(pawnFile))
+      &&   non_pawn_material(c) == BishopValueMg
+      &&   count<PAWN>(~c) <= 2)
+  {
+      Square bishopSq     = list<BISHOP>(c)[0];
+      Square queeningSq   = relative_square(c, pawnFile | RANK_8);
+      Square weakkingSq   = king_square(~c);
+      Square strongkingSq = king_square(c);
+
+      if (   opposite_colors(queeningSq, bishopSq)
+          && square_distance(queeningSq, weakkingSq) <  square_distance(queeningSq, strongkingSq)
+          && square_distance(queeningSq, weakkingSq) <= square_distance(queeningSq, frontmost_sq(c, pawns)))
+          return true;
+  }
+
+  return false;
+}
 
 /// Position::is_draw() tests whether the position is drawn by material,
 /// repetition, or the 50 moves rule. It does not detect stalemates: this
@@ -1240,6 +1265,10 @@ bool Position::is_draw() const {
   // Draw by material?
   if (   !pieces(PAWN)
       && (non_pawn_material(WHITE) + non_pawn_material(BLACK) <= BishopValueMg))
+      return true;
+
+  // Wrong bishop draw?
+  if (wrong_bishop_draw(WHITE) || wrong_bishop_draw(BLACK))
       return true;
 
   // Draw by the 50 moves rule?

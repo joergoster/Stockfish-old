@@ -161,6 +161,7 @@ public:
   Thread* this_thread() const;
   int64_t nodes_searched() const;
   void set_nodes_searched(int64_t n);
+  bool wrong_bishop_draw(Color c) const;
   bool is_draw() const;
 
   // Position consistency check, for debugging

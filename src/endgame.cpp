@@ -390,21 +390,7 @@ ScaleFactor Endgame<KBPsK>::operator()(const Position& pos) const {
   // No assertions about the material of weakSide, because we want draws to
   // be detected even when the weaker side has some pawns.
 
-  Bitboard pawns = pos.pieces(strongSide, PAWN);
   File pawnFile = file_of(pos.list<PAWN>(strongSide)[0]);
-
-  // All pawns are on a single rook file ?
-  if (    (pawnFile == FILE_A || pawnFile == FILE_H)
-      && !(pawns & ~file_bb(pawnFile)))
-  {
-      Square bishopSq = pos.list<BISHOP>(strongSide)[0];
-      Square queeningSq = relative_square(strongSide, pawnFile | RANK_8);
-      Square kingSq = pos.king_square(weakSide);
-
-      if (   opposite_colors(queeningSq, bishopSq)
-          && square_distance(queeningSq, kingSq) <= 1)
-          return SCALE_FACTOR_DRAW;
-  }
 
   // If all the pawns are on the same B or G file, then it's potentially a draw
   if (    (pawnFile == FILE_B || pawnFile == FILE_G)
