@@ -28,7 +28,7 @@ using namespace std;
 namespace {
 
   // Values modified by Joona Kiiski
-  const Value MidgameLimit = Value(15581);
+  const Value MidgameLimit = Value(13780);
   const Value EndgameLimit = Value(3998);
 
   // Scale factors used when one side has no more pawns
