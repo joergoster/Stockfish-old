@@ -166,8 +166,13 @@ namespace {
         if (doubled)
             value -= Doubled[f];
 
-        if (backward)
-            value -= Backward[opposed][f];
+        if (backward)   
+        {
+           if      (relative_rank(Us, s) == RANK_2
+                ||  relative_rank(Us, s) == RANK_3) value -=     Backward[opposed][f];
+           else if (relative_rank(Us, s) == RANK_4) value -= 3 * Backward[opposed][f] / 4;
+           else                                     value -=     Backward[opposed][f] / 2;
+        }
 
         if (chain)
             value += ChainMember[f][relative_rank(Us, s)];
