@@ -171,7 +171,7 @@ namespace {
            if (  relative_rank(Us, s) == RANK_2   // Only consider pawns on 
               || relative_rank(Us, s) == RANK_3)  // rank 2 or 3 as fully backward
                 value -= Backward[opposed][f];
-           else value -= Backward[opposed][f] / 4;
+           else value -= Backward[opposed][f] / 3;
         }
 
         if (chain)
