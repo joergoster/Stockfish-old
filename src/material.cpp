@@ -119,6 +119,14 @@ namespace {
 
         value += pc * v;
     }
+
+    int m1 = pieceCount[Us  ][ALL_PIECES] - pieceCount[Us  ][PAWN],
+        m2 = pieceCount[Them][ALL_PIECES] - pieceCount[Them][PAWN];
+    if (m1 > m2)
+    {
+        double q = (m1 + m2) / 13.0;
+        value -= (int)(634 - q * 634);
+    }
     return value;
   }
 
