@@ -167,7 +167,11 @@ namespace {
             value -= Doubled[f];
 
         if (backward)
-            value -= Backward[opposed][f];
+        {
+            if ( pos.attacks_from<KNIGHT>(s + pawn_push(Us)) & pos.pieces(Them, KNIGHT))
+                 value -= 3 * Backward[opposed][f] / 2;
+            else value -= Backward[opposed][f];
+        }
 
         if (chain)
             value += ChainMember[f][relative_rank(Us, s)];
