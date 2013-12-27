@@ -53,7 +53,7 @@ namespace {
   Score ChainMember[FILE_NB][RANK_NB];
 
   // Bonus for pawns (being member of a chain) close to the enemy king
-  const Score ChainDistBonus = S(10, 10);
+  const Score ChainDistBonus = S(5, 5);
 
   // Candidate passed pawn bonus by rank
   const Score CandidatePassed[RANK_NB] = {
@@ -177,7 +177,7 @@ namespace {
 
         if (chain)
             value += ChainMember[f][relative_rank(Us, s)]
-                  +  ChainDistBonus * std::max(5 - square_distance(s, pos.king_square(Them)), 0);
+                  +  ChainDistBonus * std::max(4 - square_distance(s, pos.king_square(Them)), 0);
 
         if (candidate)
         {
