@@ -177,7 +177,7 @@ namespace {
 
         if (chain)
             value += ChainMember[f][relative_rank(Us, s)]
-                  +  ChainDistBonus * std::max(4 - square_distance(s, pos.king_square(Them)), 0);
+                  +  ChainDistBonus * std::max(5 - square_distance(s, pos.king_square(Them)), 0);
 
         if (candidate)
         {
