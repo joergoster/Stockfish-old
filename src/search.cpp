@@ -596,6 +596,7 @@ namespace {
     if (   !PvNode
         && !ss->skipNullMove
         &&  depth < 7 * ONE_PLY
+        && !ttMove
         &&  eval - futility_margin(depth) >= beta
         &&  abs(beta) < VALUE_MATE_IN_MAX_PLY
         &&  abs(eval) < VALUE_KNOWN_WIN
