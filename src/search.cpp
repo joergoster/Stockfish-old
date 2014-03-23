@@ -66,7 +66,7 @@ namespace {
   int FutilityMoveCounts[2][32]; // [improving][depth]
 
   inline Value futility_margin(Depth d) {
-    return Value(100 * int(d));
+    return Value(110 * int(d));
   }
 
   // Reduction lookup tables (initialized at startup) and their access function
@@ -595,7 +595,6 @@ namespace {
     if (   !PvNode
         && !ss->skipNullMove
         &&  depth < 7 * ONE_PLY
-        && !ttMove
         &&  eval - futility_margin(depth) >= beta
         &&  abs(beta) < VALUE_MATE_IN_MAX_PLY
         &&  abs(eval) < VALUE_KNOWN_WIN
