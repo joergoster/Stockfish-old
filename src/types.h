@@ -322,11 +322,11 @@ extern Value PieceValue[PHASE_NB][PIECE_NB];
 
 struct ExtMove {
   Move move;
-  int score;
+  Value value;
 };
 
 inline bool operator<(const ExtMove& f, const ExtMove& s) {
-  return f.score < s.score;
+  return f.value < s.value;
 }
 
 inline Color operator~(Color c) {
@@ -335,10 +335,6 @@ inline Color operator~(Color c) {
 
 inline Square operator~(Square s) {
   return Square(s ^ SQ_A8); // Vertical flip SQ_A1 -> SQ_A8
-}
-
-inline Square operator|(File f, Rank r) {
-  return Square((r << 3) | f);
 }
 
 inline CastlingRight operator|(Color c, CastlingSide s) {
@@ -351,6 +347,10 @@ inline Value mate_in(int ply) {
 
 inline Value mated_in(int ply) {
   return -VALUE_MATE + ply;
+}
+
+inline Square make_square(File f, Rank r) {
+  return Square((r << 3) | f);
 }
 
 inline Piece make_piece(Color c, PieceType pt) {
