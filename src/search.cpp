@@ -781,7 +781,7 @@ moves_loop: // When in check and at SpNode search starts from here
       {
           assert(ttValue != VALUE_NONE);
 
-          Value rBeta = ttValue - 2 * int(depth);
+          Value rBeta = ttValue - 3 * int(depth);
           ss->excludedMove = move;
           ss->skipNullMove = true;
           value = search<NonPV>(pos, ss, rBeta - 1, rBeta, depth / 2, cutNode);
