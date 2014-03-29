@@ -173,11 +173,16 @@ namespace {
   const Score UndefendedMinor  = make_score(25, 10);
   const Score TrappedRook      = make_score(90,  0);
   const Score Unstoppable      = make_score( 0, 20);
+  const Score PawnsOnBothWings = make_score( 0, 20);
 
   // Penalty for a bishop on a1/h1 (a8/h8 for black) which is trapped by
   // a friendly pawn on b2/g2 (b7/g7 for black). This can obviously only
   // happen in Chess960 games.
   const Score TrappedBishopA1H1 = make_score(50, 50);
+
+  // Bitboards to check for pawns on both wings
+  const Bitboard LeftWing  = FileABB | FileBBB | FileCBB;
+  const Bitboard RightWing = FileFBB | FileGBB | FileHBB;
 
   // SpaceMask[Color] contains the area of the board which is considered
   // by the space evaluation. In the middlegame, each side is given a bonus
@@ -462,6 +467,7 @@ Value do_evaluate(const Position& pos) {
 
     const Color Them = (Us == WHITE ? BLACK : WHITE);
     const Square* pl = pos.list<Pt>(Us);
+    bool pawns_on_both_wings = pos.pieces(PAWN) & LeftWing && pos.pieces(PAWN) & RightWing;
 
     ei.attackedBy[Us][Pt] = 0;
 
@@ -501,6 +507,13 @@ Value do_evaluate(const Position& pos) {
             // Penalty for bishop with same colored pawns
             if (Pt == BISHOP)
                 score -= BishopPawns * ei.pi->pawns_on_same_color_squares(Us, s);
+
+            // Endgame bonus for bishop with pawns on both wings
+            if (   Pt == BISHOP
+                && pos.non_pawn_material(Us  ) == BishopValueMg
+                && pos.non_pawn_material(Them) == KnightValueMg
+                && pawns_on_both_wings)
+                score += PawnsOnBothWings;
 
             // Penalty for knight when there are few enemy pawns
             if (Pt == KNIGHT)
