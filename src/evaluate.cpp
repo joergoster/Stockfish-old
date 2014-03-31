@@ -173,7 +173,7 @@ namespace {
   const Score UndefendedMinor  = make_score(25, 10);
   const Score TrappedRook      = make_score(90,  0);
   const Score Unstoppable      = make_score( 0, 20);
-  const Score PawnsOnBothWings = make_score( 0, 30);
+  const Score PawnsOnBothWings = make_score( 0, 40);
 
   // Penalty for a bishop on a1/h1 (a8/h8 for black) which is trapped by
   // a friendly pawn on b2/g2 (b7/g7 for black). This can obviously only
@@ -508,12 +508,10 @@ Value do_evaluate(const Position& pos) {
             if (Pt == BISHOP)
                 score -= BishopPawns * ei.pi->pawns_on_same_color_squares(Us, s);
 
-            // Endgame bonus for bishop vs. knight and pawns on both wings
+            // Endgame bonus for bishop vs. knight with pawns on both wings
             if (   Pt == BISHOP
-                && pos.non_pawn_material(Us  ) <= BishopValueMg + RookValueMg
-                && pos.count<BISHOP>(Us) == 1
-                && pos.non_pawn_material(Them) <= KnightValueMg + RookValueMg
-                && pos.count<KNIGHT>(Them) == 1
+                && pos.non_pawn_material(Us  ) == BishopValueMg
+                && pos.non_pawn_material(Them) == KnightValueMg
                 && pawns_on_both_wings)
                 score += PawnsOnBothWings;
 
