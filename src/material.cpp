@@ -119,11 +119,15 @@ namespace {
     // Queen vs. 3 minors slightly favours the minors
     if (pieceCount[Us][QUEEN] == 1 && pieceCount[Them][QUEEN] == 0)
     {
-        int n = pieceCount[Them][KNIGHT] - pieceCount[Us][KNIGHT];
-        int b = pieceCount[Them][BISHOP] - pieceCount[Us][BISHOP];
+        int n = pieceCount[Them][KNIGHT] - pieceCount[Us][KNIGHT],
+            b = pieceCount[Them][BISHOP] - pieceCount[Us][BISHOP],
+            r = pieceCount[Them][ROOK  ] - pieceCount[Us][ROOK  ];
 
         if ((n == 2 && b == 1) || (n == 1 && b == 2))
             value -= 66 * 16;
+
+        if (r == 1 && n + b == 2)
+            value -= 88 * 16;
     }
 
     return value;
