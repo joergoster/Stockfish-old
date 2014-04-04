@@ -172,7 +172,7 @@ namespace {
   const Score MinorBehindPawn  = make_score(16,  0);
   const Score UndefendedMinor  = make_score(25, 10);
   const Score TrappedRook      = make_score(90,  0);
-  const Score LowMobPenalty    = make_score(30, 15);
+  const Score LowMobPenalty    = make_score(14,  7);
   const Score Unstoppable      = make_score( 0, 20);
 
   // Penalty for a bishop on a1/h1 (a8/h8 for black) which is trapped by
@@ -505,9 +505,9 @@ Value do_evaluate(const Position& pos) {
             if (Pt == KNIGHT)
                 score -= KnightPawns * std::max(5 - pos.count<PAWN>(Them), 0);
 
-            // Penalty for knight on the edge and zero mobility
+            // Penalty for knight on the edge and low mobility
             if (Pt == KNIGHT
-                && mob == 0
+                && mob <= 1
                 && (file_of(s) == FILE_A || file_of(s) == FILE_H))
                 score -= LowMobPenalty;
 
