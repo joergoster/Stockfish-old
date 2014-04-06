@@ -127,7 +127,7 @@ namespace {
             value -= 66 * 16;
 
         if (r == 1 && n + b == 2)
-            value -= 44 * 16;
+            value -= 132 * 16;
     }
 
     return value;
