@@ -461,6 +461,7 @@ Value do_evaluate(const Position& pos) {
 
     const Color Them = (Us == WHITE ? BLACK : WHITE);
     const Square* pl = pos.list<Pt>(Us);
+    const Bitboard rim = Rank1BB | Rank8BB | FileABB | FileHBB;
 
     ei.attackedBy[Us][Pt] = 0;
 
@@ -508,7 +509,7 @@ Value do_evaluate(const Position& pos) {
             // Penalty for knight on the edge and low mobility
             if (Pt == KNIGHT
                 && mob <= 1
-                && (file_of(s) == FILE_A || file_of(s) == FILE_H))
+                && rim & s)
                 score -= LowMobPenalty;
 
             // Bishop and knight outposts squares
