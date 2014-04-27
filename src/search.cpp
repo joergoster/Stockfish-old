@@ -464,7 +464,7 @@ namespace {
     SplitPoint* splitPoint;
     Key posKey;
     Move ttMove, move, excludedMove, bestMove;
-    Depth ext, newDepth, predictedDepth;
+    Depth ext, newDepth, predictedDepth, dynMSD;
     Value bestValue, value, ttValue, eval, nullValue, futilityValue;
     bool inCheck, givesCheck, pvMove, singularExtensionNode, improving;
     bool captureOrPromotion, dangerous, doFullDepthSearch;
@@ -989,11 +989,10 @@ moves_loop: // When in check and at SpNode search starts from here
       }
 
       // Step 19. Check for splitting the search
-      Depth dyn_msd = double(Material::game_phase(pos) / PHASE_MIDGAME) < 0.2 ? 2 * ONE_PLY : 
-                      double(Material::game_phase(pos) / PHASE_MIDGAME) < 0.4 ? ONE_PLY : DEPTH_ZERO;
+      dynMSD = Material::game_phase(pos) < PHASE_MIDGAME / 4 ? 2 * ONE_PLY : DEPTH_ZERO;
 
       if (   !SpNode
-          &&  depth >= Threads.minimumSplitDepth + dyn_msd
+          &&  depth >= Threads.minimumSplitDepth + dynMSD
           &&  Threads.available_slave(thisThread)
           &&  thisThread->splitPointsSize < MAX_SPLITPOINTS_PER_THREAD)
       {
