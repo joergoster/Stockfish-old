@@ -267,27 +267,29 @@ enum Score {
   SCORE_ENSURE_INTEGER_SIZE_N = INT_MIN
 };
 
-inline Score make_score(int mg, int eg) { return Score((mg << 16) + eg); }
+typedef union {
+  uint32_t full;
+  struct { int16_t eg, mg; } half;
+} ScoreView;
 
-/// Extracting the signed lower and upper 16 bits is not so trivial because
-/// according to the standard a simple cast to short is implementation defined
-/// and so is a right shift of a signed integer.
-inline Value mg_value(Score s) { return Value(((s + 0x8000) & ~0xffff) / 0x10000); }
-
-/// On Intel 64 bit we have a small speed regression with the standard conforming
-/// version. Therefore, in this case we use faster code that, although not 100%
-/// standard compliant, seems to work for Intel and MSVC.
-#if defined(IS_64BIT) && (!defined(__GNUC__) || defined(__INTEL_COMPILER))
-
-inline Value eg_value(Score s) { return Value(int16_t(s & 0xFFFF)); }
-
-#else
-
-inline Value eg_value(Score s) {
-  return Value((int)(unsigned(s) & 0x7FFFU) - (int)(unsigned(s) & 0x8000U));
+inline Score make_score(int mg, int eg) {
+  ScoreView v;
+  v.half.mg = (int16_t)mg - (uint16_t(eg) >> 15);
+  v.half.eg = (int16_t)eg;
+  return Score(v.full);
 }
 
-#endif
+inline Value mg_value(Score s) {
+  ScoreView v;
+  v.full = s;
+  return Value(v.half.mg + (uint16_t(v.half.eg) >> 15));
+}
+
+inline Value eg_value(Score s) {
+  ScoreView v;
+  v.full = s;
+  return Value(v.half.eg);
+}
 
 #define ENABLE_BASE_OPERATORS_ON(T)                                         \
 inline T operator+(const T d1, const T d2) { return T(int(d1) + int(d2)); } \

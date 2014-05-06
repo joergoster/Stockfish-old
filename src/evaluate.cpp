@@ -17,10 +17,10 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <algorithm>
 #include <cassert>
 #include <iomanip>
 #include <sstream>
-#include <algorithm>
 
 #include "bitcount.h"
 #include "evaluate.h"
@@ -158,6 +158,9 @@ namespace {
     S(0, 0), S(0, 0), S(56, 70), S(56, 70), S(76, 99), S(86, 118)
   };
 
+  // Hanging[side to move] contains a bonus for each enemy hanging piece
+  const Score Hanging[2] = { S(23, 20) , S(35, 45) };
+
   #undef S
 
   const Score Tempo            = make_score(24, 11);
@@ -219,20 +222,6 @@ namespace {
     Weight w = { Options[mgOpt] * mg_value(internalWeight) / 100,
                  Options[egOpt] * eg_value(internalWeight) / 100 };
     return w;
-  }
-
-
-  // interpolate() interpolates between a middlegame and an endgame score,
-  // based on game phase. It also scales the return value by a ScaleFactor array.
-
-  Value interpolate(const Score& v, Phase ph, ScaleFactor sf) {
-
-    assert(-VALUE_INFINITE < mg_value(v) && mg_value(v) < VALUE_INFINITE);
-    assert(-VALUE_INFINITE < eg_value(v) && eg_value(v) < VALUE_INFINITE);
-    assert(PHASE_ENDGAME <= ph && ph <= PHASE_MIDGAME);
-
-    int eg = (eg_value(v) * int(sf)) / SCALE_FACTOR_NORMAL;
-    return Value((mg_value(v) * int(ph) + eg * int(PHASE_MIDGAME - ph)) / PHASE_MIDGAME);
   }
 
 
@@ -541,7 +530,7 @@ namespace {
     if (undefendedMinors)
         score += UndefendedMinor;
 
-    // Enemy pieces not defended by a pawn and under our attack
+    // Enemies not defended by a pawn and under our attack
     weakEnemies =  pos.pieces(Them)
                  & ~ei.attackedBy[Them][PAWN]
                  & ei.attackedBy[Us][ALL_PIECES];
@@ -549,13 +538,18 @@ namespace {
     // Add a bonus according if the attacking pieces are minor or major
     if (weakEnemies)
     {
-        b = weakEnemies & (ei.attackedBy[Us][KNIGHT] | ei.attackedBy[Us][BISHOP]);
+        b = weakEnemies & (ei.attackedBy[Us][PAWN] | ei.attackedBy[Us][KNIGHT] | ei.attackedBy[Us][BISHOP]);
         if (b)
             score += Threat[0][type_of(pos.piece_on(lsb(b)))];
 
         b = weakEnemies & (ei.attackedBy[Us][ROOK] | ei.attackedBy[Us][QUEEN]);
         if (b)
             score += Threat[1][type_of(pos.piece_on(lsb(b)))];
+
+        b = weakEnemies & ~ei.attackedBy[Them][ALL_PIECES];
+        if (b)
+            score += more_than_one(b) ? Hanging[Us != pos.side_to_move()] * popcount<Max15>(b)
+                                      : Hanging[Us == pos.side_to_move()];
     }
 
     if (Trace)
@@ -734,7 +728,7 @@ namespace {
     ei.attackedBy[WHITE][ALL_PIECES] |= ei.attackedBy[WHITE][KING];
     ei.attackedBy[BLACK][ALL_PIECES] |= ei.attackedBy[BLACK][KING];
 
-    // Do not include in mobility squares protected by enemy pawns or occupied by our pieces
+    // Do not include in mobility squares protected by enemy pawns or occupied by our pawns or king
     Bitboard mobilityArea[] = { ~(ei.attackedBy[BLACK][PAWN] | pos.pieces(WHITE, PAWN, KING)),
                                 ~(ei.attackedBy[WHITE][PAWN] | pos.pieces(BLACK, PAWN, KING)) };
 
@@ -793,7 +787,11 @@ namespace {
              sf = ScaleFactor(50 * sf / SCALE_FACTOR_NORMAL);
     }
 
-    Value v = interpolate(score, ei.mi->game_phase(), sf);
+    // Interpolate between a middlegame and a (scaled by 'sf') endgame score
+    Value v =  mg_value(score) * int(ei.mi->game_phase())
+             + eg_value(score) * int(PHASE_MIDGAME - ei.mi->game_phase()) * sf / SCALE_FACTOR_NORMAL;
+
+    v /= int(PHASE_MIDGAME);
 
     // In case of tracing add all single evaluation contributions for both white and black
     if (Trace)
