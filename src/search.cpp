@@ -80,6 +80,7 @@ namespace {
   size_t MultiPV, PVIdx;
   TimeManager TimeMgr;
   double BestMoveChanges;
+  Depth dynMSD;
   Value DrawValue[COLOR_NB];
   HistoryStats History;
   GainsStats Gains;
@@ -184,6 +185,9 @@ void Search::think() {
 
   RootColor = RootPos.side_to_move();
   TimeMgr.init(Limits, RootPos.game_ply(), RootColor);
+
+  dynMSD = Material::game_phase(RootPos) < PHASE_MIDGAME / 5 ? 2 * ONE_PLY : 
+           Material::game_phase(RootPos) < 2 * PHASE_MIDGAME / 5 ? ONE_PLY : DEPTH_ZERO;
 
   int cf = Options["Contempt Factor"] * PawnValueEg / 100; // From centipawns
   DrawValue[ RootColor] = VALUE_DRAW - Value(cf);
@@ -983,9 +987,6 @@ moves_loop: // When in check and at SpNode search starts from here
       }
 
       // Step 19. Check for splitting the search
-      dynMSD = pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) <= 2 * BishopValueMg ? 2 * ONE_PLY : 
-               pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) <= 3 * RookValueMg + 2 * BishopValueMg ? ONE_PLY : DEPTH_ZERO;
-
       if (   !SpNode
           &&  depth >= Threads.minimumSplitDepth + dynMSD
           &&  Threads.available_slave(thisThread)
