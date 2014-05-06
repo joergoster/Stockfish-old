@@ -25,6 +25,7 @@
 #include <iostream>
 #include <sstream>
 
+#include "bitcount.h"
 #include "book.h"
 #include "evaluate.h"
 #include "movegen.h"
@@ -983,7 +984,8 @@ moves_loop: // When in check and at SpNode search starts from here
       }
 
       // Step 19. Check for splitting the search
-      dynMSD = Material::game_phase(pos) < PHASE_MIDGAME / 4 ? 2 * ONE_PLY : DEPTH_ZERO;
+      dynMSD = popcount<Max15>(pos.pieces()) <= 10 ? 2 * ONE_PLY : 
+               popcount<Max15>(pos.pieces()) <= 16 ? ONE_PLY : DEPTH_ZERO;
 
       if (   !SpNode
           &&  depth >= Threads.minimumSplitDepth + dynMSD
