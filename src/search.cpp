@@ -985,7 +985,7 @@ moves_loop: // When in check and at SpNode search starts from here
 
       // Step 19. Check for splitting the search
       dynMSD = popcount<Max15>(pos.pieces()) <= 10 ? 2 * ONE_PLY : 
-               popcount<Max15>(pos.pieces()) <= 16 ? ONE_PLY : DEPTH_ZERO;
+               popcount<Full >(pos.pieces()) <= 16 ? ONE_PLY : DEPTH_ZERO;
 
       if (   !SpNode
           &&  depth >= Threads.minimumSplitDepth + dynMSD
