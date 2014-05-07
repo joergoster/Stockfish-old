@@ -186,7 +186,7 @@ void Search::think() {
   RootColor = RootPos.side_to_move();
   TimeMgr.init(Limits, RootPos.game_ply(), RootColor);
 
-  dynMSD = Material::game_phase(RootPos) < PHASE_MIDGAME / 5 ? 2 * ONE_PLY : DEPTH_ZERO;
+  dynMSD = Material::game_phase(RootPos) == PHASE_ENDGAME / ONE_PLY : DEPTH_ZERO;
 
   int cf = Options["Contempt Factor"] * PawnValueEg / 100; // From centipawns
   DrawValue[ RootColor] = VALUE_DRAW - Value(cf);
