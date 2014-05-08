@@ -462,7 +462,7 @@ namespace {
     SplitPoint* splitPoint;
     Key posKey;
     Move ttMove, move, excludedMove, bestMove;
-    Depth ext, newDepth, predictedDepth, dynMSD;
+    Depth ext, newDepth, predictedDepth;
     Value bestValue, value, ttValue, eval, nullValue, futilityValue;
     bool inCheck, givesCheck, pvMove, singularExtensionNode, improving;
     bool captureOrPromotion, dangerous, doFullDepthSearch;
