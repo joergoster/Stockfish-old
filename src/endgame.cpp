@@ -156,6 +156,13 @@ Value Endgame<KXK>::operator()(const Position& pos) const {
   if (pos.side_to_move() == weakSide && !MoveList<LEGAL>(pos).size())
       return VALUE_DRAW;
 
+  // Draw detection with 2 or more bishops of the same color
+  if (    more_than_one(pos.pieces(strongSide, BISHOP))
+      && !pos.bishop_pair(strongSide)
+      && !pos.pieces(strongSide, ROOK, QUEEN)  // to avoid
+      && !pos.pieces(strongSide, KNIGHT))      // false positives!
+      return VALUE_DRAW;
+
   Square winnerKSq = pos.king_square(strongSide);
   Square loserKSq = pos.king_square(weakSide);
 
