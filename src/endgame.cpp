@@ -280,15 +280,25 @@ Value Endgame<KRKP>::operator()(const Position& pos) const {
 }
 
 
-/// KR vs KB. This is very simple, and always returns drawish scores.  The
-/// score is slightly bigger when the defending king is close to the edge.
+/// KR vs KB. This is very simple, and always returns drawish scores.
+/// The score is slightly bigger when the defending king is driven 
+/// toward the corner square of the same color as the bishop square.
 template<>
 Value Endgame<KRKB>::operator()(const Position& pos) const {
 
   assert(verify_material(pos, strongSide, RookValueMg, 0));
   assert(verify_material(pos, weakSide, BishopValueMg, 0));
 
-  Value result = Value(PushToEdges[pos.king_square(weakSide)]);
+  Square loserKSq = pos.king_square(weakSide);
+  Square bishopSq = pos.list<BISHOP>(weakSide)[0];
+
+  // We also use the kbnk_mate_table() here, trying to drive the 
+  // defending king toward a corner of the color of the bishop square.
+  // That's the only tiny chance to win this endgame.
+  if (opposite_colors(bishopSq, SQ_A1))
+      loserKSq  = ~loserKSq;
+
+  Value result = Value(PushToCorners[loserKSq]);
   return strongSide == pos.side_to_move() ? result : -result;
 }
 
