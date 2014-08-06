@@ -1127,8 +1127,7 @@ Value Position::see(Move m) const {
 bool Position::is_draw() const {
 
   if (   !pieces(PAWN)
-      && non_pawn_material(WHITE) <= BishopValueMg     // Extend to some trivial draws, where both sides
-      && non_pawn_material(BLACK) <= BishopValueMg)    // don't have sufficient mating material.
+      && (non_pawn_material(WHITE) + non_pawn_material(BLACK) <= BishopValueMg)) 
       return true;
 
   if (st->rule50 > 99 && (!checkers() || MoveList<LEGAL>(*this).size()))
