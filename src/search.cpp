@@ -76,6 +76,7 @@ namespace {
 
   size_t PVIdx;
   TimeManager TimeMgr;
+  bool null_disabled;
   double BestMoveChanges;
   Value DrawValue[COLOR_NB];
   HistoryStats History;
@@ -284,6 +285,7 @@ namespace {
     Countermoves.clear();
     Followupmoves.clear();
 
+    null_disabled = Options["Disable NullMove"];
     size_t multiPV = Options["MultiPV"];
     Skill skill(Options["Skill Level"], RootMoves.size());
 
@@ -588,7 +590,8 @@ namespace {
         return eval - futility_margin(depth);
 
     // Step 8. Null move search with verification search (is omitted in PV nodes)
-    if (   !PvNode
+    if (   !null_disabled
+        && !PvNode
         && !ss->skipNullMove
         &&  depth >= 2 * ONE_PLY
         &&  eval >= beta
