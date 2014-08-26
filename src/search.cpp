@@ -605,9 +605,10 @@ namespace {
 
         assert(eval - beta >= 0);
 
-        // Null move dynamic reduction based on depth and value
-        Depth R =  3 * ONE_PLY
+        // Null move dynamic reduction based on depth, material and value
+        Depth R =  2 * ONE_PLY
                  + depth / 4
+                 + (pos.non_pawn_material(pos.side_to_move()) > BishopValueMg) * ONE_PLY
                  + (abs(beta) < VALUE_KNOWN_WIN ? int(eval - beta) / PawnValueMg * ONE_PLY
                                                 : DEPTH_ZERO);
 
