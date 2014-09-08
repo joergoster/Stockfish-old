@@ -117,6 +117,10 @@ Endgames::Endgames() {
   add<KRKN>("KRKN");
   add<KQKP>("KQKP");
   add<KQKR>("KQKR");
+  add<KQKB>("KQKB");
+  add<KQKBB>("KQKBB");
+  add<KQKN>("KQKN");
+  add<KQKNN>("KQKNN");
   add<KBBKN>("KBBKN");
 
   add<KNPK>("KNPK");
@@ -299,21 +303,25 @@ Value Endgame<KRKB>::operator()(const Position& pos) const {
       loserKSq  = ~loserKSq;
 
   Value result = Value(PushToCorners[loserKSq]);
+
   return strongSide == pos.side_to_move() ? result : -result;
 }
 
 
 /// KR vs KN. The attacking side has slightly better winning chances than
-/// in KR vs KB, particularly if the king and the knight are far apart.
+/// in KR vs KB, if the king and the knight are far apart.
 template<>
 Value Endgame<KRKN>::operator()(const Position& pos) const {
 
   assert(verify_material(pos, strongSide, RookValueMg, 0));
   assert(verify_material(pos, weakSide, KnightValueMg, 0));
 
-  Square bksq = pos.king_square(weakSide);
-  Square bnsq = pos.list<KNIGHT>(weakSide)[0];
-  Value result = Value(PushToEdges[bksq] + PushAway[square_distance(bksq, bnsq)]);
+  Square loserKSq = pos.king_square(weakSide);
+  Square knightSq = pos.list<KNIGHT>(weakSide)[0];
+
+  Value result =  Value(PushToEdges[loserKSq]
+                + PushAway[square_distance(loserKSq, knightSq)]);
+
   return strongSide == pos.side_to_move() ? result : -result;
 }
 
@@ -343,7 +351,7 @@ Value Endgame<KQKP>::operator()(const Position& pos) const {
 }
 
 
-/// KQ vs KR.  This is almost identical to KX vs K:  We give the attacking
+/// KQ vs KR.  This is almost always a win.  We give the attacking
 /// king a bonus for having the kings close together, and for forcing the
 /// defending king towards the edge. If we also take care to avoid null move for
 /// the defending side in the search, this is usually sufficient to win KQ vs KR.
@@ -356,8 +364,7 @@ Value Endgame<KQKR>::operator()(const Position& pos) const {
   Square winnerKSq = pos.king_square(strongSide);
   Square loserKSq = pos.king_square(weakSide);
 
-  Value result =  QueenValueEg
-                - RookValueEg
+  Value result =  VALUE_KNOWN_WIN / 2
                 + PushToEdges[loserKSq]
                 + PushClose[square_distance(winnerKSq, loserKSq)];
 
@@ -365,8 +372,84 @@ Value Endgame<KQKR>::operator()(const Position& pos) const {
 }
 
 
+/// KQ vs KB.  This is always a win.
+template<>
+Value Endgame<KQKB>::operator()(const Position& pos) const {
+
+  assert(verify_material(pos, strongSide, QueenValueMg, 0));
+  assert(verify_material(pos, weakSide, BishopValueMg, 0));
+
+  Square winnerKSq = pos.king_square(strongSide);
+  Square loserKSq = pos.king_square(weakSide);
+
+  Value result =  VALUE_KNOWN_WIN
+                + PushToEdges[loserKSq]
+                + PushClose[square_distance(winnerKSq, loserKSq)];
+
+  return strongSide == pos.side_to_move() ? result : -result;
+}
+
+
+/// KQ vs KBB.  This is an easy win, if the bishops are on the same color,
+/// but most often takes more than 50 moves in case of the bishop pair.
+template<>
+Value Endgame<KQKBB>::operator()(const Position& pos) const {
+
+  assert(verify_material(pos, strongSide, QueenValueMg, 0));
+  assert(verify_material(pos, weakSide, 2 * BishopValueMg, 0));
+
+  Square loserKSq = pos.king_square(weakSide);
+
+  Value result =  pos.bishop_pair(weakSide) ? 2 * PawnValueEg : VALUE_KNOWN_WIN
+                + PushToEdges[loserKSq];
+
+  return strongSide == pos.side_to_move() ? result : -result;
+}
+
+
+/// KQ vs KN.  This is always a win.
+template<>
+Value Endgame<KQKN>::operator()(const Position& pos) const {
+
+  assert(verify_material(pos, strongSide, QueenValueMg, 0));
+  assert(verify_material(pos, weakSide, KnightValueMg, 0));
+
+  Square winnerKSq = pos.king_square(strongSide);
+  Square loserKSq = pos.king_square(weakSide);
+  Square knightSq = pos.list<KNIGHT>(weakSide)[0];
+
+  Value result =  VALUE_KNOWN_WIN
+                + PushToEdges[loserKSq]
+                + PushClose[square_distance(winnerKSq, loserKSq)]
+                + PushAway[square_distance(knightSq, loserKSq)];
+
+  return strongSide == pos.side_to_move() ? result : -result;
+}
+
+
+/// KQ vs KNN.  This is very drawish, but the stronger side has
+/// good winning chances, if the knights and their king are far apart.
+template<>
+Value Endgame<KQKNN>::operator()(const Position& pos) const {
+
+  assert(verify_material(pos, strongSide, QueenValueMg, 0));
+  assert(verify_material(pos, weakSide, 2 * KnightValueMg, 0));
+
+  Square loserKSq = pos.king_square(weakSide);
+  Square knight1Sq = pos.list<KNIGHT>(weakSide)[0];
+  Square knight2Sq = pos.list<KNIGHT>(weakSide)[1];
+
+  Value result =  VALUE_DRAW
+                + 4 * PushAway[square_distance(knight1Sq, loserKSq)]
+                + 4 * PushAway[square_distance(knight2Sq, loserKSq)]
+                + 6 * PushAway[square_distance(knight1Sq, knight2Sq)];
+
+  return strongSide == pos.side_to_move() ? result : -result;
+}
+
+
 /// KBB vs KN. This is almost always a win, but many wins require more
-/// than 50 moves. For this reason we assign a bonus of 3 pawns only. 
+/// than 50 moves. For this reason we assign a bonus of 2 pawns only. 
 /// To win in this type of endgame, we try to push the enemy king to a corner
 /// and away from his knight. For a reference of this difficult endgame see:
 /// en.wikipedia.org/wiki/Chess_endgame#Effect_of_tablebases_on_endgame_theory
@@ -380,7 +463,7 @@ Value Endgame<KBBKN>::operator()(const Position& pos) const {
   Square loserKSq = pos.king_square(weakSide);
   Square knightSq = pos.list<KNIGHT>(weakSide)[0];
 
-  Value result =  pos.bishop_pair(strongSide) ? 3 * PawnValueMg
+  Value result =  pos.bishop_pair(strongSide) ? 2 * PawnValueEg
                 + PushToCorners[loserKSq]
                 + PushClose[square_distance(winnerKSq, loserKSq)]
                 + PushAway[square_distance(loserKSq, knightSq)]
