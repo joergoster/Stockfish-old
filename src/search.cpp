@@ -19,7 +19,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cfloat>
 #include <cmath>
 #include <cstring>
 #include <iostream>
@@ -205,18 +204,6 @@ void Search::think() {
       goto finalize;
   }
 
-  if (Options["Write Search Log"])
-  {
-      Log log(Options["Search Log Filename"]);
-      log << "\nSearching: "  << RootPos.fen()
-          << "\ninfinite: "   << Limits.infinite
-          << " ponder: "      << Limits.ponder
-          << " time: "        << Limits.time[RootPos.side_to_move()]
-          << " increment: "   << Limits.inc[RootPos.side_to_move()]
-          << " moves to go: " << Limits.movestogo
-          << "\n" << std::endl;
-  }
-
   // Reset the threads, still sleeping: will wake up at split time
   for (size_t i = 0; i < Threads.size(); ++i)
       Threads[i]->maxPly = 0;
@@ -227,18 +214,6 @@ void Search::think() {
   id_loop(RootPos); // Let's start searching !
 
   Threads.timer->run = false; // Stop the timer
-
-  if (Options["Write Search Log"])
-  {
-      Time::point elapsed = Time::now() - SearchTime + 1;
-
-      Log log(Options["Search Log Filename"]);
-      log << "Nodes: "          << RootPos.nodes_searched()
-          << "\nNodes/second: " << RootPos.nodes_searched() * 1000 / elapsed
-          << "\nBest move: "    << move_to_uci(RootMoves[0].pv[0], RootPos.is_chess960())
-          << "\nPonder move: "  << move_to_uci(RootMoves[0].pv[1], RootPos.is_chess960())
-          << std::endl;
-  }
 
 finalize:
 
@@ -381,17 +356,6 @@ namespace {
         // If skill levels are enabled and time is up, pick a sub-optimal best move
         if (skill.candidates_size() && skill.time_to_pick(depth))
             skill.pick_move();
-
-        if (Options["Write Search Log"])
-        {
-            RootMove& rm = RootMoves[0];
-            if (skill.best != MOVE_NONE)
-                rm = *std::find(RootMoves.begin(), RootMoves.end(), skill.best);
-
-            Log log(Options["Search Log Filename"]);
-            log << pretty_pv(pos, depth, rm.score, Time::now() - SearchTime, &rm.pv[0])
-                << std::endl;
-        }
 
         // Have we found a "mate in x"?
         if (   Limits.mate
@@ -1465,46 +1429,13 @@ void Thread::idle_loop() {
 
   assert(!this_sp || (this_sp->masterThread == this && searching));
 
-  while (true)
+  while (!exit)
   {
-      // If we are not searching, wait for a condition to be signaled instead of
-      // wasting CPU time polling for work.
-      while (!searching || exit)
-      {
-          if (exit)
-          {
-              assert(!this_sp);
-              return;
-          }
-
-          // Grab the lock to avoid races with Thread::notify_one()
-          mutex.lock();
-
-          // If we are master and all slaves have finished then exit idle_loop
-          if (this_sp && this_sp->slavesMask.none())
-          {
-              mutex.unlock();
-              break;
-          }
-
-          // Do sleep after retesting sleep conditions under lock protection. In
-          // particular we need to avoid a deadlock in case a master thread has,
-          // in the meanwhile, allocated us and sent the notify_one() call before
-          // we had the chance to grab the lock.
-          if (!searching && !exit)
-              sleepCondition.wait(mutex);
-
-          mutex.unlock();
-      }
-
       // If this thread has been assigned work, launch a search
-      if (searching)
+      while (searching)
       {
-          assert(!exit);
-
           Threads.mutex.lock();
 
-          assert(searching);
           assert(activeSplitPoint);
           SplitPoint* sp = activeSplitPoint;
 
@@ -1588,16 +1519,23 @@ void Thread::idle_loop() {
               }
       }
 
-      // If this thread is the master of a split point and all slaves have finished
-      // their work at this split point, return from the idle loop.
+      // Grab the lock to avoid races with Thread::notify_one()
+      mutex.lock();
+
+      // If we are master and all slaves have finished then exit idle_loop
       if (this_sp && this_sp->slavesMask.none())
       {
-          this_sp->mutex.lock();
-          bool finished = this_sp->slavesMask.none(); // Retest under lock protection
-          this_sp->mutex.unlock();
-          if (finished)
-              return;
+          assert(!searching);
+          mutex.unlock();
+          break;
       }
+
+      // If we are not searching, wait for a condition to be signaled instead of
+      // wasting CPU time polling for work.
+      if (!searching && !exit)
+          sleepCondition.wait(mutex);
+
+      mutex.unlock();
   }
 }
 
