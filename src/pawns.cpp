@@ -70,7 +70,7 @@ namespace {
 
   // Weakness of our pawn shelter in front of the king indexed by [rank]
   const Value ShelterWeakness[RANK_NB] =
-  { V(100), V(0), V(27), V(73), V(92), V(101), V(101) };
+  { V(-10), V(-150), V(-115), V(-17), V(-13), V(21), V(0) };
 
   // Danger of enemy pawns moving toward our king indexed by
   // [no friendly pawn | pawn unblocked | pawn blocked][rank of enemy pawn]
