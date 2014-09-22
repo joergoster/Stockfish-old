@@ -502,7 +502,7 @@ ScaleFactor Endgame<KBPsK>::operator()(const Position& pos) const {
       Square kingSq = pos.king_square(weakSide);
 
       if (   opposite_colors(queeningSq, bishopSq)
-          && square_distance(queeningSq, kingSq) <= 1)
+          && square_distance(queeningSq, kingSq) <= 1 + (weakSide == pos.side_to_move()))
           return SCALE_FACTOR_DRAW;
   }
 
