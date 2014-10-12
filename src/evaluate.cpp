@@ -890,8 +890,8 @@ namespace Eval {
 
   void init() {
 
-    const double MaxSlope = 30;
-    const double Peak = 1280;
+    const double MaxSlope = 149;
+    const double Peak = 984;
 
     for (int t = 0, i = 1; i < 100; ++i)
     {
