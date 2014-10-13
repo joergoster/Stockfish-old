@@ -694,7 +694,7 @@ namespace {
     // If we have a specialized evaluation function for the current material
     // configuration, call it and return.
     if (ei.mi->specialized_eval_exists())
-        return ei.mi->evaluate(pos) + Eval::Tempo;
+        return ei.mi->evaluate(pos); // + Eval::Tempo;
 
     // Probe the pawn hash table
     ei.pi = Pawns::probe(pos, thisThread->pawnsTable);
@@ -794,7 +794,7 @@ namespace {
         Tracing::sf = sf;
     }
 
-    return (pos.side_to_move() == WHITE ? v : -v) + Eval::Tempo;
+    return (pos.side_to_move() == WHITE ? v : -v) + (pos.game_phase() > PHASE_ENDGAME ? Eval::Tempo : 0);
   }
 
 
