@@ -492,18 +492,36 @@ ScaleFactor Endgame<KBPsK>::operator()(const Position& pos) const {
 
   Bitboard pawns = pos.pieces(strongSide, PAWN);
   File pawnFile = file_of(pos.list<PAWN>(strongSide)[0]);
+  Square frontPawn = frontmost_sq(strongSide, pawns);
 
-  // All pawns are on a single rook file ?
+  // All pawns are on a single rook file and no enemy pawns 
+  // on the adjacent files in front of us?
   if (    (pawnFile == FILE_A || pawnFile == FILE_H)
-      && !(pawns & ~file_bb(pawnFile)))
+      && !(pawns & ~file_bb(pawnFile))
+      && !(pawn_attack_span(strongSide, frontPawn) & pos.pieces(weakSide, PAWN)))
   {
       Square bishopSq = pos.list<BISHOP>(strongSide)[0];
       Square queeningSq = relative_square(strongSide, make_square(pawnFile, RANK_8));
-      Square kingSq = pos.king_square(weakSide);
+      Square loserKSq = pos.king_square(weakSide);
 
-      if (   opposite_colors(queeningSq, bishopSq)
-          && square_distance(queeningSq, kingSq) <= 1)
+      if (opposite_colors(queeningSq, bishopSq))
+      {
+          if (square_distance(queeningSq, loserKSq) <= 1)
           return SCALE_FACTOR_DRAW;
+
+          Square winnerKSq = pos.king_square(strongSide);
+          Square b8g8Sq = pawnFile == FILE_A ? relative_square(strongSide, SQ_B8)
+                                             : relative_square(strongSide, SQ_G8);
+          int tempo = (pos.side_to_move() == weakSide);
+          int threat = pos.attacks_from<BISHOP>(b8g8Sq) & bishopSq;
+
+          if (   square_distance(queeningSq, loserKSq) - tempo
+              <= square_distance(queeningSq, frontPawn)
+              - (relative_rank(strongSide, frontPawn) == RANK_6)
+              && square_distance(queeningSq, loserKSq) + threat 
+               < square_distance(queeningSq, winnerKSq))
+          return SCALE_FACTOR_DRAW;
+       }
   }
 
   // If all the pawns are on the same B or G file, then it's potentially a draw
