@@ -24,7 +24,6 @@
 #include "bitcount.h"
 #include "pawns.h"
 #include "position.h"
-#include "ucioption.h"
 
 namespace {
 
@@ -70,10 +69,10 @@ namespace {
 
   // Danger of enemy pawns moving toward our king indexed by
   // [no friendly pawn | pawn unblocked | pawn blocked][rank of enemy pawn]
-        Value StormDanger[][RANK_NB] = {
-  { V( 0),  V(64), V(128), V(51), V(26) },
-  { V(26),  V(32), V( 96), V(38), V(20) },
-  { V( 0),  V( 0), V(160), V(25), V(13) } };
+  const Value StormDanger[][RANK_NB] = {
+  { V( 0),  V(84), V(136), V(55), V(14) },
+  { V(14),  V( 8), V( 83), V(50), V(31) },
+  { V( 0),  V( 0), V(148), V(20), V( 6) } };
 
   // Max bonus for king safety. Corresponds to start position with all the pawns
   // in front of the king and no enemy pawn on the horizon.
@@ -210,19 +209,6 @@ void init()
               int bonus = Seed[r] + (phalanx ? (Seed[r + 1] - Seed[r]) / 2 : 0);
               Connected[opposed][phalanx][r] = make_score(bonus / 2, bonus >> opposed);
           }
-
-  StormDanger[0][RANK_2] = VALUE_ZERO + Options["sd02"];
-  StormDanger[0][RANK_3] = VALUE_ZERO + Options["sd03"];
-  StormDanger[0][RANK_4] = VALUE_ZERO + Options["sd04"];
-  StormDanger[0][RANK_5] = VALUE_ZERO + Options["sd05"];
-  StormDanger[1][RANK_1] = VALUE_ZERO + Options["sd11"];
-  StormDanger[1][RANK_2] = VALUE_ZERO + Options["sd12"];
-  StormDanger[1][RANK_3] = VALUE_ZERO + Options["sd13"];
-  StormDanger[1][RANK_4] = VALUE_ZERO + Options["sd14"];
-  StormDanger[1][RANK_5] = VALUE_ZERO + Options["sd15"];
-  StormDanger[2][RANK_3] = VALUE_ZERO + Options["sd23"];
-  StormDanger[2][RANK_4] = VALUE_ZERO + Options["sd24"];
-  StormDanger[2][RANK_5] = VALUE_ZERO + Options["sd25"];
 }
 
 

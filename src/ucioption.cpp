@@ -37,7 +37,6 @@ namespace UCI {
 /// 'On change' actions, triggered by an option's value change
 void on_logger(const Option& o) { start_logger(o); }
 void on_eval(const Option&) { Eval::init(); }
-void on_pawns(const Option&) { Pawns::init(); }
 void on_threads(const Option&) { Threads.read_uci_options(); }
 void on_hash_size(const Option& o) { TT.resize(o); }
 void on_clear_hash(const Option&) { TT.clear(); }
@@ -68,19 +67,6 @@ void init(OptionsMap& o) {
   o["Minimum Thinking Time"] << Option(20, 0, 5000);
   o["Slow Mover"]            << Option(80, 10, 1000);
   o["UCI_Chess960"]          << Option(false);
-  // SPSA params
-  o["sd02"]                  << Option( 64, 0, 600, on_pawns);
-  o["sd03"]                  << Option(128, 0, 600, on_pawns);
-  o["sd04"]                  << Option( 51, 0, 600, on_pawns);
-  o["sd05"]                  << Option( 26, 0, 600, on_pawns);
-  o["sd11"]                  << Option( 26, 0, 600, on_pawns);
-  o["sd12"]                  << Option( 32, 0, 600, on_pawns);
-  o["sd13"]                  << Option( 96, 0, 600, on_pawns);
-  o["sd14"]                  << Option( 38, 0, 600, on_pawns);
-  o["sd15"]                  << Option( 20, 0, 600, on_pawns);
-  o["sd23"]                  << Option(160, 0, 600, on_pawns);
-  o["sd24"]                  << Option( 25, 0, 600, on_pawns);
-  o["sd25"]                  << Option( 13, 0, 600, on_pawns);
 }
 
 
