@@ -477,7 +477,7 @@ namespace {
         && tte
         && tte->depth() >= depth
         && ttValue != VALUE_NONE // Only in case of TT access race
-        && (           PvNode ?  tte->bound() == BOUND_EXACT
+        && (           PvNode ? (tte->bound() == BOUND_EXACT && ttValue != VALUE_DRAW)
             : ttValue >= beta ? (tte->bound() &  BOUND_LOWER)
                               : (tte->bound() &  BOUND_UPPER)))
     {
@@ -1044,7 +1044,7 @@ moves_loop: // When in check and at SpNode search starts from here
     if (   tte
         && tte->depth() >= ttDepth
         && ttValue != VALUE_NONE // Only in case of TT access race
-        && (           PvNode ?  tte->bound() == BOUND_EXACT
+        && (           PvNode ? (tte->bound() == BOUND_EXACT && ttValue != VALUE_DRAW)
             : ttValue >= beta ? (tte->bound() &  BOUND_LOWER)
                               : (tte->bound() &  BOUND_UPPER)))
     {
