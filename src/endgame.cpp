@@ -494,11 +494,9 @@ ScaleFactor Endgame<KBPsK>::operator()(const Position& pos) const {
   File pawnFile = file_of(pos.list<PAWN>(strongSide)[0]);
   Square frontPawn = frontmost_sq(strongSide, pawns);
 
-  // All pawns are on a single rook file and no enemy pawns 
-  // on the adjacent files in front of us?
+  // All pawns are on a single rook file ?
   if (    (pawnFile == FILE_A || pawnFile == FILE_H)
-      && !(pawns & ~file_bb(pawnFile))
-      && !(pawn_attack_span(strongSide, frontPawn) & pos.pieces(weakSide, PAWN)))
+      && !(pawns & ~file_bb(pawnFile)))
   {
       Square bishopSq = pos.list<BISHOP>(strongSide)[0];
       Square queeningSq = relative_square(strongSide, make_square(pawnFile, RANK_8));
@@ -507,7 +505,7 @@ ScaleFactor Endgame<KBPsK>::operator()(const Position& pos) const {
       if (opposite_colors(queeningSq, bishopSq))
       {
           if (square_distance(queeningSq, loserKSq) <= 1)
-          return SCALE_FACTOR_DRAW;
+          return ScaleFactor(0 + 4 * pos.count<PAWN>(weakSide));
 
           Square winnerKSq = pos.king_square(strongSide);
           Square b8g8Sq = pawnFile == FILE_A ? relative_square(strongSide, SQ_B8)
@@ -520,7 +518,7 @@ ScaleFactor Endgame<KBPsK>::operator()(const Position& pos) const {
               - (relative_rank(strongSide, frontPawn) == RANK_6)
               && square_distance(queeningSq, loserKSq) + threat 
                < square_distance(queeningSq, winnerKSq))
-          return SCALE_FACTOR_DRAW;
+          return ScaleFactor(0 + 8 * pos.count<PAWN>(weakSide));
        }
   }
 
