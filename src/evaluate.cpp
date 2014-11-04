@@ -27,7 +27,6 @@
 #include "material.h"
 #include "pawns.h"
 #include "thread.h"
-#include "ucioption.h"
 
 namespace {
 
@@ -141,8 +140,8 @@ namespace {
   // Threat[attacking][attacked] contains bonuses according to which piece
   // type attacks which one.
   const Score Threat[][PIECE_TYPE_NB] = {
-    { S(0, 0), S( 7, 39), S(24, 49), S(24, 49), S(41,100), S(41,100) }, // Minor
-    { S(0, 0), S(15, 39), S(15, 45), S(15, 45), S(15, 45), S(24, 49) }  // Major
+    { S(0, 0), S(0, 38), S(32, 45), S(32, 45), S(41,100), S(35,104) }, // Minor
+    { S(0, 0), S(7, 28), S(20, 49), S(20, 49), S(8 , 42), S(23, 44) }  // Major
   };
 
   // ThreatenedByPawn[PieceType] contains a penalty according to which piece
@@ -198,8 +197,6 @@ namespace {
   // KingDanger[attackUnits] contains the actual king danger weighted
   // scores, indexed by a calculated integer number.
   Score KingDanger[128];
-
-  const int ScalePawnSpan[2] = { 38, 56 };
 
   // apply_weight() weighs score 'v' by weight 'w' trying to prevent overflow
   Score apply_weight(Score v, const Weight& w) {
@@ -491,6 +488,22 @@ namespace {
   }
 
 
+  // max_piece_type() is a helper function used by evaluate_threats() to get
+  // the value of the biggest PieceType of color C in 'target' bitboard.
+
+  template<Color C>
+  inline PieceType max_piece_type(const Position& pos, const Bitboard target) {
+
+    assert(target & (pos.pieces(C) ^ pos.pieces(C, KING)));
+
+    for (PieceType pt = QUEEN; pt > PAWN; --pt)
+        if (target & pos.pieces(C, pt))
+            return pt;
+
+    return PAWN;
+  }
+
+
   // evaluate_threats() assigns bonuses according to the type of attacking piece
   // and the type of attacked one.
 
@@ -499,33 +512,34 @@ namespace {
 
     const Color Them = (Us == WHITE ? BLACK : WHITE);
 
-    Bitboard b, weakEnemies, protectedEnemies;
-    Score score = SCORE_ZERO;
     enum { Minor, Major };
 
-    // Protected enemies
-    protectedEnemies = (pos.pieces(Them) ^ pos.pieces(Them,PAWN))
-                      & ei.attackedBy[Them][PAWN]
+    Bitboard b, weakEnemies, protectedEnemies;
+    Score score = SCORE_ZERO;
+
+    // Enemies defended by a pawn and under our attack by a minor piece
+    protectedEnemies =  (pos.pieces(Them) ^ pos.pieces(Them, PAWN))
+                      &  ei.attackedBy[Them][PAWN]
                       & (ei.attackedBy[Us][KNIGHT] | ei.attackedBy[Us][BISHOP]);
 
     if (protectedEnemies)
-        score += Threat[Minor][type_of(pos.piece_on(lsb(protectedEnemies)))];
+        score += Threat[Minor][max_piece_type<Them>(pos, protectedEnemies)];
 
     // Enemies not defended by a pawn and under our attack
-    weakEnemies =  pos.pieces(Them)
+    weakEnemies =   pos.pieces(Them)
                  & ~ei.attackedBy[Them][PAWN]
-                 & ei.attackedBy[Us][ALL_PIECES];
+                 &  ei.attackedBy[Us][ALL_PIECES];
 
     // Add a bonus according if the attacking pieces are minor or major
     if (weakEnemies)
     {
         b = weakEnemies & (ei.attackedBy[Us][KNIGHT] | ei.attackedBy[Us][BISHOP]);
         if (b)
-            score += Threat[Minor][type_of(pos.piece_on(lsb(b)))];
+            score += Threat[Minor][max_piece_type<Them>(pos, b)];
 
         b = weakEnemies & (ei.attackedBy[Us][ROOK] | ei.attackedBy[Us][QUEEN]);
         if (b)
-            score += Threat[Major][type_of(pos.piece_on(lsb(b)))];
+            score += Threat[Major][max_piece_type<Them>(pos, b)];
 
         b = weakEnemies & ~ei.attackedBy[Them][ALL_PIECES];
         if (b)
@@ -749,27 +763,25 @@ namespace {
     if (    ei.mi->game_phase() < PHASE_MIDGAME
         && (sf == SCALE_FACTOR_NORMAL || sf == SCALE_FACTOR_ONEPAWN))
     {
-        if (pos.opposite_bishops()) {
-            // Ignoring any pawns, do both sides only have a single bishop and no
-            // other pieces?
+        if (pos.opposite_bishops())
+        {
+            // Endgame with opposite-colored bishops and no other pieces (ignoring pawns)
+            // is almost a draw, in case of KBP vs KB is even more a draw.
             if (   pos.non_pawn_material(WHITE) == BishopValueMg
                 && pos.non_pawn_material(BLACK) == BishopValueMg)
-            {
-                // Check for KBP vs KB with only a single pawn that is almost
-                // certainly a draw or at least two pawns.
-                bool one_pawn = (pos.count<PAWN>(WHITE) + pos.count<PAWN>(BLACK) == 1);
-                sf = one_pawn ? ScaleFactor(8) : ScaleFactor(32);
-            }
+                sf = more_than_one(pos.pieces(PAWN)) ? ScaleFactor(32) : ScaleFactor(8);
+
+            // Endgame with opposite-colored bishops, but also other pieces. Still
+            // a bit drawish, but not as drawish as with only the two bishops.
             else
-                // Endgame with opposite-colored bishops, but also other pieces. Still
-                // a bit drawish, but not as drawish as with only the two bishops.
                  sf = ScaleFactor(50 * sf / SCALE_FACTOR_NORMAL);
-        } else if (    abs(eg_value(score)) <= BishopValueEg
-                   &&  ei.pi->pawn_span(strongSide) <= 1
-                   && !pos.pawn_passed(~strongSide, pos.king_square(~strongSide))) {
-            // Endings where weaker side can be place his king in front of the opponent's pawns are drawish.
-            sf = ScaleFactor(ScalePawnSpan[ei.pi->pawn_span(strongSide)]);
         }
+        // Endings where weaker side can place his king in front of the opponent's
+        // pawns are drawish.
+        else if (    abs(eg_value(score)) <= BishopValueEg
+                 &&  ei.pi->pawn_span(strongSide) <= 1
+                 && !pos.pawn_passed(~strongSide, pos.king_square(~strongSide)))
+                 sf = ei.pi->pawn_span(strongSide) ? ScaleFactor(56) : ScaleFactor(38);
     }
 
     // Interpolate between a middlegame and a (scaled by 'sf') endgame score
@@ -888,8 +900,7 @@ namespace Eval {
   }
 
 
-  /// init() computes evaluation weights from the corresponding UCI parameters
-  /// and setup king tables.
+  /// init() computes evaluation weights.
 
   void init() {
 
