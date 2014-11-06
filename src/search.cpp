@@ -323,13 +323,16 @@ namespace {
                 if (bestValue <= alpha)
                 {
                     alpha = std::max(bestValue - delta, -VALUE_INFINITE);
+                    beta  = std::min(beta + delta / 6, VALUE_INFINITE);
 
                     Signals.failedLowAtRoot = true;
                     Signals.stopOnPonderhit = false;
                 }
                 else if (bestValue >= beta)
-                    beta = std::min(bestValue + delta, VALUE_INFINITE);
-
+                {
+                    beta  = std::min(bestValue + delta, VALUE_INFINITE);
+                    alpha = std::max(alpha - delta / 6, -VALUE_INFINITE);
+                }
                 else
                     break;
 
