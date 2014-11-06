@@ -62,14 +62,14 @@ namespace {
 
   // Weakness of our pawn shelter in front of the king indexed by [rank]
   const Value ShelterWeakness[RANK_NB] =
-  { V(100), V(0), V(24), V(51), V(63), V(98), V(0) };
+  { V(100), V(0), V(27), V(73), V(92), V(101), V(101) };
 
   // Danger of enemy pawns moving toward our king indexed by
   // [no friendly pawn | pawn unblocked | pawn blocked][rank of enemy pawn]
   const Value StormDanger[][RANK_NB] = {
-  { V( 0),  V(90), V(138), V(78), V(67) },
-  { V(33),  V(37), V(149), V(68), V( 9) },
-  { V( 0),  V( 0), V(152), V(20), V(26) } };
+  { V( 0),  V(64), V(129), V(57), V(27) },
+  { V(27),  V(32), V( 96), V(42), V(24) },
+  { V( 0),  V( 0), V(157), V(27), V(11) } };
 
   // Max bonus for king safety. Corresponds to start position with all the pawns
   // in front of the king and no enemy pawn on the horizon.
