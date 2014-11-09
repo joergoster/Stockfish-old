@@ -221,7 +221,7 @@ namespace {
     ei.attackedBy[Us][ALL_PIECES] = ei.attackedBy[Us][PAWN] = ei.pi->pawn_attacks(Us);
 
     // Init king safety tables only if we are going to use them
-    if (pos.non_pawn_material(Us) > QueenValueMg + PawnValueMg)
+    if (pos.non_pawn_material(Us) >= QueenValueMg)
     {
         ei.kingRing[Them] = b | shift_bb<Down>(b);
         b &= ei.attackedBy[Us][PAWN];
@@ -583,12 +583,12 @@ namespace {
             Square blockSq = s + pawn_push(Us);
 
             // Adjust bonus based on the king's proximity
-            ebonus +=  square_distance(pos.king_square(Them), blockSq) * 5 * rr
-                     - square_distance(pos.king_square(Us  ), blockSq) * 2 * rr;
+            ebonus +=  distance(pos.king_square(Them), blockSq) * 5 * rr
+                     - distance(pos.king_square(Us  ), blockSq) * 2 * rr;
 
             // If blockSq is not the queening square then consider also a second push
             if (relative_rank(Us, blockSq) != RANK_8)
-                ebonus -= square_distance(pos.king_square(Us), blockSq + pawn_push(Us)) * rr;
+                ebonus -= distance(pos.king_square(Us), blockSq + pawn_push(Us)) * rr;
 
             // If the pawn is free to advance, then increase the bonus
             if (pos.empty(blockSq))
