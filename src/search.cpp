@@ -408,10 +408,11 @@ namespace {
     Depth ext, newDepth, predictedDepth;
     Value bestValue, value, ttValue, eval, nullValue, futilityValue;
     bool inCheck, givesCheck, singularExtensionNode, improving;
-    bool captureOrPromotion, dangerous, doFullDepthSearch;
+    bool captureOrPromotion, dangerous, doFullDepthSearch, nullThreat;
     int moveCount, quietCount;
 
     // Step 1. Initialize node
+    nullThreat = false;
     Thread* thisThread = pos.this_thread();
     inCheck = pos.checkers();
 
@@ -595,6 +596,29 @@ namespace {
         }
     }
 
+    // Step 8a. Null move threat extension
+    if (    PvNode
+        && !ss->skipNullMove
+        &&  depth <= 3 * ONE_PLY
+        &&  eval >= beta)
+    {
+        ss->currentMove = MOVE_NULL;
+
+        assert(eval - beta >= 0);
+
+        // Null move fixed reduction 
+        Depth R = 2 * ONE_PLY;
+
+        pos.do_null_move(st);
+        (ss+1)->skipNullMove = true;
+        nullValue = depth-R < ONE_PLY ? -qsearch<PV, false>(pos, ss+1, -beta, -alpha, DEPTH_ZERO)
+                                      : - search<PV, false>(pos, ss+1, -beta, -alpha, depth-R, !cutNode);
+        (ss+1)->skipNullMove = false;
+        pos.undo_null_move();
+
+        if (nullValue + 100 <= alpha) nullThreat = true;
+     }
+
     // Step 9. ProbCut (skipped when in check)
     // If we have a very good capture (i.e. SEE > seeValues[captured_piece_type])
     // and a reduced search returns a value much above beta, we can (almost) safely
@@ -717,6 +741,9 @@ moves_loop: // When in check and at SpNode search starts from here
 
       // Step 12. Extend checks
       if (givesCheck && pos.see_sign(move) >= VALUE_ZERO)
+          ext = ONE_PLY;
+
+      if (nullThreat)
           ext = ONE_PLY;
 
       // Singular extension search. If all moves but one fail low on a search of
