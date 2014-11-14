@@ -384,7 +384,7 @@ Value Endgame<KQKB>::operator()(const Position& pos) const {
 
   Value result =  VALUE_KNOWN_WIN
                 + PushToEdges[loserKSq]
-                + PushClose[square_distance(winnerKSq, loserKSq)];
+                + PushClose[distance(winnerKSq, loserKSq)];
 
   return strongSide == pos.side_to_move() ? result : -result;
 }
@@ -420,8 +420,8 @@ Value Endgame<KQKN>::operator()(const Position& pos) const {
 
   Value result =  VALUE_KNOWN_WIN
                 + PushToEdges[loserKSq]
-                + PushClose[square_distance(winnerKSq, loserKSq)]
-                + PushAway[square_distance(knightSq, loserKSq)];
+                + PushClose[distance(winnerKSq, loserKSq)]
+                + PushAway[distance(knightSq, loserKSq)];
 
   return strongSide == pos.side_to_move() ? result : -result;
 }
@@ -440,9 +440,9 @@ Value Endgame<KQKNN>::operator()(const Position& pos) const {
   Square knight2Sq = pos.list<KNIGHT>(weakSide)[1];
 
   Value result =  VALUE_DRAW
-                + 4 * PushAway[square_distance(knight1Sq, loserKSq)]
-                + 4 * PushAway[square_distance(knight2Sq, loserKSq)]
-                + 6 * PushAway[square_distance(knight1Sq, knight2Sq)];
+                + 4 * PushAway[distance(knight1Sq, loserKSq)]
+                + 4 * PushAway[distance(knight2Sq, loserKSq)]
+                + 6 * PushAway[distance(knight1Sq, knight2Sq)];
 
   return strongSide == pos.side_to_move() ? result : -result;
 }
@@ -465,8 +465,8 @@ Value Endgame<KBBKN>::operator()(const Position& pos) const {
 
   Value result =  pos.bishop_pair(strongSide) ? 2 * PawnValueEg
                 + PushToCorners[loserKSq]
-                + PushClose[square_distance(winnerKSq, loserKSq)]
-                + PushAway[square_distance(loserKSq, knightSq)]
+                + PushClose[distance(winnerKSq, loserKSq)]
+                + PushAway[distance(loserKSq, knightSq)]
                 : VALUE_DRAW;
 
   return strongSide == pos.side_to_move() ? result : -result;
@@ -504,7 +504,7 @@ ScaleFactor Endgame<KBPsK>::operator()(const Position& pos) const {
 
       if (opposite_colors(queeningSq, bishopSq))
       {
-          if (square_distance(queeningSq, loserKSq) <= 1)
+          if (distance(queeningSq, loserKSq) <= 1)
           return ScaleFactor(0 + 4 * pos.count<PAWN>(weakSide));
 
           Square winnerKSq = pos.king_square(strongSide);
@@ -513,11 +513,11 @@ ScaleFactor Endgame<KBPsK>::operator()(const Position& pos) const {
           int tempo = (pos.side_to_move() == weakSide);
           int threat = pos.attacks_from<BISHOP>(b8g8Sq) & bishopSq;
 
-          if (   square_distance(queeningSq, loserKSq) - tempo
-              <= square_distance(queeningSq, frontPawn)
+          if (   distance(queeningSq, loserKSq) - tempo
+              <= distance(queeningSq, frontPawn)
               - (relative_rank(strongSide, frontPawn) == RANK_6)
-              && square_distance(queeningSq, loserKSq) + threat 
-               < square_distance(queeningSq, winnerKSq))
+              && distance(queeningSq, loserKSq) + threat 
+               < distance(queeningSq, winnerKSq))
           return ScaleFactor(0 + 8 * pos.count<PAWN>(weakSide));
        }
   }
