@@ -403,12 +403,12 @@ namespace {
     Move ttMove, move, excludedMove, bestMove;
     Depth ext, newDepth, predictedDepth;
     Value bestValue, value, ttValue, eval, nullValue, futilityValue;
-    bool inCheck, givesCheck, singularExtensionNode, improving;
-    bool captureOrPromotion, dangerous, doFullDepthSearch, nullThreat;
+    bool inCheck, givesCheck, singularExtensionNode, nullExtensionNode;
+    bool captureOrPromotion, dangerous, doFullDepthSearch, improving;
     int moveCount, quietCount;
 
     // Step 1. Initialize node
-    nullThreat = false;
+    nullExtensionNode = false;
     Thread* thisThread = pos.this_thread();
     inCheck = pos.checkers();
 
@@ -551,7 +551,7 @@ namespace {
         return eval - futility_margin(depth);
 
     // Step 8. Null move search with verification search (is omitted in PV nodes)
-    if (   !PvNode
+    if (   (!PvNode || depth >= 11 * ONE_PLY)
         && !ss->skipNullMove
         &&  depth >= 2 * ONE_PLY
         &&  eval >= beta
@@ -564,14 +564,22 @@ namespace {
         // Null move dynamic reduction based on depth and value
         Depth R = (3 + depth / 4 + std::min(int(eval - beta) / PawnValueMg, 3)) * ONE_PLY;
 
+        // In normal case detect fail-highs, for null extension detect fail-lows
+        Value threshold = PvNode ? alpha - 418 : beta;
+
         pos.do_null_move(st);
         (ss+1)->skipNullMove = true;
-        nullValue = depth-R < ONE_PLY ? -qsearch<NonPV, false>(pos, ss+1, -beta, -beta+1, DEPTH_ZERO)
-                                      : - search<NonPV, false>(pos, ss+1, -beta, -beta+1, depth-R, !cutNode);
+        nullValue = depth-R < ONE_PLY ? -qsearch<NonPV, false>(pos, ss+1, -threshold, -threshold+1, DEPTH_ZERO)
+                                      : - search<NonPV, false>(pos, ss+1, -threshold, -threshold+1, depth-R, !cutNode);
         (ss+1)->skipNullMove = false;
         pos.undo_null_move();
 
-        if (nullValue >= beta)
+        // If a null search fails very low in a PvNode and is not due to a
+        // hanging piece then position is complex and deserves an extension
+        if (PvNode && nullValue < threshold)
+        nullExtensionNode = (ss+1)->currentMove && !pos.capture_or_promotion((ss+1)->currentMove);
+
+        if (!PvNode && nullValue >= threshold)
         {
             // Do not return unproven mate scores
             if (nullValue >= VALUE_MATE_IN_MAX_PLY)
@@ -590,29 +598,6 @@ namespace {
                 return nullValue;
         }
     }
-
-    // Step 8a. Null move threat extension
-    if (    PvNode
-        && !ss->skipNullMove
-        &&  depth <= 3 * ONE_PLY
-        &&  eval >= beta)
-    {
-        ss->currentMove = MOVE_NULL;
-
-        assert(eval - beta >= 0);
-
-        // Null move fixed reduction 
-        Depth R = 2 * ONE_PLY;
-
-        pos.do_null_move(st);
-        (ss+1)->skipNullMove = true;
-        nullValue = depth-R < ONE_PLY ? -qsearch<PV, false>(pos, ss+1, -beta, -alpha, DEPTH_ZERO)
-                                      : - search<PV, false>(pos, ss+1, -beta, -alpha, depth-R, !cutNode);
-        (ss+1)->skipNullMove = false;
-        pos.undo_null_move();
-
-        if (nullValue + 100 <= alpha) nullThreat = true;
-     }
 
     // Step 9. ProbCut (skipped when in check)
     // If we have a very good capture (i.e. SEE > seeValues[captured_piece_type])
@@ -739,9 +724,6 @@ moves_loop: // When in check and at SpNode search starts from here
 
       // Step 12. Extend checks
       if (givesCheck && pos.see_sign(move) >= VALUE_ZERO)
-          ext = ONE_PLY;
-
-      if (nullThreat)
           ext = ONE_PLY;
 
       // Singular extension search. If all moves but one fail low on a search of
@@ -899,7 +881,15 @@ moves_loop: // When in check and at SpNode search starts from here
                             givesCheck ? -qsearch<PV,  true>(pos, ss+1, -beta, -alpha, DEPTH_ZERO)
                                        : -qsearch<PV, false>(pos, ss+1, -beta, -alpha, DEPTH_ZERO)
                                        : - search<PV, false>(pos, ss+1, -beta, -alpha, newDepth, false);
+
+      // Null-move threat extension
+      // Backup a score > alpha with an extended search
+      if (   nullExtensionNode
+          && value > alpha
+          && ss->ply >= 10)
+          value = -search<PV, false>(pos, ss+1, -beta, -alpha, newDepth+ONE_PLY, false);
       }
+
       // Step 17. Undo move
       pos.undo_move(move);
 
