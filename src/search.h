@@ -32,12 +32,26 @@ struct SplitPoint;
 
 namespace Search {
 
+struct PVEntry {
+  Move pv[MAX_PLY+1];
+
+  void update(Move move, PVEntry* child) {
+      pv[0] = move;
+
+      int i = 1;
+      for (; child && i < MAX_PLY && child->pv[i - 1] != MOVE_NONE; ++i)
+          pv[i] = child->pv[i - 1];
+      pv[i] = MOVE_NONE;
+  } 
+};
+
 /// The Stack struct keeps track of the information we need to remember from
 /// nodes shallower and deeper in the tree during the search. Each search thread
 /// has its own array of Stack objects, indexed by the current ply.
 
 struct Stack {
   SplitPoint* splitPoint;
+  PVEntry* pv;
   int ply;
   Move currentMove;
   Move ttMove;
@@ -62,7 +76,6 @@ struct RootMove {
   bool operator<(const RootMove& m) const { return score > m.score; } // Ascending sort
   bool operator==(const Move& m) const { return pv[0] == m; }
 
-  void extract_pv_from_tt(Position& pos);
   void insert_pv_in_tt(Position& pos);
 
   Value score;
@@ -78,13 +91,14 @@ struct RootMove {
 struct LimitsType {
 
   LimitsType() { // Using memset on a std::vector is undefined behavior
-    time[WHITE] = time[BLACK] = inc[WHITE] = inc[BLACK] = movestogo =
-    depth = nodes = movetime = mate = infinite = ponder = 0;
+    nodes = time[WHITE] = time[BLACK] = inc[WHITE] = inc[BLACK] = movestogo =
+    depth = movetime = mate = infinite = ponder = 0;
   }
   bool use_time_management() const { return !(mate | movetime | depth | nodes | infinite); }
 
   std::vector<Move> searchmoves;
-  int time[COLOR_NB], inc[COLOR_NB], movestogo, depth, nodes, movetime, mate, infinite, ponder;
+  int time[COLOR_NB], inc[COLOR_NB], movestogo, depth, movetime, mate, infinite, ponder;
+  int64_t nodes;
 };
 
 
@@ -105,8 +119,8 @@ extern int RootPly;
 extern Time::point SearchTime;
 extern StateStackPtr SetupStates;
 
-extern void init();
-extern void think();
+void init();
+void think();
 template<bool Root> uint64_t perft(Position& pos, Depth depth);
 
 } // namespace Search

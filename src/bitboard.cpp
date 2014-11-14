@@ -24,8 +24,6 @@
 #include "bitcount.h"
 #include "rkiss.h"
 
-CACHE_LINE_ALIGNMENT
-
 Bitboard RMasks[SQUARE_NB];
 Bitboard RMagics[SQUARE_NB];
 Bitboard* RAttacks[SQUARE_NB];
@@ -57,8 +55,6 @@ namespace {
   // De Bruijn sequences. See chessprogramming.wikispaces.com/BitScan
   const uint64_t DeBruijn_64 = 0x3F79D71B4CB0A89ULL;
   const uint32_t DeBruijn_32 = 0x783A9B23;
-
-  CACHE_LINE_ALIGNMENT
 
   int MS1BTable[256];
   Square BSFTable[SQUARE_NB];
@@ -181,7 +177,7 @@ void Bitboards::init() {
       for (Square s2 = SQ_A1; s2 <= SQ_H8; ++s2)
           if (s1 != s2)
           {
-              SquareDistance[s1][s2] = std::max(file_distance(s1, s2), rank_distance(s1, s2));
+              SquareDistance[s1][s2] = std::max(distance<File>(s1, s2), distance<Rank>(s1, s2));
               DistanceRingsBB[s1][SquareDistance[s1][s2] - 1] |= s2;
           }
 
@@ -195,7 +191,7 @@ void Bitboards::init() {
               {
                   Square to = s + Square(c == WHITE ? steps[pt][i] : -steps[pt][i]);
 
-                  if (is_ok(to) && square_distance(s, to) < 3)
+                  if (is_ok(to) && distance(s, to) < 3)
                       StepAttacksBB[make_piece(c, pt)][s] |= to;
               }
 
@@ -233,7 +229,7 @@ namespace {
 
     for (int i = 0; i < 4; ++i)
         for (Square s = sq + deltas[i];
-             is_ok(s) && square_distance(s, s - deltas[i]) == 1;
+             is_ok(s) && distance(s, s - deltas[i]) == 1;
              s += deltas[i])
         {
             attack |= s;
