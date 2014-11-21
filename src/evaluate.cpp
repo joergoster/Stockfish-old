@@ -123,10 +123,11 @@ namespace {
   {// A     B     C     D     E     F     G     H
     V(0), V(0), V(0), V(0), V(0), V(0), V(0), V(0), // Knights
     V(0), V(0), V(0), V(0), V(0), V(0), V(0), V(0),
-    V(0), V(0), V(4), V(8), V(8), V(4), V(0), V(0),
-    V(0), V(4),V(17),V(26),V(26),V(17), V(4), V(0),
-    V(0), V(8),V(26),V(35),V(35),V(26), V(8), V(0),
-    V(0), V(4),V(17),V(17),V(17),V(17), V(4), V(0) },
+    V(12),V(13),V(10),V(6), V(21),V(16),V(17),V(20),
+    V(15),V(17),V(13),V(8), V(27),V(21),V(23),V(26),
+    V(26),V(30),V(23),V(15),V(47),V(36),V(40),V(46),
+    V(29),V(34),V(26),V(16),V(52),V(41),V(44),V(51),
+    V(30),V(34),V(26),V(17),V(53),V(41),V(45),V(52) },
   {
     V(0), V(0), V(0), V(0), V(0), V(0), V(0), V(0), // Bishops
     V(0), V(0), V(0), V(0), V(0), V(0), V(0), V(0),
@@ -317,8 +318,7 @@ namespace {
                 score -= BishopPawns * ei.pi->pawns_on_same_color_squares(Us, s);
 
             // Bishop and knight outpost square
-            if (     pos.count<PAWN>(Them) >= 4
-                && !(pos.pieces(Them, PAWN) & pawn_attack_span(Us, s)))
+            if (!(pos.pieces(Them, PAWN) & pawn_attack_span(Us, s)))
                 score += evaluate_outpost<Pt, Us>(pos, ei, s);
 
             // Bishop or knight behind a pawn
