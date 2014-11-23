@@ -273,7 +273,7 @@ namespace {
             if (depth >= 5 * ONE_PLY)
             {
                 delta = Value(16);
-                alpha = std::max(RootMoves[PVIdx].prevScore - std::max(4 * delta - 3 * depth/ONE_PLY, delta), -VALUE_INFINITE);
+                alpha = std::max(RootMoves[PVIdx].prevScore - std::max(2 * delta - depth/ONE_PLY, delta), -VALUE_INFINITE);
                 beta  = std::min(RootMoves[PVIdx].prevScore + delta, VALUE_INFINITE);
             }
 
