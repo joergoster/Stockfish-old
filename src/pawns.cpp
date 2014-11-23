@@ -165,7 +165,7 @@ namespace {
             value -= UnsupportedPawnPenalty;
 
         if (doubled)
-            value -= Doubled[f] / rank_distance(s, lsb(doubled));
+            value -= Doubled[f] / distance<Rank>(s, frontmost_sq(Us, doubled));
 
         if (backward)
             value -= Backward[opposed][f];

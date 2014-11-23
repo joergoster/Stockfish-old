@@ -65,11 +65,6 @@
 #  endif
 
 #define CACHE_LINE_SIZE 64
-#if defined(_MSC_VER) || defined(__INTEL_COMPILER)
-#  define CACHE_LINE_ALIGNMENT __declspec(align(CACHE_LINE_SIZE))
-#else
-#  define CACHE_LINE_ALIGNMENT  __attribute__ ((aligned(CACHE_LINE_SIZE)))
-#endif
 
 #ifdef _MSC_VER
 #  define FORCE_INLINE  __forceinline
@@ -217,7 +212,8 @@ enum Depth {
   DEPTH_QS_NO_CHECKS  = -1,
   DEPTH_QS_RECAPTURES = -5,
 
-  DEPTH_NONE = -6
+  DEPTH_NONE = -6,
+  DEPTH_MAX  = MAX_PLY
 };
 
 enum Square {
@@ -254,7 +250,6 @@ enum Rank {
   RANK_1, RANK_2, RANK_3, RANK_4, RANK_5, RANK_6, RANK_7, RANK_8, RANK_NB
 };
 
-template <typename T> inline T dist(T x, T y) { return x < y ? y - x : x - y; }
 
 /// The Score enum stores a middlegame and an endgame value in a single integer
 /// (enum). The least significant 16 bits are used to store the endgame value
@@ -325,8 +320,6 @@ inline Score operator*(Score s1, Score s2);
 inline Score operator/(Score s, int i) {
   return make_score(mg_value(s) / i, eg_value(s) / i);
 }
-
-CACHE_LINE_ALIGNMENT
 
 extern Value PieceValue[PHASE_NB][PIECE_NB];
 
@@ -435,7 +428,7 @@ inline Move make(Square from, Square to, PieceType pt = KNIGHT) {
 }
 
 inline bool is_ok(Move m) {
-  return from_sq(m) != to_sq(m); // Catches also MOVE_NULL and MOVE_NONE
+  return from_sq(m) != to_sq(m); // Catch also MOVE_NULL and MOVE_NONE
 }
 
 #endif // #ifndef TYPES_H_INCLUDED
