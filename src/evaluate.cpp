@@ -158,7 +158,6 @@ namespace {
   const Score RookOpenFile     = S(43, 21);
   const Score RookSemiOpenFile = S(19, 10);
   const Score BishopPawns      = S( 8, 12);
-  const Score KnightNearKing   = S( 6,  6);
   const Score MinorBehindPawn  = S(16,  0);
   const Score TrappedRook      = S(92,  0);
   const Score Unstoppable      = S( 0, 20);
@@ -319,8 +318,7 @@ namespace {
 
             // Bishop and knight outpost square
             if (!(pos.pieces(Them, PAWN) & pawn_attack_span(Us, s)))
-                score += evaluate_outpost<Pt, Us>(pos, ei, s)
-                      + KnightNearKing * int(Pt == KNIGHT) * std::max(5 - distance(s, pos.king_square(Them)), 0);
+                score += evaluate_outpost<Pt, Us>(pos, ei, s);
 
             // Bishop or knight behind a pawn
             if (    relative_rank(Us, s) < RANK_5
