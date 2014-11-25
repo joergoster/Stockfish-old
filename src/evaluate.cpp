@@ -317,9 +317,12 @@ namespace {
                 score -= BishopPawns * ei.pi->pawns_on_same_color_squares(Us, s);
 
             // Bishop and knight outpost square
-            if (     pos.count<PAWN>(Them) >= 4
-                && !(pos.pieces(Them, PAWN) & pawn_attack_span(Us, s)))
+            if (!(pos.pieces(Them, PAWN) & pawn_attack_span(Us, s)))
                 score += evaluate_outpost<Pt, Us>(pos, ei, s);
+            else if (  !(ei.attackedBy[Them][PAWN] & s)
+                     &&  ei.attackedBy[Us][PAWN] & s
+                     && (relative_rank(Us, s) == RANK_4 || relative_rank(Us, s) == RANK_5))
+                     score += make_score(6, 3);  // to provoke a weakening pawn move
 
             // Bishop or knight behind a pawn
             if (    relative_rank(Us, s) < RANK_5
