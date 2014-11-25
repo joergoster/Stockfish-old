@@ -87,7 +87,7 @@ namespace {
   void id_loop(Position& pos);
   Value value_to_tt(Value v, int ply);
   Value value_from_tt(Value v, int ply);
-  void update_pv(Move* pv, Move move, Move* child);
+  void update_pv(Move* pv, Move move, Move* childPv);
   void update_stats(const Position& pos, Stack* ss, Move move, Depth depth, Move* quiets, int quietsCnt);
   string uci_pv(const Position& pos, Depth depth, Value alpha, Value beta);
 
@@ -217,9 +217,12 @@ void Search::think() {
       RootPos.this_thread()->wait_for(Signals.stop);
   }
 
-  sync_cout << "bestmove " << UCI::format_move(RootMoves[0].pv[0], RootPos.is_chess960())
-            << " ponder "  << UCI::format_move(RootMoves[0].pv[1], RootPos.is_chess960())
-            << sync_endl;
+  sync_cout << "bestmove " << UCI::format_move(RootMoves[0].pv[0], RootPos.is_chess960());
+
+  if (RootMoves[0].pv.size() > 1)
+      std::cout << " ponder " << UCI::format_move(RootMoves[0].pv[1], RootPos.is_chess960());
+
+  std::cout << sync_endl;
 }
 
 
@@ -864,8 +867,9 @@ moves_loop: // When in check and at SpNode search starts from here
       // parent node fail low with value <= alpha and to try another move.
       if (PvNode && (moveCount == 1 || (value > alpha && (RootNode || value < beta))))
       {
-          pv[0] = MOVE_NONE;
           (ss+1)->pv = pv;
+          (ss+1)->pv[0] = MOVE_NONE;
+
           value = newDepth <   ONE_PLY ?
                             givesCheck ? -qsearch<PV,  true>(pos, ss+1, -beta, -alpha, DEPTH_ZERO)
                                        : -qsearch<PV, false>(pos, ss+1, -beta, -alpha, DEPTH_ZERO)
@@ -900,8 +904,11 @@ moves_loop: // When in check and at SpNode search starts from here
           {
               rm.score = value;
               rm.pv.resize(1);
-              for (int i = 0; (ss+1)->pv && (ss+1)->pv[i] != MOVE_NONE; ++i)
-                  rm.pv.push_back((ss+1)->pv[i]);
+
+              assert((ss+1)->pv);
+
+              for (Move* m = (ss+1)->pv; *m != MOVE_NONE; ++m)
+                  rm.pv.push_back(*m);
 
               // We record how often the best move has been changed in each
               // iteration. This information is used for time management: When
@@ -924,12 +931,8 @@ moves_loop: // When in check and at SpNode search starts from here
           {
               bestMove = SpNode ? splitPoint->bestMove = move : move;
 
-              if (PvNode && !RootNode)
-              {
-                  update_pv(ss->pv, move, (ss+1)->pv);
-                  if (SpNode)
-                      update_pv(splitPoint->ss->pv, move, (ss+1)->pv);
-              }
+              if (PvNode && !RootNode) // Update pv even in fail-high case
+                  update_pv(SpNode ? splitPoint->ss->pv : ss->pv, move, (ss+1)->pv);
 
               if (PvNode && value < beta) // Update alpha! Always alpha < beta
                   alpha = SpNode ? splitPoint->alpha = value : value;
@@ -1179,7 +1182,7 @@ moves_loop: // When in check and at SpNode search starts from here
 
           if (value > alpha)
           {
-              if (PvNode)
+              if (PvNode) // Update pv even in fail-high case
                   update_pv(ss->pv, move, (ss+1)->pv);
 
               if (PvNode && value < beta) // Update alpha here! Always alpha < beta
@@ -1238,12 +1241,12 @@ moves_loop: // When in check and at SpNode search starts from here
   }
 
 
-  // update_pv() copies child node pv[] adding current move
+  // update_pv() adds current move and appends child pv[]
 
-  void update_pv(Move* pv, Move move, Move* child) {
+  void update_pv(Move* pv, Move move, Move* childPv) {
 
-    for (*pv++ = move; child && *child != MOVE_NONE; )
-        *pv++ = *child++;
+    for (*pv++ = move; childPv && *childPv != MOVE_NONE; )
+        *pv++ = *childPv++;
     *pv = MOVE_NONE;
   }
 
@@ -1533,7 +1536,11 @@ void check_time() {
       dbg_print();
   }
 
-  if (Limits.use_time_management() && !Limits.ponder)
+  // An engine may not stop pondering until told so by the GUI
+  if (Limits.ponder)
+      return;
+
+  if (Limits.use_time_management())
   {
       bool stillAtFirstMove =    Signals.firstRootMove
                              && !Signals.failedLowAtRoot
