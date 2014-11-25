@@ -159,6 +159,7 @@ namespace {
   const Score RookSemiOpenFile = S(19, 10);
   const Score BishopPawns      = S( 8, 12);
   const Score MinorBehindPawn  = S(16,  0);
+  const Score RookOutpost      = S(12,  0);
   const Score TrappedRook      = S(92,  0);
   const Score Unstoppable      = S( 0, 20);
   const Score Hanging          = S(31, 26);
@@ -169,6 +170,13 @@ namespace {
   const Score TrappedBishopA1H1 = S(50, 50);
 
   #undef S
+
+  // RookOutpostMask[Color] contains the area of the board which is considered
+  // by the rook outpost evaluation.
+  const Bitboard RookOutpostMask[] = {
+    (FileABB | FileBBB | FileGBB | FileHBB) & (Rank4BB | Rank5BB | Rank6BB),
+    (FileABB | FileBBB | FileGBB | FileHBB) & (Rank5BB | Rank4BB | Rank3BB)
+  };
 
   // SpaceMask[Color] contains the area of the board which is considered
   // by the space evaluation. In the middlegame, each side is given a bonus
@@ -336,6 +344,12 @@ namespace {
                     score += popcount<Max15>(pawns) * RookOnPawn;
             }
 
+            // Rook outpost
+            if (  !(pos.pieces(Them, PAWN) & pawn_attack_span(Us, s))
+                &&  ei.attackedBy[Us][PAWN] & s
+                &&  RookOutpostMask[Us] & s)
+                score += RookOutpost;
+ 
             // Give a bonus for a rook on a open or semi-open file
             if (ei.pi->semiopen_file(Us, file_of(s)))
                 score += ei.pi->semiopen_file(Them, file_of(s)) ? RookOpenFile : RookSemiOpenFile;
