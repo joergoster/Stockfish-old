@@ -89,6 +89,7 @@ namespace {
   void id_loop(Position& pos);
   Value value_to_tt(Value v, int ply);
   Value value_from_tt(Value v, int ply);
+  void update_pv(Move* pv, Move move, Move* childPv);
   void update_stats(const Position& pos, Stack* ss, Move move, Depth depth, Move* quiets, int quietsCnt);
   string uci_pv(const Position& pos, Depth depth, Value alpha, Value beta);
 
@@ -219,9 +220,12 @@ void Search::think() {
       RootPos.this_thread()->wait_for(Signals.stop);
   }
 
-  sync_cout << "bestmove " << UCI::format_move(RootMoves[0].pv[0], RootPos.is_chess960())
-            << " ponder "  << UCI::format_move(RootMoves[0].pv[1], RootPos.is_chess960())
-            << sync_endl;
+  sync_cout << "bestmove " << UCI::format_move(RootMoves[0].pv[0], RootPos.is_chess960());
+
+  if (RootMoves[0].pv.size() > 1)
+      std::cout << " ponder " << UCI::format_move(RootMoves[0].pv[1], RootPos.is_chess960());
+
+  std::cout << sync_endl;
 }
 
 
@@ -259,7 +263,7 @@ namespace {
     multiPV = std::max(multiPV, skill.candidates_size());
 
     // Iterative deepening loop until requested to stop or target depth reached
-    while (++depth < MAX_PLY && !Signals.stop && (!Limits.depth || depth <= Limits.depth))
+    while (++depth < DEPTH_MAX && !Signals.stop && (!Limits.depth || depth <= Limits.depth))
     {
         // Age out PV variability metric
         BestMoveChanges *= 0.5;
@@ -398,8 +402,7 @@ namespace {
     assert(PvNode || (alpha == beta - 1));
     assert(depth > DEPTH_ZERO);
 
-    PVEntry pv;
-    Move quietsSearched[64];
+    Move pv[MAX_PLY+1], quietsSearched[64];
     StateInfo st;
     const TTEntry *tte;
     SplitPoint* splitPoint;
@@ -470,11 +473,8 @@ namespace {
     ss->ttMove = ttMove = RootNode ? RootMoves[PVIdx].pv[0] : tte ? tte->move() : MOVE_NONE;
     ttValue = tte ? value_from_tt(tte->value(), ss->ply) : VALUE_NONE;
 
-    // At PV nodes we check for exact scores, whilst at non-PV nodes we check for
-    // a fail high/low. The biggest advantage to probing at PV nodes is to have a
-    // smooth experience in analysis mode. We don't probe at Root nodes otherwise
-    // we should also update RootMoveList to avoid bogus output.
-    if (   !PvNode
+    // At non-PV nodes we check for a fail high/low. We don't probe at PV nodes
+    if (  !PvNode
         && tte
         && tte->depth() >= depth
         && ttValue != VALUE_NONE // Only in case of TT access race
@@ -874,14 +874,17 @@ moves_loop: // When in check and at SpNode search starts from here
       // For PV nodes only, do a full PV search on the first move or after a fail
       // high (in the latter case search only if value < beta), otherwise let the
       // parent node fail low with value <= alpha and to try another move.
-      if (PvNode && (moveCount == 1 || (value > alpha && (RootNode || value < beta)))) {
-          pv.pv[0] = MOVE_NONE;
-          (ss+1)->pv = &pv;
+      if (PvNode && (moveCount == 1 || (value > alpha && (RootNode || value < beta))))
+      {
+          (ss+1)->pv = pv;
+          (ss+1)->pv[0] = MOVE_NONE;
+
           value = newDepth <   ONE_PLY ?
                             givesCheck ? -qsearch<PV,  true>(pos, ss+1, -beta, -alpha, DEPTH_ZERO)
                                        : -qsearch<PV, false>(pos, ss+1, -beta, -alpha, DEPTH_ZERO)
                                        : - search<PV, false>(pos, ss+1, -beta, -alpha, newDepth, false);
       }
+
       // Step 17. Undo move
       pos.undo_move(move);
 
@@ -910,8 +913,11 @@ moves_loop: // When in check and at SpNode search starts from here
           {
               rm.score = value;
               rm.pv.resize(1);
-              for (int i = 0; (ss+1)->pv && i < MAX_PLY && (ss+1)->pv->pv[i] != MOVE_NONE; ++i)
-                  rm.pv.push_back((ss+1)->pv->pv[i]);
+
+              assert((ss+1)->pv);
+
+              for (Move* m = (ss+1)->pv; *m != MOVE_NONE; ++m)
+                  rm.pv.push_back(*m);
 
               // We record how often the best move has been changed in each
               // iteration. This information is used for time management: When
@@ -934,11 +940,8 @@ moves_loop: // When in check and at SpNode search starts from here
           {
               bestMove = SpNode ? splitPoint->bestMove = move : move;
 
-              if (NT == PV) {
-                  ss->pv->update(move, (ss+1)->pv);
-                  if (SpNode)
-                      splitPoint->ss->pv->update(move, (ss+1)->pv);
-              }
+              if (PvNode && !RootNode) // Update pv even in fail-high case
+                  update_pv(SpNode ? splitPoint->ss->pv : ss->pv, move, (ss+1)->pv);
 
               if (PvNode && value < beta) // Update alpha! Always alpha < beta
                   alpha = SpNode ? splitPoint->alpha = value : value;
@@ -1024,7 +1027,7 @@ moves_loop: // When in check and at SpNode search starts from here
     assert(PvNode || (alpha == beta - 1));
     assert(depth <= DEPTH_ZERO);
 
-    PVEntry pv;
+    Move pv[MAX_PLY+1];
     StateInfo st;
     const TTEntry* tte;
     Key posKey;
@@ -1033,12 +1036,11 @@ moves_loop: // When in check and at SpNode search starts from here
     bool givesCheck, evasionPrunable;
     Depth ttDepth;
 
-    if (PvNode) {
-        // To flag BOUND_EXACT a node with eval above alpha and no available moves
-        oldAlpha = alpha;
-
-        (ss+1)->pv = &pv;
-        ss->pv->pv[0] = MOVE_NONE;
+    if (PvNode)
+    {
+        oldAlpha = alpha; // To flag BOUND_EXACT when eval above alpha and no available moves
+        (ss+1)->pv = pv;
+        ss->pv[0] = MOVE_NONE;
     }
 
     ss->currentMove = bestMove = MOVE_NONE;
@@ -1062,7 +1064,7 @@ moves_loop: // When in check and at SpNode search starts from here
     ttMove = tte ? tte->move() : MOVE_NONE;
     ttValue = tte ? value_from_tt(tte->value(),ss->ply) : VALUE_NONE;
 
-    if (  !PvNode 
+    if (  !PvNode
         && tte
         && tte->depth() >= ttDepth
         && ttValue != VALUE_NONE // Only in case of TT access race
@@ -1189,8 +1191,8 @@ moves_loop: // When in check and at SpNode search starts from here
 
           if (value > alpha)
           {
-              if (PvNode)
-                  ss->pv->update(move, &pv);
+              if (PvNode) // Update pv even in fail-high case
+                  update_pv(ss->pv, move, (ss+1)->pv);
 
               if (PvNode && value < beta) // Update alpha here! Always alpha < beta
               {
@@ -1248,6 +1250,15 @@ moves_loop: // When in check and at SpNode search starts from here
   }
 
 
+  // update_pv() adds current move and appends child pv[]
+
+  void update_pv(Move* pv, Move move, Move* childPv) {
+
+    for (*pv++ = move; childPv && *childPv != MOVE_NONE; )
+        *pv++ = *childPv++;
+    *pv = MOVE_NONE;
+  }
+
   // update_stats() updates killers, history, countermoves and followupmoves stats after a fail-high
   // of a quiet move.
 
@@ -1261,7 +1272,7 @@ moves_loop: // When in check and at SpNode search starts from here
 
     // Increase history value of the cut-off move and decrease all the other
     // played quiet moves.
-    Value bonus = Value(4 * int(depth) * int(depth));
+    Value bonus = Value(int(depth) * int(depth));
     History.update(pos.moved_piece(move), to_sq(move), bonus);
     for (int i = 0; i < quietsCnt; ++i)
     {
@@ -1380,15 +1391,17 @@ void RootMove::insert_pv_in_tt(Position& pos) {
 
   StateInfo state[MAX_PLY], *st = state;
   const TTEntry* tte;
-  int idx = 0;
+  size_t idx = 0;
 
-  for (; idx < int(pv.size()); ++idx) {
+  for ( ; idx < pv.size(); ++idx)
+  {
       tte = TT.probe(pos.key());
 
       if (!tte || tte->move() != pv[idx]) // Don't overwrite correct entries
           TT.store(pos.key(), VALUE_NONE, BOUND_NONE, DEPTH_NONE, pv[idx], VALUE_NONE);
 
       assert(MoveList<LEGAL>(pos).contains(pv[idx]));
+
       pos.do_move(pv[idx], *st++);
   }
 
@@ -1532,7 +1545,11 @@ void check_time() {
       dbg_print();
   }
 
-  if (Limits.use_time_management() && !Limits.ponder)
+  // An engine may not stop pondering until told so by the GUI
+  if (Limits.ponder)
+      return;
+
+  if (Limits.use_time_management())
   {
       bool stillAtFirstMove =    Signals.firstRootMove
                              && !Signals.failedLowAtRoot
