@@ -35,12 +35,12 @@ endif
 BINDIR = $(PREFIX)/bin
 
 ### Built-in benchmark for pgo-builds
-PGOBENCH = ./$(EXE) bench 32 1 1 default time
+PGOBENCH = ./$(EXE) bench 16 1 1 default time
 
 ### Object files
 OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
-	material.o misc.o movegen.o movepick.o notation.o pawns.o \
-	position.o search.o thread.o timeman.o tt.o uci.o ucioption.o
+	material.o misc.o movegen.o movepick.o pawns.o position.o \
+	search.o thread.o timeman.o tt.o uci.o ucioption.o
 
 ### ==========================================================================
 ### Section 2. High-level Configuration
@@ -75,6 +75,12 @@ bsfq = no
 popcnt = no
 sse = no
 pext = no
+syzygy = yes
+
+ifeq ($(syzygy),yes)
+	OBJS += syzygy/tbprobe.o
+	CXXFLAGS += -DSYZYGY
+endif
 
 ### 2.2 Architecture specific
 
@@ -285,7 +291,11 @@ endif
 
 ### 3.9 popcnt
 ifeq ($(popcnt),yes)
-	CXXFLAGS += -msse3 -mpopcnt -DUSE_POPCNT
+	ifeq ($(comp),icc)
+		CXXFLAGS += -msse3 -DUSE_POPCNT
+	else
+		CXXFLAGS += -msse3 -mpopcnt -DUSE_POPCNT
+	endif
 endif
 
 ### 3.10 pext
@@ -394,7 +404,7 @@ install:
 	-strip $(BINDIR)/$(EXE)
 
 clean:
-	$(RM) $(EXE) $(EXE).exe *.o .depend *~ core bench.txt *.gcda
+	$(RM) $(EXE) $(EXE).exe *.o .depend *~ core bench.txt *.gcda ./syzygy/*.o
 
 default:
 	help
