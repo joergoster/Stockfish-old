@@ -30,15 +30,15 @@ namespace {
   // Polynomial material balance parameters
 
   //                      pair  pawn knight bishop rook queen
-  const int Linear[6] = { 1839, -280, -1520, -714,  249, -154 };
+  const int Linear[6] = { 1532, -327, -837, -722,  249, -154 };
 
   const int QuadraticSameSide[][PIECE_TYPE_NB] = {
     //            OUR PIECES
     // pair pawn knight bishop rook queen
     {   0                               }, // Bishop pair
-    {-290,    4                         }, // Pawn
-    {-372,   59, -81                    }, // knight      OUR PIECES
-    {   0,  325, 350,    0              }, // Bishop
+    {-103,   50                         }, // Pawn
+    {-313,  232, 118                    }, // knight      OUR PIECES
+    {   0,   97, 114,    0              }, // Bishop
     { -27,   -2,  46,   100,  -141      }, // Rook
     {-177,   25, 129,   142,  -137,   0 }  // Queen
   };
@@ -47,9 +47,9 @@ namespace {
     //           THEIR PIECES
     // pair pawn knight bishop rook queen
     {   0                               }, // Bishop pair
-    {-489,    0                         }, // Pawn
-    { -46,  152,    0                   }, // Knight      OUR PIECES
-    {-317, -210, -386,    0             }, // Bishop
+    {-226,    0                         }, // Pawn
+    {  79,  -75,    0                   }, // Knight      OUR PIECES
+    { 163,   69,  268,    0             }, // Bishop
     {  50,   40,   23,  -22,    0       }, // Rook
     {  98,  105,  -39,  141,  274,    0 }  // Queen
   };
