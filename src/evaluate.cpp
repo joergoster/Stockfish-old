@@ -159,7 +159,7 @@ namespace {
   const Score RookSemiOpenFile = S(19, 10);
   const Score BishopPawns      = S( 8, 12);
   const Score MinorBehindPawn  = S(16,  0);
-  const Score RookOutpost      = S(12,  0);
+  const Score RookOutpost      = S(12,  6);
   const Score TrappedRook      = S(92,  0);
   const Score Unstoppable      = S( 0, 20);
   const Score Hanging          = S(31, 26);
@@ -346,9 +346,10 @@ namespace {
 
             // Rook outpost
             if (  !(pos.pieces(Them, PAWN) & pawn_attack_span(Us, s))
+                &&  RookOutpostMask[Us] & s
                 &&  ei.attackedBy[Us][PAWN] & s
-                &&  RookOutpostMask[Us] & s)
-                score += RookOutpost;
+                && ~(ei.attackedBy[Them][KNIGHT] | ei.attackedBy[Them][BISHOP]) & s)
+                score += !pos.pieces(Them, KNIGHT, BISHOP) ? 2 * RookOutpost : RookOutpost;
  
             // Give a bonus for a rook on a open or semi-open file
             if (ei.pi->semiopen_file(Us, file_of(s)))
