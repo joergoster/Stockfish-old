@@ -46,7 +46,7 @@ struct Stack {
   Move killers[2];
   Depth reduction;
   Value staticEval;
-  bool skipNullMove;
+  bool skipEarlyPruning;
 };
 
 
@@ -56,7 +56,7 @@ struct Stack {
 /// all non-pv moves.
 struct RootMove {
 
-  RootMove(Move m) : score(-VALUE_INFINITE), prevScore(-VALUE_INFINITE), pv(1, m) {}
+  RootMove(Move m) : score(-VALUE_INFINITE), previousScore(-VALUE_INFINITE), pv(1, m) {}
 
   bool operator<(const RootMove& m) const { return score > m.score; } // Ascending sort
   bool operator==(const Move& m) const { return pv[0] == m; }
@@ -64,10 +64,11 @@ struct RootMove {
   void insert_pv_in_tt(Position& pos);
 
   Value score;
-  Value prevScore;
+  Value previousScore;
   std::vector<Move> pv;
 };
 
+typedef std::vector<RootMove> RootMoveVector;
 
 /// The LimitsType struct stores information sent by GUI about available time
 /// to search the current move, maximum depth/time, if we are in analysis mode
@@ -98,7 +99,7 @@ typedef std::auto_ptr<std::stack<StateInfo> > StateStackPtr;
 
 extern volatile SignalsType Signals;
 extern LimitsType Limits;
-extern std::vector<RootMove> RootMoves;
+extern RootMoveVector RootMoves;
 extern Position RootPos;
 extern int RootPly;
 extern Time::point SearchTime;

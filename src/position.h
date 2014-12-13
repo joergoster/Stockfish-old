@@ -24,8 +24,8 @@
 #include <cstddef>
 
 #include "bitboard.h"
-#include "bitcount.h"
 #include "types.h"
+
 
 /// The checkInfo struct is initialized at c'tor time and keeps info used
 /// to detect if a move gives check.
@@ -50,7 +50,7 @@ struct CheckInfo {
 
 struct StateInfo {
   Key pawnKey, materialKey;
-  Value npMaterial[COLOR_NB];
+  Value nonPawnMaterial[COLOR_NB];
   int castlingRights, rule50, pliesFromNull;
   Score psq;
   Square epSquare;
@@ -78,8 +78,8 @@ class Position {
 
 public:
   Position() {}
-  Position(const Position& pos, Thread* t) { *this = pos; thisThread = t; }
-  Position(const std::string& f, bool c960, Thread* t) { set(f, c960, t); }
+  Position(const Position& pos, Thread* th) { *this = pos; thisThread = th; }
+  Position(const std::string& f, bool c960, Thread* th) { set(f, c960, th); }
   Position& operator=(const Position&);
   static void init();
 
@@ -100,7 +100,6 @@ public:
   bool empty(Square s) const;
   template<PieceType Pt> int count(Color c) const;
   template<PieceType Pt> const Square* list(Color c) const;
-  int total_piece_count() const;
 
   // Castling
   int can_castle(Color c) const;
@@ -115,7 +114,7 @@ public:
 
   // Attacks to/from a given square
   Bitboard attackers_to(Square s) const;
-  Bitboard attackers_to(Square s, Bitboard occ) const;
+  Bitboard attackers_to(Square s, Bitboard occupied) const;
   Bitboard attacks_from(Piece pc, Square s) const;
   template<PieceType> Bitboard attacks_from(Square s) const;
   template<PieceType> Bitboard attacks_from(Square s, Color c) const;
@@ -347,7 +346,7 @@ inline Score Position::psq_score() const {
 }
 
 inline Value Position::non_pawn_material(Color c) const {
-  return st->npMaterial[c];
+  return st->nonPawnMaterial[c];
 }
 
 inline int Position::game_ply() const {
@@ -356,10 +355,6 @@ inline int Position::game_ply() const {
 
 inline int Position::rule50_count() const {
   return st->rule50;
-}
-
-inline int Position::total_piece_count() const {
-  return HasPopCnt ? popcount<Full>(pieces()) : pieceCount[WHITE][ALL_PIECES];
 }
 
 inline bool Position::opposite_bishops() const {
@@ -412,8 +407,7 @@ inline void Position::put_piece(Square s, Color c, PieceType pt) {
   byColorBB[c] |= s;
   index[s] = pieceCount[c][pt]++;
   pieceList[c][pt][index[s]] = s;
-  if (!HasPopCnt)
-      pieceCount[WHITE][ALL_PIECES]++;
+  pieceCount[c][ALL_PIECES]++;
 }
 
 inline void Position::move_piece(Square from, Square to, Color c, PieceType pt) {
@@ -444,8 +438,7 @@ inline void Position::remove_piece(Square s, Color c, PieceType pt) {
   index[lastSquare] = index[s];
   pieceList[c][pt][index[lastSquare]] = lastSquare;
   pieceList[c][pt][pieceCount[c][pt]] = SQ_NONE;
-  if (!HasPopCnt)
-      pieceCount[WHITE][ALL_PIECES]--;
+  pieceCount[c][ALL_PIECES]--;
 }
 
 #endif // #ifndef POSITION_H_INCLUDED

@@ -25,35 +25,38 @@
 #include <sstream>
 
 #include "evaluate.h"
+#include "misc.h"
 #include "movegen.h"
 #include "movepick.h"
-#include "rkiss.h"
 #include "search.h"
 #include "timeman.h"
 #include "thread.h"
 #include "tt.h"
 #include "uci.h"
-
-#ifdef SYZYGY
 #include "syzygy/tbprobe.h"
-#endif
 
 namespace Search {
 
   volatile SignalsType Signals;
   LimitsType Limits;
-  std::vector<RootMove> RootMoves;
+  RootMoveVector RootMoves;
   Position RootPos;
   int RootPly;
   Time::point SearchTime;
   StateStackPtr SetupStates;
-  int TBCardinality;
-  uint64_t TBHits;
-  bool RootInTB;
-  bool TB50MoveRule;
-  Depth TBProbeDepth;
-  Value TBScore;
 }
+
+namespace Tablebases {
+
+  int Cardinality;
+  uint64_t Hits;
+  bool RootInTB;
+  bool UseRule50;
+  Depth ProbeDepth;
+  Value Score;
+}
+
+namespace TB = Tablebases;
 
 using std::string;
 using Eval::evaluate;
@@ -194,12 +197,23 @@ void Search::think() {
 
   RootPly = RootPos.game_ply();
   TimeMgr.init(Limits, RootPly, RootPos.side_to_move());
-  TBHits = TBCardinality = 0;
-  RootInTB = false;
 
-  int cf = Options["Contempt"] * PawnValueEg / 100; // From centipawns
-  DrawValue[ RootPos.side_to_move()] = VALUE_DRAW - Value(cf);
-  DrawValue[~RootPos.side_to_move()] = VALUE_DRAW + Value(cf);
+  int contempt = Options["Contempt"] * PawnValueEg / 100; // From centipawns
+  DrawValue[ RootPos.side_to_move()] = VALUE_DRAW - Value(contempt);
+  DrawValue[~RootPos.side_to_move()] = VALUE_DRAW + Value(contempt);
+
+  TB::Hits = 0;
+  TB::RootInTB = false;
+  TB::UseRule50 = Options["Syzygy50MoveRule"];
+  TB::ProbeDepth = Options["SyzygyProbeDepth"] * ONE_PLY;
+  TB::Cardinality = Options["SyzygyProbeLimit"];
+
+  // Skip TB probing when no TB found: !TBLargest -> !TB::Cardinality
+  if (TB::Cardinality > TB::MaxCardinality)
+  {
+      TB::Cardinality = TB::MaxCardinality;
+      TB::ProbeDepth = DEPTH_ZERO;
+  }
 
   if (RootMoves.empty())
   {
@@ -210,59 +224,36 @@ void Search::think() {
   }
   else
   {
-#ifdef SYZYGY
-      // Check Tablebases at root
-      int piecesCnt = RootPos.total_piece_count();
-      TBCardinality = Options["SyzygyProbeLimit"];
-      TBProbeDepth = Options["SyzygyProbeDepth"] * ONE_PLY;
-      if (TBCardinality > Tablebases::TBLargest)
+      if (TB::Cardinality >=  RootPos.count<ALL_PIECES>(WHITE)
+                            + RootPos.count<ALL_PIECES>(BLACK))
       {
-          TBCardinality = Tablebases::TBLargest;
-          TBProbeDepth = 0 * ONE_PLY;
-      }
-      TB50MoveRule = Options["Syzygy50MoveRule"];
-
-      if (piecesCnt <= TBCardinality)
-      {
-          TBHits = RootMoves.size();
-
           // If the current root position is in the tablebases then RootMoves
           // contains only moves that preserve the draw or win.
-          RootInTB = Tablebases::root_probe(RootPos, TBScore);
+          TB::RootInTB = Tablebases::root_probe(RootPos, RootMoves, TB::Score);
 
-          if (RootInTB)
-          {
-              TBCardinality = 0; // Do not probe tablebases during the search
+          if (TB::RootInTB)
+              TB::Cardinality = 0; // Do not probe tablebases during the search
 
-              // It might be a good idea to mangle the hash key (xor it
-              // with a fixed value) in order to "clear" the hash table of
-              // the results of previous probes. However, that would have to
-              // be done from within the Position class, so we skip it for now.
-
-              // Optional: decrease target time.
-          }
           else // If DTZ tables are missing, use WDL tables as a fallback
           {
               // Filter out moves that do not preserve a draw or win
-              RootInTB = Tablebases::root_probe_wdl(RootPos, TBScore);
+              TB::RootInTB = Tablebases::root_probe_wdl(RootPos, RootMoves, TB::Score);
 
               // Only probe during search if winning
-              if (TBScore <= VALUE_DRAW)
-                  TBCardinality = 0;
+              if (TB::Score <= VALUE_DRAW)
+                  TB::Cardinality = 0;
           }
 
-          if (!RootInTB)
+          if (TB::RootInTB)
           {
-              TBHits = 0;
-          }
-          else if (!TB50MoveRule)
-          {
-              TBScore = TBScore > VALUE_DRAW ? VALUE_MATE - MAX_PLY - 1
-                      : TBScore < VALUE_DRAW ? -VALUE_MATE + MAX_PLY + 1
-                      : TBScore;
+              TB::Hits = RootMoves.size();
+
+              if (!TB::UseRule50)
+                  TB::Score =  TB::Score > VALUE_DRAW ?  VALUE_MATE - MAX_PLY - 1
+                             : TB::Score < VALUE_DRAW ? -VALUE_MATE + MAX_PLY + 1
+                                                      :  VALUE_DRAW;
           }
       }
-#endif
 
       for (size_t i = 0; i < Threads.size(); ++i)
           Threads[i]->maxPly = 0;
@@ -337,7 +328,7 @@ namespace {
         // Save the last iteration's scores before first PV line is searched and
         // all the move scores except the (new) PV are set to -VALUE_INFINITE.
         for (size_t i = 0; i < RootMoves.size(); ++i)
-            RootMoves[i].prevScore = RootMoves[i].score;
+            RootMoves[i].previousScore = RootMoves[i].score;
 
         // MultiPV loop. We perform a full root search for each PV line
         for (PVIdx = 0; PVIdx < std::min(multiPV, RootMoves.size()) && !Signals.stop; ++PVIdx)
@@ -346,8 +337,8 @@ namespace {
             if (depth >= 5 * ONE_PLY)
             {
                 delta = Value(16);
-                alpha = std::max(RootMoves[PVIdx].prevScore - delta,-VALUE_INFINITE);
-                beta  = std::min(RootMoves[PVIdx].prevScore + delta, VALUE_INFINITE);
+                alpha = std::max(RootMoves[PVIdx].previousScore - delta,-VALUE_INFINITE);
+                beta  = std::min(RootMoves[PVIdx].previousScore + delta, VALUE_INFINITE);
             }
 
             // Start with a small aspiration window and, in the case of a fail
@@ -470,11 +461,12 @@ namespace {
 
     Move pv[MAX_PLY+1], quietsSearched[64];
     StateInfo st;
-    const TTEntry *tte;
+    TTEntry* tte;
+    bool ttHit;
     SplitPoint* splitPoint;
     Key posKey;
     Move ttMove, move, excludedMove, bestMove;
-    Depth ext, newDepth, predictedDepth;
+    Depth extension, newDepth, predictedDepth;
     Value bestValue, value, ttValue, eval, nullValue, futilityValue;
     bool inCheck, givesCheck, singularExtensionNode, improving;
     bool captureOrPromotion, dangerous, doFullDepthSearch;
@@ -490,6 +482,7 @@ namespace {
         bestMove   = splitPoint->bestMove;
         bestValue  = splitPoint->bestValue;
         tte = NULL;
+        ttHit = false;
         ttMove = excludedMove = MOVE_NONE;
         ttValue = VALUE_NONE;
 
@@ -527,7 +520,7 @@ namespace {
     assert(0 <= ss->ply && ss->ply < MAX_PLY);
 
     ss->currentMove = ss->ttMove = (ss+1)->excludedMove = bestMove = MOVE_NONE;
-    (ss+1)->skipNullMove = false; (ss+1)->reduction = DEPTH_ZERO;
+    (ss+1)->skipEarlyPruning = false; (ss+1)->reduction = DEPTH_ZERO;
     (ss+2)->killers[0] = (ss+2)->killers[1] = MOVE_NONE;
 
     // Step 4. Transposition table lookup
@@ -535,13 +528,13 @@ namespace {
     // TT value, so we use a different position key in case of an excluded move.
     excludedMove = ss->excludedMove;
     posKey = excludedMove ? pos.exclusion_key() : pos.key();
-    tte = TT.probe(posKey);
-    ss->ttMove = ttMove = RootNode ? RootMoves[PVIdx].pv[0] : tte ? tte->move() : MOVE_NONE;
-    ttValue = tte ? value_from_tt(tte->value(), ss->ply) : VALUE_NONE;
+    tte = TT.probe(posKey, ttHit);
+    ss->ttMove = ttMove = RootNode ? RootMoves[PVIdx].pv[0] : ttHit ? tte->move() : MOVE_NONE;
+    ttValue = ttHit ? value_from_tt(tte->value(), ss->ply) : VALUE_NONE;
 
     // At non-PV nodes we check for a fail high/low. We don't probe at PV nodes
     if (  !PvNode
-        && tte
+        && ttHit
         && tte->depth() >= depth
         && ttValue != VALUE_NONE // Only in case of TT access race
         && (ttValue >= beta ? (tte->bound() & BOUND_LOWER)
@@ -556,38 +549,35 @@ namespace {
         return ttValue;
     }
 
-#ifdef SYZYGY
     // Step 4a. Tablebase probe
-    if (   !RootNode
-        && pos.total_piece_count() <= TBCardinality
-        && ( pos.total_piece_count() < TBCardinality || depth >= TBProbeDepth )
-        && pos.rule50_count() == 0)
+    if (!RootNode && TB::Cardinality)
     {
-        int found, v = Tablebases::probe_wdl(pos, &found);
+        int piecesCnt = pos.count<ALL_PIECES>(WHITE) + pos.count<ALL_PIECES>(BLACK);
 
-        if (found)
+        if (    piecesCnt <= TB::Cardinality
+            && (piecesCnt <  TB::Cardinality || depth >= TB::ProbeDepth)
+            &&  pos.rule50_count() == 0)
         {
-            TBHits++;
+            int found, v = Tablebases::probe_wdl(pos, &found);
 
-            if (TB50MoveRule) {
-                value = v < -1 ? -VALUE_MATE + MAX_PLY + ss->ply
-                      : v >  1 ?  VALUE_MATE - MAX_PLY - ss->ply
-                      : VALUE_DRAW + 2 * v;
-            }
-            else
+            if (found)
             {
-                value = v < 0 ? -VALUE_MATE + MAX_PLY + ss->ply
-                      : v > 0 ?  VALUE_MATE - MAX_PLY - ss->ply
-                      : VALUE_DRAW;
+                TB::Hits++;
+
+                int drawScore = TB::UseRule50 ? 1 : 0;
+
+                value =  v < -drawScore ? -VALUE_MATE + MAX_PLY + ss->ply
+                       : v >  drawScore ?  VALUE_MATE - MAX_PLY - ss->ply
+                                        :  VALUE_DRAW + 2 * v * drawScore;
+
+                tte->save(posKey, value_to_tt(value, ss->ply), BOUND_EXACT,
+                          std::min(DEPTH_MAX - ONE_PLY, depth + 6 * ONE_PLY),
+                          MOVE_NONE, VALUE_NONE, TT.get_generation());
+
+                return value;
             }
-
-            TT.store(posKey, value_to_tt(value, ss->ply), BOUND_EXACT,
-                     std::min(DEPTH_MAX - ONE_PLY, depth + 6 * ONE_PLY), MOVE_NONE, VALUE_NONE);
-
-            return value;
         }
     }
-#endif
 
     // Step 5. Evaluate the position statically and update parent's gain statistics
     if (inCheck)
@@ -596,7 +586,7 @@ namespace {
         goto moves_loop;
     }
 
-    else if (tte)
+    else if (ttHit)
     {
         // Never assume anything on values stored in TT
         if ((ss->staticEval = eval = tte->eval_value()) == VALUE_NONE)
@@ -612,8 +602,11 @@ namespace {
         eval = ss->staticEval =
         (ss-1)->currentMove != MOVE_NULL ? evaluate(pos) : -(ss-1)->staticEval + 2 * Eval::Tempo;
 
-        TT.store(posKey, VALUE_NONE, BOUND_NONE, DEPTH_NONE, MOVE_NONE, ss->staticEval);
+        tte->save(posKey, VALUE_NONE, BOUND_NONE, DEPTH_NONE, MOVE_NONE, ss->staticEval, TT.get_generation());
     }
+
+    if (ss->skipEarlyPruning)
+        goto moves_loop;
 
     if (   !pos.captured_piece_type()
         &&  ss->staticEval != VALUE_NONE
@@ -645,7 +638,6 @@ namespace {
 
     // Step 7. Futility pruning: child node (skipped when in check)
     if (   !PvNode
-        && !ss->skipNullMove
         &&  depth < 7 * ONE_PLY
         &&  eval - futility_margin(depth) >= beta
         &&  eval < VALUE_KNOWN_WIN  // Do not return unproven wins
@@ -655,7 +647,6 @@ namespace {
     // Step 8. Null move search with verification search (is omitted in PV nodes)
     if (   !null_disabled
         && !PvNode
-        && !ss->skipNullMove
         &&  depth >= 2 * ONE_PLY
         &&  eval >= beta
         &&  pos.non_pawn_material(pos.side_to_move()))
@@ -671,10 +662,10 @@ namespace {
                  + std::min(int(eval - beta) / PawnValueMg, 3) * ONE_PLY;
 
         pos.do_null_move(st);
-        (ss+1)->skipNullMove = true;
+        (ss+1)->skipEarlyPruning = true;
         nullValue = depth-R < ONE_PLY ? -qsearch<NonPV, false>(pos, ss+1, -beta, -beta+1, DEPTH_ZERO)
                                       : - search<NonPV, false>(pos, ss+1, -beta, -beta+1, depth-R, !cutNode);
-        (ss+1)->skipNullMove = false;
+        (ss+1)->skipEarlyPruning = false;
         pos.undo_null_move();
 
         if (nullValue >= beta)
@@ -687,11 +678,11 @@ namespace {
                 return nullValue;
 
             // Do verification search at high depths
-            ss->skipNullMove = true;
+            ss->skipEarlyPruning = true;
             R = 5 * ONE_PLY;
             Value v = depth-R < ONE_PLY ? qsearch<NonPV, false>(pos, ss, beta-1, beta, DEPTH_ZERO)
                                         :  search<NonPV, false>(pos, ss, beta-1, beta, depth-R, false);
-            ss->skipNullMove = false;
+            ss->skipEarlyPruning = false;
 
             if (v >= beta)
                 return nullValue;
@@ -704,7 +695,6 @@ namespace {
     // prune the previous move.
     if (   !PvNode
         &&  depth >= 5 * ONE_PLY
-        && !ss->skipNullMove
         &&  abs(beta) < VALUE_MATE_IN_MAX_PLY)
     {
         Value rbeta = std::min(beta + 200, VALUE_INFINITE);
@@ -735,12 +725,12 @@ namespace {
         && (PvNode || ss->staticEval + 256 >= beta))
     {
         Depth d = 2 * (depth - 2 * ONE_PLY) - (PvNode ? DEPTH_ZERO : depth / 2);
-        ss->skipNullMove = true;
+        ss->skipEarlyPruning = true;
         search<PvNode ? PV : NonPV, false>(pos, ss, alpha, beta, d / 2, true);
-        ss->skipNullMove = false;
+        ss->skipEarlyPruning = false;
 
-        tte = TT.probe(posKey);
-        ttMove = tte ? tte->move() : MOVE_NONE;
+        tte = TT.probe(posKey, ttHit);
+        ttMove = ttHit ? tte->move() : MOVE_NONE;
     }
 
 moves_loop: // When in check and at SpNode search starts from here
@@ -810,7 +800,7 @@ moves_loop: // When in check and at SpNode search starts from here
       if (PvNode)
           (ss+1)->pv = NULL;
 
-      ext = DEPTH_ZERO;
+      extension = DEPTH_ZERO;
       captureOrPromotion = pos.capture_or_promotion(move);
 
       givesCheck =  type_of(move) == NORMAL && !ci.dcCandidates
@@ -823,7 +813,7 @@ moves_loop: // When in check and at SpNode search starts from here
 
       // Step 12. Extend checks
       if (givesCheck && pos.see_sign(move) >= VALUE_ZERO)
-          ext = ONE_PLY;
+          extension = ONE_PLY;
 
       // Singular extension search. If all moves but one fail low on a search of
       // (alpha-s, beta-s), and just one fails high on (alpha, beta), then that move
@@ -832,22 +822,22 @@ moves_loop: // When in check and at SpNode search starts from here
       // ttValue minus a margin then we extend the ttMove.
       if (    singularExtensionNode
           &&  move == ttMove
-          && !ext
+          && !extension
           &&  pos.legal(move, ci.pinned))
       {
           Value rBeta = ttValue - 2 * depth / ONE_PLY;
           ss->excludedMove = move;
-          ss->skipNullMove = true;
+          ss->skipEarlyPruning = true;
           value = search<NonPV, false>(pos, ss, rBeta - 1, rBeta, depth / 2, cutNode);
-          ss->skipNullMove = false;
+          ss->skipEarlyPruning = false;
           ss->excludedMove = MOVE_NONE;
 
           if (value < rBeta)
-              ext = ONE_PLY;
+              extension = ONE_PLY;
       }
 
       // Update the current move (this must be done after singular extension search)
-      newDepth = depth - ONE_PLY + ext;
+      newDepth = depth - ONE_PLY + extension;
 
       // Step 13. Pruning at shallow depth (exclude PV nodes)
       if (   !PvNode
@@ -1100,10 +1090,10 @@ moves_loop: // When in check and at SpNode search starts from here
     else if (bestValue >= beta && !pos.capture_or_promotion(bestMove) && !inCheck)
         update_stats(pos, ss, bestMove, depth, quietsSearched, quietCount - 1);
 
-    TT.store(posKey, value_to_tt(bestValue, ss->ply),
-             bestValue >= beta  ? BOUND_LOWER :
-             PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
-             depth, bestMove, ss->staticEval);
+    tte->save(posKey, value_to_tt(bestValue, ss->ply),
+              bestValue >= beta ? BOUND_LOWER :
+              PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
+              depth, bestMove, ss->staticEval, TT.get_generation());
 
     assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
 
@@ -1128,7 +1118,8 @@ moves_loop: // When in check and at SpNode search starts from here
 
     Move pv[MAX_PLY+1];
     StateInfo st;
-    const TTEntry* tte;
+    TTEntry* tte;
+    bool ttHit;
     Key posKey;
     Move ttMove, move, bestMove;
     Value bestValue, value, ttValue, futilityValue, futilityBase, oldAlpha;
@@ -1159,12 +1150,12 @@ moves_loop: // When in check and at SpNode search starts from here
 
     // Transposition table lookup
     posKey = pos.key();
-    tte = TT.probe(posKey);
-    ttMove = tte ? tte->move() : MOVE_NONE;
-    ttValue = tte ? value_from_tt(tte->value(),ss->ply) : VALUE_NONE;
+    tte = TT.probe(posKey, ttHit);
+    ttMove = ttHit ? tte->move() : MOVE_NONE;
+    ttValue = ttHit ? value_from_tt(tte->value(), ss->ply) : VALUE_NONE;
 
     if (  !PvNode
-        && tte
+        && ttHit
         && tte->depth() >= ttDepth
         && ttValue != VALUE_NONE // Only in case of TT access race
         && (ttValue >= beta ? (tte->bound() &  BOUND_LOWER)
@@ -1182,7 +1173,7 @@ moves_loop: // When in check and at SpNode search starts from here
     }
     else
     {
-        if (tte)
+        if (ttHit)
         {
             // Never assume anything on values stored in TT
             if ((ss->staticEval = bestValue = tte->eval_value()) == VALUE_NONE)
@@ -1200,9 +1191,9 @@ moves_loop: // When in check and at SpNode search starts from here
         // Stand pat. Return immediately if static value is at least beta
         if (bestValue >= beta)
         {
-            if (!tte)
-                TT.store(pos.key(), value_to_tt(bestValue, ss->ply), BOUND_LOWER,
-                         DEPTH_NONE, MOVE_NONE, ss->staticEval);
+            if (!ttHit)
+                tte->save(pos.key(), value_to_tt(bestValue, ss->ply), BOUND_LOWER,
+                          DEPTH_NONE, MOVE_NONE, ss->staticEval, TT.get_generation());
 
             return bestValue;
         }
@@ -1300,8 +1291,8 @@ moves_loop: // When in check and at SpNode search starts from here
               }
               else // Fail high
               {
-                  TT.store(posKey, value_to_tt(value, ss->ply), BOUND_LOWER,
-                           ttDepth, move, ss->staticEval);
+                  tte->save(posKey, value_to_tt(value, ss->ply), BOUND_LOWER,
+                            ttDepth, move, ss->staticEval, TT.get_generation());
 
                   return value;
               }
@@ -1314,9 +1305,9 @@ moves_loop: // When in check and at SpNode search starts from here
     if (InCheck && bestValue == -VALUE_INFINITE)
         return mated_in(ss->ply); // Plies to mate from the root
 
-    TT.store(posKey, value_to_tt(bestValue, ss->ply),
-             PvNode && bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER,
-             ttDepth, bestMove, ss->staticEval);
+    tte->save(posKey, value_to_tt(bestValue, ss->ply),
+              PvNode && bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER,
+              ttDepth, bestMove, ss->staticEval, TT.get_generation());
 
     assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
 
@@ -1398,16 +1389,13 @@ moves_loop: // When in check and at SpNode search starts from here
 
   Move Skill::pick_move() {
 
-    static RKISS rk;
-
-    // PRNG sequence should be not deterministic
-    for (int i = Time::now() % 50; i > 0; --i)
-        rk.rand<unsigned>();
+    // PRNG sequence should be non-deterministic, so we seed it with the time at init
+    static PRNG rng(Time::now());
 
     // RootMoves are already sorted by score in descending order
     int variance = std::min(RootMoves[0].score - RootMoves[candidates - 1].score, PawnValueMg);
     int weakness = 120 - 2 * level;
-    int max_s = -VALUE_INFINITE;
+    int maxScore = -VALUE_INFINITE;
     best = MOVE_NONE;
 
     // Choose best move. For each move score we add two terms both dependent on
@@ -1415,19 +1403,19 @@ moves_loop: // When in check and at SpNode search starts from here
     // then we choose the move with the resulting highest score.
     for (size_t i = 0; i < candidates; ++i)
     {
-        int s = RootMoves[i].score;
+        int score = RootMoves[i].score;
 
         // Don't allow crazy blunders even at very low skills
-        if (i > 0 && RootMoves[i - 1].score > s + 2 * PawnValueMg)
+        if (i > 0 && RootMoves[i - 1].score > score + 2 * PawnValueMg)
             break;
 
         // This is our magic formula
-        s += (  weakness * int(RootMoves[0].score - s)
-              + variance * (rk.rand<unsigned>() % weakness)) / 128;
+        score += (  weakness * int(RootMoves[0].score - score)
+                  + variance * (rng.rand<unsigned>() % weakness)) / 128;
 
-        if (s > max_s)
+        if (score > maxScore)
         {
-            max_s = s;
+            maxScore = score;
             best = RootMoves[i].pv[0];
         }
     }
@@ -1458,16 +1446,10 @@ moves_loop: // When in check and at SpNode search starts from here
             continue;
 
         Depth d = updated ? depth : depth - ONE_PLY;
-        Value v = updated ? RootMoves[i].score : RootMoves[i].prevScore;
+        Value v = updated ? RootMoves[i].score : RootMoves[i].previousScore;
 
-        bool tb = RootInTB;
-        if (tb)
-        {
-            if (abs(v) >= VALUE_MATE - MAX_PLY)
-                tb = false;
-            else
-                v = TBScore;
-        }
+        bool tb = TB::RootInTB && abs(v) < VALUE_MATE - MAX_PLY;
+        v = tb ? TB::Score : v;
 
         if (ss.rdbuf()->in_avail()) // Not at first line
             ss << "\n";
@@ -1478,7 +1460,7 @@ moves_loop: // When in check and at SpNode search starts from here
            << " score "     << ((!tb && i == PVIdx) ? UCI::format_value(v, alpha, beta) : UCI::format_value(v))
            << " nodes "     << pos.nodes_searched()
            << " nps "       << pos.nodes_searched() * 1000 / elapsed
-           << " tbhits "    << TBHits
+           << " tbhits "    << TB::Hits
            << " time "      << elapsed
            << " pv";
 
@@ -1499,15 +1481,15 @@ moves_loop: // When in check and at SpNode search starts from here
 void RootMove::insert_pv_in_tt(Position& pos) {
 
   StateInfo state[MAX_PLY], *st = state;
-  const TTEntry* tte;
   size_t idx = 0;
 
   for ( ; idx < pv.size(); ++idx)
   {
-      tte = TT.probe(pos.key());
+      bool ttHit;
+      TTEntry* tte = TT.probe(pos.key(), ttHit);
 
-      if (!tte || tte->move() != pv[idx]) // Don't overwrite correct entries
-          TT.store(pos.key(), VALUE_NONE, BOUND_NONE, DEPTH_NONE, pv[idx], VALUE_NONE);
+      if (!ttHit || tte->move() != pv[idx]) // Don't overwrite correct entries
+          tte->save(pos.key(), VALUE_NONE, BOUND_NONE, DEPTH_NONE, pv[idx], VALUE_NONE, TT.get_generation());
 
       assert(MoveList<LEGAL>(pos).contains(pv[idx]));
 
