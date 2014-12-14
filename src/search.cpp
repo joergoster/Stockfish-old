@@ -906,6 +906,7 @@ moves_loop: // When in check and at SpNode search starts from here
       // re-searched at full depth.
       if (    depth >= 3 * ONE_PLY
           &&  moveCount > 1
+          && !dangerous
           && !captureOrPromotion
           &&  move != ss->killers[0]
           &&  move != ss->killers[1])
