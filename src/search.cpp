@@ -181,7 +181,7 @@ uint64_t Search::perft(Position& pos, Depth depth) {
           pos.undo_move(*it);
       }
       if (Root)
-          sync_cout << UCI::format_move(*it, pos.is_chess960()) << ": " << cnt << sync_endl;
+          sync_cout << UCI::move(*it, pos.is_chess960()) << ": " << cnt << sync_endl;
   }
   return nodes;
 }
@@ -219,7 +219,7 @@ void Search::think() {
   {
       RootMoves.push_back(MOVE_NONE);
       sync_cout << "info depth 0 score "
-                << UCI::format_value(RootPos.checkers() ? -VALUE_MATE : VALUE_DRAW)
+                << UCI::value(RootPos.checkers() ? -VALUE_MATE : VALUE_DRAW)
                 << sync_endl;
   }
   else
@@ -277,10 +277,10 @@ void Search::think() {
       RootPos.this_thread()->wait_for(Signals.stop);
   }
 
-  sync_cout << "bestmove " << UCI::format_move(RootMoves[0].pv[0], RootPos.is_chess960());
+  sync_cout << "bestmove " << UCI::move(RootMoves[0].pv[0], RootPos.is_chess960());
 
   if (RootMoves[0].pv.size() > 1)
-      std::cout << " ponder " << UCI::format_move(RootMoves[0].pv[1], RootPos.is_chess960());
+      std::cout << " ponder " << UCI::move(RootMoves[0].pv[1], RootPos.is_chess960());
 
   std::cout << sync_endl;
 }
@@ -459,13 +459,12 @@ namespace {
     Move pv[MAX_PLY+1], quietsSearched[64];
     StateInfo st;
     TTEntry* tte;
-    bool ttHit;
     SplitPoint* splitPoint;
     Key posKey;
     Move ttMove, move, excludedMove, bestMove;
     Depth extension, newDepth, predictedDepth;
     Value bestValue, value, ttValue, eval, nullValue, futilityValue;
-    bool inCheck, givesCheck, singularExtensionNode, improving;
+    bool ttHit, inCheck, givesCheck, singularExtensionNode, improving;
     bool captureOrPromotion, dangerous, doFullDepthSearch;
     int moveCount, quietCount;
 
@@ -569,7 +568,7 @@ namespace {
 
                 tte->save(posKey, value_to_tt(value, ss->ply), BOUND_EXACT,
                           std::min(DEPTH_MAX - ONE_PLY, depth + 6 * ONE_PLY),
-                          MOVE_NONE, VALUE_NONE, TT.get_generation());
+                          MOVE_NONE, VALUE_NONE, TT.generation());
 
                 return value;
             }
@@ -599,7 +598,7 @@ namespace {
         eval = ss->staticEval =
         (ss-1)->currentMove != MOVE_NULL ? evaluate(pos) : -(ss-1)->staticEval + 2 * Eval::Tempo;
 
-        tte->save(posKey, VALUE_NONE, BOUND_NONE, DEPTH_NONE, MOVE_NONE, ss->staticEval, TT.get_generation());
+        tte->save(posKey, VALUE_NONE, BOUND_NONE, DEPTH_NONE, MOVE_NONE, ss->staticEval, TT.generation());
     }
 
     if (ss->skipEarlyPruning)
@@ -790,7 +789,7 @@ moves_loop: // When in check and at SpNode search starts from here
 
           if (thisThread == Threads.main() && Time::now() - SearchTime > 3000)
               sync_cout << "info depth " << depth / ONE_PLY
-                        << " currmove " << UCI::format_move(move, pos.is_chess960())
+                        << " currmove " << UCI::move(move, pos.is_chess960())
                         << " currmovenumber " << moveCount + PVIdx << sync_endl;
       }
 
@@ -1091,7 +1090,7 @@ moves_loop: // When in check and at SpNode search starts from here
     tte->save(posKey, value_to_tt(bestValue, ss->ply),
               bestValue >= beta ? BOUND_LOWER :
               PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
-              depth, bestMove, ss->staticEval, TT.get_generation());
+              depth, bestMove, ss->staticEval, TT.generation());
 
     assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
 
@@ -1117,11 +1116,10 @@ moves_loop: // When in check and at SpNode search starts from here
     Move pv[MAX_PLY+1];
     StateInfo st;
     TTEntry* tte;
-    bool ttHit;
     Key posKey;
     Move ttMove, move, bestMove;
     Value bestValue, value, ttValue, futilityValue, futilityBase, oldAlpha;
-    bool givesCheck, evasionPrunable;
+    bool ttHit, givesCheck, evasionPrunable;
     Depth ttDepth;
 
     if (PvNode)
@@ -1191,7 +1189,7 @@ moves_loop: // When in check and at SpNode search starts from here
         {
             if (!ttHit)
                 tte->save(pos.key(), value_to_tt(bestValue, ss->ply), BOUND_LOWER,
-                          DEPTH_NONE, MOVE_NONE, ss->staticEval, TT.get_generation());
+                          DEPTH_NONE, MOVE_NONE, ss->staticEval, TT.generation());
 
             return bestValue;
         }
@@ -1290,7 +1288,7 @@ moves_loop: // When in check and at SpNode search starts from here
               else // Fail high
               {
                   tte->save(posKey, value_to_tt(value, ss->ply), BOUND_LOWER,
-                            ttDepth, move, ss->staticEval, TT.get_generation());
+                            ttDepth, move, ss->staticEval, TT.generation());
 
                   return value;
               }
@@ -1305,7 +1303,7 @@ moves_loop: // When in check and at SpNode search starts from here
 
     tte->save(posKey, value_to_tt(bestValue, ss->ply),
               PvNode && bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER,
-              ttDepth, bestMove, ss->staticEval, TT.get_generation());
+              ttDepth, bestMove, ss->staticEval, TT.generation());
 
     assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
 
@@ -1455,7 +1453,7 @@ moves_loop: // When in check and at SpNode search starts from here
         ss << "info depth " << d / ONE_PLY
            << " seldepth "  << selDepth
            << " multipv "   << i + 1
-           << " score "     << ((!tb && i == PVIdx) ? UCI::format_value(v, alpha, beta) : UCI::format_value(v))
+           << " score "     << ((!tb && i == PVIdx) ? UCI::value(v, alpha, beta) : UCI::value(v))
            << " nodes "     << pos.nodes_searched()
            << " nps "       << pos.nodes_searched() * 1000 / elapsed
            << " tbhits "    << TB::Hits
@@ -1463,7 +1461,7 @@ moves_loop: // When in check and at SpNode search starts from here
            << " pv";
 
         for (size_t j = 0; j < RootMoves[i].pv.size(); ++j)
-            ss << " " << UCI::format_move(RootMoves[i].pv[j], pos.is_chess960());
+            ss << " " << UCI::move(RootMoves[i].pv[j], pos.is_chess960());
     }
 
     return ss.str();
@@ -1487,7 +1485,7 @@ void RootMove::insert_pv_in_tt(Position& pos) {
       TTEntry* tte = TT.probe(pos.key(), ttHit);
 
       if (!ttHit || tte->move() != pv[idx]) // Don't overwrite correct entries
-          tte->save(pos.key(), VALUE_NONE, BOUND_NONE, DEPTH_NONE, pv[idx], VALUE_NONE, TT.get_generation());
+          tte->save(pos.key(), VALUE_NONE, BOUND_NONE, DEPTH_NONE, pv[idx], VALUE_NONE, TT.generation());
 
       assert(MoveList<LEGAL>(pos).contains(pv[idx]));
 
