@@ -113,6 +113,8 @@ Endgames::Endgames() {
   add<KNNK>("KNNK");
   add<KRNKR>("KRNKR");
   add<KRBKR>("KRBKR");
+  add<KQNKQ>("KQNKQ");
+  add<KQBKQ>("KQBKQ");
   add<KBNK>("KBNK");
   add<KRKP>("KRKP");
   add<KRKB>("KRKB");
@@ -479,6 +481,8 @@ Value Endgame<KBBKN>::operator()(const Position& pos) const {
 template<> Value Endgame<KNNK>::operator()(const Position&) const { return VALUE_DRAW; }
 template<> Value Endgame<KRNKR>::operator()(const Position&) const { return VALUE_DRAW; }
 template<> Value Endgame<KRBKR>::operator()(const Position&) const { return VALUE_DRAW; }
+template<> Value Endgame<KQNKQ>::operator()(const Position&) const { return VALUE_DRAW; }
+template<> Value Endgame<KQBKQ>::operator()(const Position&) const { return VALUE_DRAW; }
 
 
 /// KB and one or more pawns vs K. It checks for draws with rook pawns and
