@@ -59,6 +59,12 @@ namespace {
   const int PushClose[8] = { 0, 0, 100, 80, 60, 40, 20, 10 };
   const int PushAway [8] = { 0, 5, 20, 40, 60, 80, 90, 100 };
 
+  // FortressMask[Color] used by KQ vs KR and one or more pawns endgame
+  Bitboard FortressMask[] = {
+      0x00FF7E4242C37E00ULL,
+      0x007EC342427EFF00ULL
+  };
+
 #ifndef NDEBUG
   bool verify_material(const Position& pos, Color c, Value npm, int pawnsCnt) {
     return pos.non_pawn_material(c) == npm && pos.count<PAWN>(c) == pawnsCnt;
@@ -578,18 +584,19 @@ ScaleFactor Endgame<KQKRPs>::operator()(const Position& pos) const {
   assert(pos.count<ROOK>(weakSide) == 1);
   assert(pos.count<PAWN>(weakSide) >= 1);
 
-  Square kingSq = pos.king_square(weakSide);
+  Square strongKingSq = pos.king_square(strongSide);
+  Square weakKingSq = pos.king_square(weakSide);
   Square rsq = pos.list<ROOK>(weakSide)[0];
 
-  if (    relative_rank(weakSide, kingSq) <= RANK_2
-      &&  relative_rank(weakSide, pos.king_square(strongSide)) >= RANK_4
-      &&  relative_rank(weakSide, rsq) == RANK_3
+  if (      pos.pieces(weakSide, PAWN) & FortressMask[weakSide]
+      &&    relative_rank(weakSide, strongKingSq) > relative_rank(weakSide, rsq)
       && (  pos.pieces(weakSide, PAWN)
-          & pos.attacks_from<KING>(kingSq)
+          & pos.attacks_from<KING>(weakKingSq)
           & pos.attacks_from<PAWN>(rsq, strongSide)))
           return SCALE_FACTOR_DRAW;
 
-  return SCALE_FACTOR_NONE;
+  return pos.rule50_count() > 14 ? ScaleFactor(int(SCALE_FACTOR_NORMAL * double((101 - pos.rule50_count()) / 172)))
+                                 : SCALE_FACTOR_NONE;
 }
 
 
