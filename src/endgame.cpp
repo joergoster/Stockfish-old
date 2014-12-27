@@ -412,10 +412,11 @@ Value Endgame<KQKBB>::operator()(const Position& pos) const {
   Square bishop1Sq = pos.list<BISHOP>(weakSide)[0];
   Square bishop2Sq = pos.list<BISHOP>(weakSide)[1];
 
-  Value result =  pos.bishop_pair(weakSide) ? VALUE_DRAW : VALUE_KNOWN_WIN
-                + 4 * PushAway[distance(bishop1Sq, loserKSq)]
-                + 4 * PushAway[distance(bishop2Sq, loserKSq)]
-                + 6 * PushAway[distance(bishop1Sq, bishop2Sq)];
+  Value result =  (pos.bishop_pair(weakSide) ? VALUE_DRAW : VALUE_KNOWN_WIN)
+                + 2 * PushToEdges[loserKSq]
+                + PushAway[distance(bishop1Sq, loserKSq)]
+                + PushAway[distance(bishop2Sq, loserKSq)]
+                + PushAway[distance(bishop1Sq, bishop2Sq)];
 
   return strongSide == pos.side_to_move() ? result : -result;
 }
@@ -454,9 +455,10 @@ Value Endgame<KQKNN>::operator()(const Position& pos) const {
   Square knight2Sq = pos.list<KNIGHT>(weakSide)[1];
 
   Value result =  VALUE_DRAW
-                + 4 * PushAway[distance(knight1Sq, loserKSq)]
-                + 4 * PushAway[distance(knight2Sq, loserKSq)]
-                + 6 * PushAway[distance(knight1Sq, knight2Sq)];
+                + 2 * PushToEdges[loserKSq]
+                + 2 * PushAway[distance(knight1Sq, loserKSq)]
+                + 2 * PushAway[distance(knight2Sq, loserKSq)]
+                + 2 * PushAway[distance(knight1Sq, knight2Sq)];
 
   return strongSide == pos.side_to_move() ? result : -result;
 }
