@@ -409,9 +409,13 @@ Value Endgame<KQKBB>::operator()(const Position& pos) const {
   assert(verify_material(pos, weakSide, 2 * BishopValueMg, 0));
 
   Square loserKSq = pos.king_square(weakSide);
+  Square bishop1Sq = pos.list<BISHOP>(weakSide)[0];
+  Square bishop2Sq = pos.list<BISHOP>(weakSide)[1];
 
-  Value result =  pos.bishop_pair(weakSide) ? 2 * PawnValueEg : VALUE_KNOWN_WIN
-                + PushToEdges[loserKSq];
+  Value result =  pos.bishop_pair(weakSide) ? VALUE_DRAW : VALUE_KNOWN_WIN
+                + 4 * PushAway[distance(bishop1Sq, loserKSq)]
+                + 4 * PushAway[distance(bishop2Sq, loserKSq)]
+                + 6 * PushAway[distance(bishop1Sq, bishop2Sq)];
 
   return strongSide == pos.side_to_move() ? result : -result;
 }
