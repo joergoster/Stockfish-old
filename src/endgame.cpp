@@ -532,6 +532,20 @@ ScaleFactor Endgame<KBPsK>::operator()(const Position& pos) const {
        }
   }
 
+  // Check for the fortress draw in KBPK
+  if (   pos.count<PAWN>(strongSide) == 1
+      && pos.count<PAWN>(weakSide) == 0
+      && (pawnFile == FILE_B || pawnFile == FILE_G))
+  {
+      // Assume strongSide is white and the pawn is on files A-D
+      Square pawnSq     = normalize(pos, strongSide, pos.list<PAWN>(strongSide)[0]);
+      Square weakKingSq = normalize(pos, strongSide, pos.king_square(weakSide));
+      Square bishopSq   = normalize(pos, strongSide, pos.list<BISHOP>(strongSide)[0]);
+
+      if (pawnSq == SQ_B6 && bishopSq == SQ_A7 && weakKingSq == SQ_B7)
+          return SCALE_FACTOR_DRAW;
+  }
+
   // If all the pawns are on the same B or G file, then it's potentially a draw
   if (    (pawnFile == FILE_B || pawnFile == FILE_G)
       && !(pos.pieces(PAWN) & ~file_bb(pawnFile))
