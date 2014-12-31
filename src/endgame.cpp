@@ -542,7 +542,7 @@ ScaleFactor Endgame<KBPsK>::operator()(const Position& pos) const {
       Square weakKingSq = normalize(pos, strongSide, pos.king_square(weakSide));
       Square bishopSq   = normalize(pos, strongSide, pos.list<BISHOP>(strongSide)[0]);
 
-      if (pawnSq == SQ_B6 && bishopSq == SQ_A7 && weakKingSq == SQ_B7)
+      if (pawnSq == SQ_B6 && bishopSq == SQ_A7 && (weakKingSq == SQ_B7 || weakKingSq == SQ_A8))
           return SCALE_FACTOR_DRAW;
   }
 

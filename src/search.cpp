@@ -196,7 +196,7 @@ template uint64_t Search::perft<true>(Position& pos, Depth depth);
 void Search::think() {
 
   RootPly = RootPos.game_ply();
-  TimeMgr.init(Limits, RootPly, RootPos.side_to_move());
+  TimeMgr.init(Limits, RootPos.side_to_move(), RootPly);
 
   int contempt = Options["Contempt"] * PawnValueEg / 100; // From centipawns
   DrawValue[ RootPos.side_to_move()] = VALUE_DRAW - Value(contempt);
