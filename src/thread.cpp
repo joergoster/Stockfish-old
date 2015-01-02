@@ -23,7 +23,7 @@
 #include "movegen.h"
 #include "search.h"
 #include "thread.h"
-#include "ucioption.h"
+#include "uci.h"
 
 using namespace Search;
 
@@ -69,12 +69,12 @@ void ThreadBase::notify_one() {
 }
 
 
-// wait_for() set the thread to sleep until condition 'b' turns true
+// wait_for() set the thread to sleep until 'condition' turns true
 
-void ThreadBase::wait_for(volatile const bool& b) {
+void ThreadBase::wait_for(volatile const bool& condition) {
 
   mutex.lock();
-  while (!b) sleepCondition.wait(mutex);
+  while (!condition) sleepCondition.wait(mutex);
   mutex.unlock();
 }
 
@@ -255,7 +255,7 @@ Thread* ThreadPool::available_slave(const Thread* master) const {
 // leave their idle loops and call search(). When all threads have returned from
 // search() then split() returns.
 
-void Thread::split(Position& pos, const Stack* ss, Value alpha, Value beta, Value* bestValue,
+void Thread::split(Position& pos, Stack* ss, Value alpha, Value beta, Value* bestValue,
                    Move* bestMove, Depth depth, int moveCount,
                    MovePicker* movePicker, int nodeType, bool cutNode) {
 
@@ -341,10 +341,10 @@ void Thread::split(Position& pos, const Stack* ss, Value alpha, Value beta, Valu
 
 void ThreadPool::wait_for_think_finished() {
 
-  MainThread* t = main();
-  t->mutex.lock();
-  while (t->thinking) sleepCondition.wait(t->mutex);
-  t->mutex.unlock();
+  MainThread* th = main();
+  th->mutex.lock();
+  while (th->thinking) sleepCondition.wait(th->mutex);
+  th->mutex.unlock();
 }
 
 
