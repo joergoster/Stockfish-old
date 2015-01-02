@@ -464,7 +464,7 @@ namespace {
     Depth extension, newDepth, predictedDepth;
     Value bestValue, value, ttValue, eval, nullValue, futilityValue;
     bool ttHit, inCheck, givesCheck, singularExtensionNode, improving;
-    bool captureOrPromotion, dangerous, doFullDepthSearch;
+    bool captureOrPromotion, dangerous, doFullDepthSearch, LateEndgame;
     int moveCount, quietCount;
 
     // Step 1. Initialize node
@@ -801,6 +801,8 @@ moves_loop: // When in check and at SpNode search starts from here
                  || type_of(move) != NORMAL
                  || pos.advanced_pawn_push(move);
 
+      LateEndgame = pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) <= 4 * RookValueMg;
+
       // Step 12. Extend checks
       if (givesCheck && pos.see_sign(move) >= VALUE_ZERO)
           extension = ONE_PLY;
@@ -901,8 +903,7 @@ moves_loop: // When in check and at SpNode search starts from here
           &&  moveCount > 1
           && !captureOrPromotion
           &&  move != ss->killers[0]
-          &&  move != ss->killers[1]
-          && (ss->ply > 6 || moveCount > 2))
+          &&  move != ss->killers[1])
       {
           ss->reduction = reduction<PvNode>(improving, depth, moveCount);
 
@@ -910,7 +911,7 @@ moves_loop: // When in check and at SpNode search starts from here
               ||  History[pos.piece_on(to_sq(move))][to_sq(move)] < 0)
               ss->reduction += ONE_PLY;
 
-          if (move == countermoves[0] || move == countermoves[1])
+          if (move == countermoves[0] || move == countermoves[1] || LateEndgame)
               ss->reduction = std::max(DEPTH_ZERO, ss->reduction - ONE_PLY);
 
           // Decrease reduction for moves that escape a capture
