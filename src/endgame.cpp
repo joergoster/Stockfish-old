@@ -1,7 +1,7 @@
 /*
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
-  Copyright (C) 2008-2014 Marco Costalba, Joona Kiiski, Tord Romstad
+  Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -173,7 +173,7 @@ Value Endgame<KXK>::operator()(const Position& pos) const {
 
   // Draw detection with 2 or more bishops of the same color
   if (    more_than_one(pos.pieces(strongSide, BISHOP))
-      && !pos.bishop_pair(strongSide)
+      && !opposite_colors(pos.list<BISHOP>(strongSide)[0], pos.list<BISHOP>(strongSide)[1])
       && !pos.pieces(strongSide, ROOK, QUEEN)  // to avoid
       && !pos.pieces(strongSide, KNIGHT))      // false positives!
       return VALUE_DRAW;
@@ -189,7 +189,8 @@ Value Endgame<KXK>::operator()(const Position& pos) const {
   if (   pos.count<QUEEN>(strongSide)
       || pos.count<ROOK>(strongSide)
       ||(pos.count<BISHOP>(strongSide) && pos.count<KNIGHT>(strongSide))
-      || pos.bishop_pair(strongSide)
+      ||(pos.count<BISHOP>(strongSide) > 1 && opposite_colors(pos.list<BISHOP>(strongSide)[0],
+                                                              pos.list<BISHOP>(strongSide)[1]))
       || pos.count<KNIGHT>(strongSide) >= 3)
       result += VALUE_KNOWN_WIN;
 
@@ -240,7 +241,7 @@ Value Endgame<KPK>::operator()(const Position& pos) const {
 
   Color us = strongSide == pos.side_to_move() ? WHITE : BLACK;
 
-  if (!Bitbases::probe_kpk(wksq, psq, bksq, us))
+  if (!Bitbases::probe(wksq, psq, bksq, us))
       return VALUE_DRAW;
 
   Value result = VALUE_KNOWN_WIN + PawnValueEg + Value(rank_of(psq));
@@ -402,7 +403,7 @@ Value Endgame<KQKBB>::operator()(const Position& pos) const {
   Square bishop1Sq = pos.list<BISHOP>(weakSide)[0];
   Square bishop2Sq = pos.list<BISHOP>(weakSide)[1];
 
-  Value result =  (pos.bishop_pair(weakSide) ? VALUE_DRAW : VALUE_KNOWN_WIN)
+  Value result =  (opposite_colors(bishop1Sq, bishop2Sq) ? VALUE_DRAW : VALUE_KNOWN_WIN)
                 + 2 * PushToEdges[loserKSq]
                 + PushAway[distance(bishop1Sq, loserKSq)]
                 + PushAway[distance(bishop2Sq, loserKSq)]
@@ -469,7 +470,8 @@ Value Endgame<KBBKN>::operator()(const Position& pos) const {
   Square loserKSq = pos.king_square(weakSide);
   Square knightSq = pos.list<KNIGHT>(weakSide)[0];
 
-  Value result =  pos.bishop_pair(strongSide) ? 2 * PawnValueEg
+  Value result =  opposite_colors(pos.list<BISHOP>(strongSide)[0],
+                                  pos.list<BISHOP>(strongSide)[1]) ? 2 * PawnValueEg
                 + PushToCorners[loserKSq]
                 + PushClose[distance(winnerKSq, loserKSq)]
                 + PushAway[distance(loserKSq, knightSq)]
@@ -1020,5 +1022,5 @@ ScaleFactor Endgame<KPKP>::operator()(const Position& pos) const {
 
   // Probe the KPK bitbase with the weakest side's pawn removed. If it's a draw,
   // it's probably at least a draw even with the pawn.
-  return Bitbases::probe_kpk(wksq, psq, bksq, us) ? SCALE_FACTOR_NONE : SCALE_FACTOR_DRAW;
+  return Bitbases::probe(wksq, psq, bksq, us) ? SCALE_FACTOR_NONE : SCALE_FACTOR_DRAW;
 }

@@ -1,7 +1,7 @@
 /*
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
-  Copyright (C) 2008-2014 Marco Costalba, Joona Kiiski, Tord Romstad
+  Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
-#include <cstring>
+#include <cstring>   // For std::memset
 #include <iostream>
 #include <sstream>
 
@@ -585,7 +585,7 @@ namespace {
     else if (ttHit)
     {
         // Never assume anything on values stored in TT
-        if ((ss->staticEval = eval = tte->eval_value()) == VALUE_NONE)
+        if ((ss->staticEval = eval = tte->eval()) == VALUE_NONE)
             eval = ss->staticEval = evaluate(pos);
 
         // Can ttValue be used as a better position evaluation?
@@ -1172,7 +1172,7 @@ moves_loop: // When in check and at SpNode search starts from here
         if (ttHit)
         {
             // Never assume anything on values stored in TT
-            if ((ss->staticEval = bestValue = tte->eval_value()) == VALUE_NONE)
+            if ((ss->staticEval = bestValue = tte->eval()) == VALUE_NONE)
                 ss->staticEval = bestValue = evaluate(pos);
 
             // Can ttValue be used as a better position evaluation?
@@ -1453,8 +1453,12 @@ moves_loop: // When in check and at SpNode search starts from here
         ss << "info depth " << d / ONE_PLY
            << " seldepth "  << selDepth
            << " multipv "   << i + 1
-           << " score "     << ((!tb && i == PVIdx) ? UCI::value(v, alpha, beta) : UCI::value(v))
-           << " nodes "     << pos.nodes_searched()
+           << " score "     << UCI::value(v);
+
+        if (!tb && i == PVIdx)
+              ss << (v >= beta ? " lowerbound" : v <= alpha ? " upperbound" : "");
+
+        ss << " nodes "     << pos.nodes_searched()
            << " nps "       << pos.nodes_searched() * 1000 / elapsed
            << " tbhits "    << TB::Hits
            << " time "      << elapsed
