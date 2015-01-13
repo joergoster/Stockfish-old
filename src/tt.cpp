@@ -1,7 +1,7 @@
 /*
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
-  Copyright (C) 2008-2014 Marco Costalba, Joona Kiiski, Tord Romstad
+  Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <cstring>
+#include <cstring>   // For std::memset
 #include <iostream>
 
 #include "bitboard.h"
@@ -32,6 +32,8 @@ TranspositionTable TT; // Our global transposition table
 
 void TranspositionTable::resize(size_t mbSize) {
 
+  assert(sizeof(TTCluster) == CacheLineSize / 2);
+
   size_t newClusterCount = size_t(1) << msb((mbSize * 1024 * 1024) / sizeof(TTCluster));
 
   if (newClusterCount == clusterCount)
@@ -40,7 +42,7 @@ void TranspositionTable::resize(size_t mbSize) {
   clusterCount = newClusterCount;
 
   free(mem);
-  mem = calloc(clusterCount * sizeof(TTCluster) + CACHE_LINE_SIZE - 1, 1);
+  mem = calloc(clusterCount * sizeof(TTCluster) + CacheLineSize - 1, 1);
 
   if (!mem)
   {
@@ -49,7 +51,7 @@ void TranspositionTable::resize(size_t mbSize) {
       exit(EXIT_FAILURE);
   }
 
-  table = (TTCluster*)((uintptr_t(mem) + CACHE_LINE_SIZE - 1) & ~(CACHE_LINE_SIZE - 1));
+  table = (TTCluster*)((uintptr_t(mem) + CacheLineSize - 1) & ~(CacheLineSize - 1));
 }
 
 
@@ -75,7 +77,7 @@ TTEntry* TranspositionTable::probe(const Key key, bool& found) const {
   TTEntry* const tte = first_entry(key);
   const uint16_t key16 = key >> 48;  // Use the high 16 bits as key inside the cluster
 
-  for (unsigned i = 0; i < TTClusterSize; ++i)
+  for (int i = 0; i < TTClusterSize; ++i)
       if (!tte[i].key16 || tte[i].key16 == key16)
       {
           if (tte[i].key16)
@@ -86,7 +88,7 @@ TTEntry* TranspositionTable::probe(const Key key, bool& found) const {
 
   // Find an entry to be replaced according to the replacement strategy
   TTEntry* replace = tte;
-  for (unsigned i = 1; i < TTClusterSize; ++i)
+  for (int i = 1; i < TTClusterSize; ++i)
       if (  ((  tte[i].genBound8 & 0xFC) == generation8 || tte[i].bound() == BOUND_EXACT)
           - ((replace->genBound8 & 0xFC) == generation8)
           - (tte[i].depth8 < replace->depth8) < 0)

@@ -1,7 +1,7 @@
 /*
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
-  Copyright (C) 2008-2014 Marco Costalba, Joona Kiiski, Tord Romstad
+  Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -71,7 +71,7 @@ namespace {
 } // namespace
 
 
-bool Bitbases::probe_kpk(Square wksq, Square wpsq, Square bksq, Color us) {
+bool Bitbases::probe(Square wksq, Square wpsq, Square bksq, Color us) {
 
   assert(file_of(wpsq) <= FILE_D);
 
@@ -80,7 +80,7 @@ bool Bitbases::probe_kpk(Square wksq, Square wpsq, Square bksq, Color us) {
 }
 
 
-void Bitbases::init_kpk() {
+void Bitbases::init() {
 
   unsigned idx, repeat = 1;
   std::vector<KPKPosition> db;
