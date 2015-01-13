@@ -905,7 +905,7 @@ moves_loop: // When in check and at SpNode search starts from here
           &&  move != ss->killers[0]
           &&  move != ss->killers[1])
       {
-          ss->reduction = reduction<PvNode>(improving, depth - LateEndgame * ONE_PLY, moveCount);
+          ss->reduction = reduction<PvNode>(improving, depth - LateEndgame * ONE_PLY, moveCount - LateEndgame);
 
           if (   (!PvNode && cutNode)
               ||  History[pos.piece_on(to_sq(move))][to_sq(move)] < 0)
