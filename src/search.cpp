@@ -801,7 +801,7 @@ moves_loop: // When in check and at SpNode search starts from here
                  || type_of(move) != NORMAL
                  || pos.advanced_pawn_push(move);
 
-      LateEndgame = pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) <= 4 * RookValueMg;
+      LateEndgame = pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) <= 3 * RookValueMg;
 
       // Step 12. Extend checks
       if (givesCheck && pos.see_sign(move) >= VALUE_ZERO)
@@ -905,13 +905,13 @@ moves_loop: // When in check and at SpNode search starts from here
           &&  move != ss->killers[0]
           &&  move != ss->killers[1])
       {
-          ss->reduction = reduction<PvNode>(improving, depth, moveCount);
+          ss->reduction = reduction<PvNode>(improving, depth - LateEndgame * ONE_PLY, moveCount);
 
           if (   (!PvNode && cutNode)
               ||  History[pos.piece_on(to_sq(move))][to_sq(move)] < 0)
               ss->reduction += ONE_PLY;
 
-          if (move == countermoves[0] || move == countermoves[1] || LateEndgame)
+          if (move == countermoves[0] || move == countermoves[1])
               ss->reduction = std::max(DEPTH_ZERO, ss->reduction - ONE_PLY);
 
           // Decrease reduction for moves that escape a capture
