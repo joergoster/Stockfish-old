@@ -86,7 +86,7 @@ namespace {
 
   size_t PVIdx;
   TimeManager TimeMgr;
-  bool null_disabled;
+  bool doNull;
   double BestMoveChanges;
   Value DrawValue[COLOR_NB];
   HistoryStats History;
@@ -311,7 +311,7 @@ namespace {
     Countermoves.clear();
     Followupmoves.clear();
 
-    null_disabled = Options["Disable NullMove"];
+    doNull = Options["NullMove"];
     size_t multiPV = Options["MultiPV"];
     Skill skill(Options["Skill Level"], RootMoves.size());
 
@@ -641,7 +641,7 @@ namespace {
         return eval - futility_margin(depth);
 
     // Step 8. Null move search with verification search (is omitted in PV nodes)
-    if (   !null_disabled
+    if (    doNull
         && !PvNode
         &&  depth >= 2 * ONE_PLY
         &&  eval >= beta
@@ -674,8 +674,8 @@ namespace {
                 return nullValue;
 
             // Do verification search at high depths
-            ss->skipEarlyPruning = true;
             R = 5 * ONE_PLY;
+            ss->skipEarlyPruning = true;
             Value v = depth-R < ONE_PLY ? qsearch<NonPV, false>(pos, ss, beta-1, beta, DEPTH_ZERO)
                                         :  search<NonPV, false>(pos, ss, beta-1, beta, depth-R, false);
             ss->skipEarlyPruning = false;
