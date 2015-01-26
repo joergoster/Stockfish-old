@@ -279,7 +279,7 @@ void Search::think() {
 
   sync_cout << "bestmove " << UCI::move(RootMoves[0].pv[0], RootPos.is_chess960());
 
-  if (RootMoves[0].pv.size() > 1)
+  if (RootMoves[0].pv.size() > 1 || RootMoves[0].extract_ponder_from_tt(RootPos))
       std::cout << " ponder " << UCI::move(RootMoves[0].pv[1], RootPos.is_chess960());
 
   std::cout << sync_endl;
@@ -369,7 +369,8 @@ namespace {
 
                 // When failing high/low give some update (without cluttering
                 // the UI) before a re-search.
-                if (  (bestValue <= alpha || bestValue >= beta)
+                if (   multiPV == 1
+                    && (bestValue <= alpha || bestValue >= beta)
                     && Time::now() - SearchTime > 3000)
                     sync_cout << uci_pv(pos, depth, alpha, beta) << sync_endl;
 
@@ -633,7 +634,7 @@ namespace {
     }
 
     // Step 7. Futility pruning: child node (skipped when in check)
-    if (   !PvNode
+    if (   !RootNode
         &&  depth < 7 * ONE_PLY
         &&  eval - futility_margin(depth) >= beta
         &&  eval < VALUE_KNOWN_WIN  // Do not return unproven wins
@@ -835,8 +836,8 @@ moves_loop: // When in check and at SpNode search starts from here
       // Update the current move (this must be done after singular extension search)
       newDepth = depth - ONE_PLY + extension;
 
-      // Step 13. Pruning at shallow depth (exclude PV nodes)
-      if (   !PvNode
+      // Step 13. Pruning at shallow depth
+      if (   !RootNode
           && !captureOrPromotion
           && !inCheck
           && !dangerous
@@ -915,7 +916,7 @@ moves_loop: // When in check and at SpNode search starts from here
           ss->reduction = reduction<PvNode>(improving, depth, moveCount);
 
           if (   (!PvNode && cutNode)
-              ||  History[pos.piece_on(to_sq(move))][to_sq(move)] < 0)
+              ||  History[pos.piece_on(to_sq(move))][to_sq(move)] < VALUE_ZERO)
               ss->reduction += ONE_PLY;
 
           if (move == countermoves[0] || move == countermoves[1])
@@ -925,7 +926,7 @@ moves_loop: // When in check and at SpNode search starts from here
           if (   ss->reduction
               && type_of(move) == NORMAL
               && type_of(pos.piece_on(to_sq(move))) != PAWN
-              && pos.see(make_move(to_sq(move), from_sq(move))) < 0)
+              && pos.see(make_move(to_sq(move), from_sq(move))) < VALUE_ZERO)
               ss->reduction = std::max(DEPTH_ZERO, ss->reduction - ONE_PLY);
 
           Depth d = std::max(newDepth - ss->reduction, ONE_PLY);
@@ -1219,8 +1220,7 @@ moves_loop: // When in check and at SpNode search starts from here
                   : pos.gives_check(move, ci);
 
       // Futility pruning
-      if (   !PvNode
-          && !InCheck
+      if (   !InCheck
           && !givesCheck
           &&  futilityBase > -VALUE_KNOWN_WIN
           && !pos.advanced_pawn_push(move))
@@ -1229,13 +1229,13 @@ moves_loop: // When in check and at SpNode search starts from here
 
           futilityValue = futilityBase + PieceValue[EG][pos.piece_on(to_sq(move))];
 
-          if (futilityValue < beta)
+          if (futilityValue <= alpha)
           {
               bestValue = std::max(bestValue, futilityValue);
               continue;
           }
 
-          if (futilityBase < beta && pos.see(move) <= VALUE_ZERO)
+          if (futilityBase <= alpha && pos.see(move) <= VALUE_ZERO)
           {
               bestValue = std::max(bestValue, futilityBase);
               continue;
@@ -1249,8 +1249,7 @@ moves_loop: // When in check and at SpNode search starts from here
                        && !pos.can_castle(pos.side_to_move());
 
       // Don't search moves with negative SEE values
-      if (   !PvNode
-          && (!InCheck || evasionPrunable)
+      if (  (!InCheck || evasionPrunable)
           &&  type_of(move) != PROMOTION
           &&  pos.see_sign(move) < VALUE_ZERO)
           continue;
@@ -1499,6 +1498,30 @@ void RootMove::insert_pv_in_tt(Position& pos) {
   }
 
   while (idx) pos.undo_move(pv[--idx]);
+}
+
+
+/// RootMove::extract_ponder_from_tt() is called in case we have no ponder move before
+/// exiting the search, for instance in case we stop the search during a fail high at
+/// root. We try hard to have a ponder move to return to the GUI, otherwise in case of
+/// 'ponder on' we have nothing to think on.
+
+Move RootMove::extract_ponder_from_tt(Position& pos)
+{
+    StateInfo st;
+    bool found;
+
+    assert(pv.size() == 1);
+
+    pos.do_move(pv[0], st);
+    TTEntry* tte = TT.probe(pos.key(), found);
+    Move m = found ? tte->move() : MOVE_NONE;
+    if (!MoveList<LEGAL>(pos).contains(m))
+        m = MOVE_NONE;
+
+    pos.undo_move(pv[0]);
+    pv.push_back(m);
+    return m;
 }
 
 

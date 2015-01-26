@@ -65,8 +65,9 @@
 
 #if defined(USE_PEXT)
 #  include <immintrin.h> // Header for _pext_u64() intrinsic
+#  define pext(b, m) _pext_u64(b, m)
 #else
-#  define _pext_u64(b, m) (0)
+#  define pext(b, m) (0)
 #endif
 
 #ifdef _MSC_VER
@@ -273,11 +274,15 @@ inline Score make_score(int mg, int eg) {
 /// according to the standard a simple cast to short is implementation defined
 /// and so is a right shift of a signed integer.
 inline Value mg_value(Score s) {
-  return Value(((s + 0x8000) & ~0xFFFF) / 0x10000);
+
+  union { uint16_t u; int16_t s; } mg = { uint16_t(unsigned(s + 0x8000) >> 16) };
+  return Value(mg.s);
 }
 
 inline Value eg_value(Score s) {
-  return Value((int)(unsigned(s) & 0x7FFFU) - (int)(unsigned(s) & 0x8000U));
+
+  union { uint16_t u; int16_t s; } eg = { uint16_t(unsigned(s)) };
+  return Value(eg.s);
 }
 
 #define ENABLE_BASE_OPERATORS_ON(T)                             \
