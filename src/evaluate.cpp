@@ -170,9 +170,6 @@ namespace {
   // happen in Chess960 games.
   const Score TrappedBishopA1H1 = S(50, 50);
 
-  #undef S
-  #undef V
-
   // SpaceMask[Color] contains the area of the board which is considered
   // by the space evaluation. In the middlegame, each side is given a bonus
   // based on how many squares inside this area are safe and available for
@@ -181,6 +178,8 @@ namespace {
     (FileCBB | FileDBB | FileEBB | FileFBB) & (Rank2BB | Rank3BB | Rank4BB),
     (FileCBB | FileDBB | FileEBB | FileFBB) & (Rank7BB | Rank6BB | Rank5BB)
   };
+
+  const Value SpaceThreshold = V(10715);
 
   // King danger constants and variables. The king danger scores are looked-up
   // in KingDanger[]. Various little "meta-bonuses" measuring the strength
@@ -201,6 +200,9 @@ namespace {
   // KingDanger[attackUnits] contains the actual king danger weighted
   // scores, indexed by a calculated integer number.
   Score KingDanger[512];
+
+  #undef S
+  #undef V
 
   // apply_weight() weighs score 's' by weight 'w' trying to prevent overflow
   Score apply_weight(Score s, const Weight& w) {
@@ -761,8 +763,8 @@ namespace {
             score -= int(relative_rank(BLACK, frontmost_sq(BLACK, b))) * Unstoppable;
     }
 
-    // Evaluate space for both sides, only during opening
-    if (pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) >= 2 * QueenValueMg + 4 * RookValueMg + 2 * KnightValueMg)
+    // Evaluate space for both sides, only during opening and early midgame
+    if (pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) >= SpaceThreshold)
     {
         Score s = evaluate_space<WHITE>(pos, ei) - evaluate_space<BLACK>(pos, ei);
         score += apply_weight(s, Weights[Space]);
