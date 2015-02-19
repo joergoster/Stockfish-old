@@ -175,7 +175,7 @@ uint64_t Search::perft(Position& pos, Depth depth) {
           cnt = 1, nodes++;
       else
       {
-          pos.do_move(*it, st, ci, pos.gives_check(*it, ci));
+          pos.do_move(*it, st, pos.gives_check(*it, ci));
           cnt = leaf ? MoveList<LEGAL>(pos).size() : perft<false>(pos, depth - ONE_PLY);
           nodes += cnt;
           pos.undo_move(*it);
@@ -711,7 +711,7 @@ namespace {
             if (pos.legal(move, ci.pinned))
             {
                 ss->currentMove = move;
-                pos.do_move(move, st, ci, pos.gives_check(move, ci));
+                pos.do_move(move, st, pos.gives_check(move, ci));
                 value = -search<NonPV, false>(pos, ss+1, -rbeta, -rbeta+1, rdepth, !cutNode);
                 pos.undo_move(move);
                 if (value >= rbeta)
@@ -905,7 +905,7 @@ moves_loop: // When in check and at SpNode search starts from here
           quietsSearched[quietCount++] = move;
 
       // Step 14. Make the move
-      pos.do_move(move, st, ci, givesCheck);
+      pos.do_move(move, st, givesCheck);
 
       // Step 15. Reduced depth search (LMR). If the move fails high it will be
       // re-searched at full depth.
@@ -1054,7 +1054,9 @@ moves_loop: // When in check and at SpNode search starts from here
           &&  Threads.size() >= 2
           &&  depth >= Threads.minimumSplitDepth
           &&  (   !thisThread->activeSplitPoint
-               || !thisThread->activeSplitPoint->allSlavesSearching)
+               || !thisThread->activeSplitPoint->allSlavesSearching
+               || (   int(Threads.size()) > MAX_SLAVES_PER_SPLITPOINT
+                   && thisThread->activeSplitPoint->slavesCount == MAX_SLAVES_PER_SPLITPOINT))
           &&  thisThread->splitPointsSize < MAX_SPLITPOINTS_PER_THREAD)
       {
           assert(bestValue > -VALUE_INFINITE && bestValue < beta);
@@ -1267,7 +1269,7 @@ moves_loop: // When in check and at SpNode search starts from here
       ss->currentMove = move;
 
       // Make and search the move
-      pos.do_move(move, st, ci, givesCheck);
+      pos.do_move(move, st, givesCheck);
       value = givesCheck ? -qsearch<NT,  true>(pos, ss+1, -beta, -alpha, depth - ONE_PLY)
                          : -qsearch<NT, false>(pos, ss+1, -beta, -alpha, depth - ONE_PLY);
       pos.undo_move(move);
@@ -1599,6 +1601,11 @@ void Thread::idle_loop() {
           // Try to late join to another split point if none of its slaves has
           // already finished.
           if (Threads.size() > 2)
+          {
+              SplitPoint *bestSp = NULL;
+              int bestThread = 0;
+              int bestScore = INT_MAX;
+
               for (size_t i = 0; i < Threads.size(); ++i)
               {
                   const int size = Threads[i]->splitPointsSize; // Local copy
@@ -1606,26 +1613,42 @@ void Thread::idle_loop() {
 
                   if (   sp
                       && sp->allSlavesSearching
+                      && sp->slavesCount < MAX_SLAVES_PER_SPLITPOINT
                       && available_to(Threads[i]))
                   {
-                      // Recheck the conditions under lock protection
-                      Threads.mutex.lock();
-                      sp->mutex.lock();
+                      int score = sp->spLevel * 256 * 256 + sp->slavesCount * 256 - sp->depth * 1;
 
-                      if (   sp->allSlavesSearching
-                          && available_to(Threads[i]))
+                      if (score < bestScore)
                       {
-                           sp->slavesMask.set(idx);
-                           activeSplitPoint = sp;
-                           searching = true;
+                           bestSp = sp;
+                           bestThread = i;
+                           bestScore = score;
                       }
-
-                      sp->mutex.unlock();
-                      Threads.mutex.unlock();
-
-                      break; // Just a single attempt
                   }
               }
+
+              if (bestSp)
+              {
+                  sp = bestSp;
+ 
+                  // Recheck the conditions under lock protection
+                  Threads.mutex.lock();
+                  sp->mutex.lock();
+
+                  if (   sp->allSlavesSearching
+                      && sp->slavesCount < MAX_SLAVES_PER_SPLITPOINT
+                      && available_to(Threads[bestThread]))
+                  {
+                      sp->slavesMask.set(idx);
+                      sp->slavesCount++;
+                      activeSplitPoint = sp;
+                      searching = true;
+                  }
+
+                  sp->mutex.unlock();
+                  Threads.mutex.unlock();
+              }
+          }
       }
 
       // Grab the lock to avoid races with Thread::notify_one()

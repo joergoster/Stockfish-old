@@ -47,7 +47,7 @@ namespace Zobrist {
   Key exclusion;
 }
 
-Key Position::exclusion_key() const { return st->key ^ Zobrist::exclusion;}
+Key Position::exclusion_key() const { return st->key ^ Zobrist::exclusion; }
 
 namespace {
 
@@ -690,10 +690,10 @@ bool Position::gives_check(Move m, const CheckInfo& ci) const {
 void Position::do_move(Move m, StateInfo& newSt) {
 
   CheckInfo ci(*this);
-  do_move(m, newSt, ci, gives_check(m, ci));
+  do_move(m, newSt, gives_check(m, ci));
 }
 
-void Position::do_move(Move m, StateInfo& newSt, const CheckInfo& ci, bool moveIsCheck) {
+void Position::do_move(Move m, StateInfo& newSt, bool moveIsCheck) {
 
   assert(is_ok(m));
   assert(&newSt != st);
@@ -856,30 +856,8 @@ void Position::do_move(Move m, StateInfo& newSt, const CheckInfo& ci, bool moveI
   // Update the key with the final value
   st->key = k;
 
-  // Update checkers bitboard: piece must be already moved due to attacks_from()
-  st->checkersBB = 0;
-
-  if (moveIsCheck)
-  {
-      if (type_of(m) != NORMAL)
-          st->checkersBB = attackers_to(king_square(them)) & pieces(us);
-      else
-      {
-          // Direct checks
-          if (ci.checkSq[pt] & to)
-              st->checkersBB |= to;
-
-          // Discovered checks
-          if (ci.dcCandidates && (ci.dcCandidates & from))
-          {
-              if (pt != ROOK)
-                  st->checkersBB |= attacks_from<ROOK>(king_square(them)) & pieces(us, QUEEN, ROOK);
-
-              if (pt != BISHOP)
-                  st->checkersBB |= attacks_from<BISHOP>(king_square(them)) & pieces(us, QUEEN, BISHOP);
-          }
-      }
-  }
+  // Calculate checkers bitboard (if move is check)
+  st->checkersBB = moveIsCheck ? attackers_to(king_square(them)) & pieces(us) : 0;
 
   sideToMove = ~sideToMove;
 
@@ -1060,8 +1038,8 @@ Value Position::see(Move m) const {
   stm = color_of(piece_on(from));
   occupied = pieces() ^ from;
 
-  // Castling moves are implemented as king capturing the rook so cannot be
-  // handled correctly. Simply return 0 that is always the correct value
+  // Castling moves are implemented as king capturing the rook so cannot
+  // be handled correctly. Simply return VALUE_ZERO that is always correct
   // unless in the rare case the rook ends up under attack.
   if (type_of(m) == CASTLING)
       return VALUE_ZERO;

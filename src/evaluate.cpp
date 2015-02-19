@@ -91,7 +91,7 @@ namespace {
   // Evaluation weights, indexed by evaluation term
   enum { Mobility, PawnStructure, PassedPawns, Space, KingSafety };
   const struct Weight { int mg, eg; } Weights[] = {
-    {289, 344}, {233, 201}, {221, 273}, {46, 0}, {324, 0}
+    {289, 344}, {233, 201}, {221, 273}, {46, 0}, {322, 0}
   };
 
   #define V(v) Value(v)
@@ -162,6 +162,8 @@ namespace {
   const Score TrappedRook        = S(92,  0);
   const Score Unstoppable        = S( 0, 20);
   const Score Hanging            = S(31, 26);
+  const Score PawnAttackThreat   = S(20, 20);
+  const Score PawnSafePush       = S( 5 , 5);
 
   // Penalty for a bishop on a1/h1 (a8/h8 for black) which is trapped by
   // a friendly pawn on b2/g2 (b7/g7 for black). This can obviously only
@@ -186,15 +188,15 @@ namespace {
   // index to KingDanger[].
   //
   // KingAttackWeights[PieceType] contains king attack weights by piece type
-  const int KingAttackWeights[] = { 0, 0, 8, 4, 4, 1 };
+  const int KingAttackWeights[] = { 0, 0, 7, 5, 4, 1 };
 
   // Bonuses for enemy's safe checks
   const int QueenContactCheck = 89;
-  const int RookContactCheck  = 72;
-  const int QueenCheck        = 51;
-  const int RookCheck         = 38;
-  const int BishopCheck       = 5;
-  const int KnightCheck       = 16;
+  const int RookContactCheck  = 71;
+  const int QueenCheck        = 50;
+  const int RookCheck         = 37;
+  const int BishopCheck       = 6;
+  const int KnightCheck       = 14;
 
   // KingDanger[attackUnits] contains the actual king danger weighted
   // scores, indexed by a calculated integer number.
@@ -412,9 +414,9 @@ namespace {
         // attacked and undefended squares around our king and the quality of
         // the pawn shelter (current 'score' value).
         attackUnits =  std::min(74, ei.kingAttackersCount[Them] * ei.kingAttackersWeight[Them])
-                     + 9 * ei.kingAdjacentZoneAttacksCount[Them]
+                     +  8 * ei.kingAdjacentZoneAttacksCount[Them]
                      + 25 * popcount<Max15>(undefended)
-                     +  10 * (ei.pinnedPieces[Us] != 0)
+                     + 11 * (ei.pinnedPieces[Us] != 0)
                      - mg_value(score) / 8
                      - !pos.count<QUEEN>(Them) * 60;
 
@@ -492,7 +494,12 @@ namespace {
   template<Color Us, bool Trace>
   Score evaluate_threats(const Position& pos, const EvalInfo& ei) {
 
-    const Color Them = (Us == WHITE ? BLACK : WHITE);
+    const Color Them        = (Us == WHITE ? BLACK    : WHITE);
+    const Square Up         = (Us == WHITE ? DELTA_N  : DELTA_S);
+    const Square Left       = (Us == WHITE ? DELTA_NW : DELTA_SE);
+    const Square Right      = (Us == WHITE ? DELTA_NE : DELTA_SW);
+    const Bitboard TRank2BB = (Us == WHITE ? Rank2BB  : Rank7BB);
+    const Bitboard TRank7BB = (Us == WHITE ? Rank7BB  : Rank2BB);
 
     enum { Defended, Weak };
     enum { Minor, Major };
@@ -540,6 +547,25 @@ namespace {
         if (b)
             score += more_than_one(b) ? KingOnMany : KingOnOne;
     }
+
+    // Add a small bonus for safe pawn pushes
+    b = pos.pieces(Us, PAWN) & ~TRank7BB;
+    b = shift_bb<Up>(b | (shift_bb<Up>(b & TRank2BB) & ~pos.pieces()));
+
+    b &=  ~pos.pieces()
+        & ~ei.attackedBy[Them][PAWN]
+        & (ei.attackedBy[Us][ALL_PIECES] | ~ei.attackedBy[Them][ALL_PIECES]);
+
+    if (b)
+        score += popcount<Full>(b) * PawnSafePush;
+
+    // Add another bonus if the pawn push attacks an enemy piece
+    b =  (shift_bb<Left>(b) | shift_bb<Right>(b))
+       &  pos.pieces(Them)
+       & ~ei.attackedBy[Us][PAWN];
+
+    if (b)
+        score += popcount<Max15>(b) * PawnAttackThreat;
 
     if (Trace)
         Tracing::write(Tracing::THREAT, Us, score);
@@ -891,14 +917,14 @@ namespace Eval {
 
   void init() {
 
-    const double MaxSlope = 8.5;
-    const double Peak = 1280;
-    double t = 0.0;
+    const int MaxSlope = 8700;
+    const int Peak = 1280000;
+    int t = 0;
 
-    for (int i = 1; i < 400; ++i)
+    for (int i = 0; i < 400; ++i)
     {
-        t = std::min(Peak, std::min(0.027 * i * i, t + MaxSlope));
-        KingDanger[i] = apply_weight(make_score(int(t), 0), Weights[KingSafety]);
+        t = std::min(Peak, std::min(i * i * 27, t + MaxSlope));
+        KingDanger[i] = apply_weight(make_score(t / 1000, 0), Weights[KingSafety]);
     }
   }
 
