@@ -762,7 +762,7 @@ namespace {
     }
 
     // Evaluate space for both sides, only during opening
-    if (pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) >= 2 * QueenValueMg + 4 * RookValueMg + 2 * KnightValueMg)
+    if (pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) >= Value(10775))   // CLOP value
     {
         Score s = evaluate_space<WHITE>(pos, ei) - evaluate_space<BLACK>(pos, ei);
         score += apply_weight(s, Weights[Space]);
