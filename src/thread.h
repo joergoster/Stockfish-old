@@ -31,9 +31,9 @@
 
 struct Thread;
 
-const int MAX_THREADS = 128;
-const int MAX_SPLITPOINTS_PER_THREAD = 8;
-const int MAX_SLAVES_PER_SPLITPOINT = 4;
+const size_t MAX_THREADS = 128;
+const size_t MAX_SPLITPOINTS_PER_THREAD = 8;
+const size_t MAX_SLAVES_PER_SPLITPOINT = 4;
 
 /// Mutex and ConditionVariable struct are wrappers of the low level locking
 /// machinery and are modeled after the corresponding C++11 classes.
@@ -73,7 +73,6 @@ struct SplitPoint {
   const Position* pos;
   Search::Stack* ss;
   Thread* masterThread;
-  int spLevel;
   Depth depth;
   Value beta;
   int nodeType;
@@ -86,7 +85,6 @@ struct SplitPoint {
   // Shared variable data
   Mutex mutex;
   std::bitset<MAX_THREADS> slavesMask;
-  int slavesCount;
   volatile bool allSlavesSearching;
   volatile uint64_t nodes;
   volatile Value alpha;
@@ -138,7 +136,7 @@ struct Thread : public ThreadBase {
   size_t idx;
   int maxPly;
   SplitPoint* volatile activeSplitPoint;
-  volatile int splitPointsSize;
+  volatile size_t splitPointsSize;
   volatile bool searching;
 };
 
