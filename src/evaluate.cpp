@@ -332,6 +332,8 @@ namespace {
             // Bonus for a fianchettoed bishop on the kingside
             if (   Pt == BISHOP
                 && s == relative_square(Us, SQ_G2)
+                && pos.piece_on(s + pawn_push(Us)) == make_piece(Us, PAWN)
+                && ei.attackedBy[Us][PAWN] & (s + pawn_push(Us))
                 && distance(s, pos.king_square(Us)) == 1)
                 score += KingsideFianchetto;
 
