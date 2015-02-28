@@ -158,7 +158,7 @@ namespace {
   const Score RookOnOpenFile     = S(43, 21);
   const Score RookOnSemiOpenFile = S(19, 10);
   const Score BishopPawns        = S( 8, 12);
-  const Score KingsideFianchetto = S(16,  0);
+  const Score KingsideFianchetto = S(12,  0);
   const Score MinorBehindPawn    = S(16,  0);
   const Score TrappedRook        = S(92,  0);
   const Score Unstoppable        = S( 0, 20);
@@ -333,8 +333,8 @@ namespace {
             if (   Pt == BISHOP
                 && s == relative_square(Us, SQ_G2)
                 && pos.piece_on(s + pawn_push(Us)) == make_piece(Us, PAWN)
-                && ei.attackedBy[Us][PAWN] & (s + pawn_push(Us))
-                && distance(s, pos.king_square(Us)) == 1)
+                && pos.piece_on(s + DELTA_E) == make_piece(Us, PAWN)
+                && pos.piece_on(s + DELTA_W) == make_piece(Us, PAWN))
                 score += KingsideFianchetto;
 
             // An important Chess960 pattern: A cornered bishop blocked by a friendly
