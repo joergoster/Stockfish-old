@@ -146,16 +146,16 @@ namespace {
   // Threat[defended/weak][minor/major attacking][attacked PieceType] contains
   // bonuses according to which piece type attacks which one.
   const Score Threat[][2][PIECE_TYPE_NB] = {
-  { { S(0, 0), S( 0, 0), S(19, 37), S(24, 37), S(44, 97), S(35,106) },   // Defended Minor
-    { S(0, 0), S( 0, 0), S( 9, 14), S( 9, 14), S( 7, 14), S(24, 48) } }, // Defended Major
-  { { S(0, 0), S( 0,32), S(33, 41), S(31, 50), S(41,100), S(35,104) },   // Weak Minor
-    { S(0, 0), S( 0,27), S(26, 57), S(26, 57), S(0 , 43), S(23, 51) } }  // Weak Major
+  { { S(0, 0), S( 0, 0), S(19, 37), S(23, 38), S(46, 98), S(34,108) },   // Defended Minor
+    { S(0, 0), S( 0, 0), S( 9, 15), S( 9, 13), S( 5, 14), S(27, 51) } }, // Defended Major
+  { { S(0, 0), S( 1,31), S(37, 41), S(35, 48), S(35,100), S(39,107) },   // Weak Minor
+    { S(0, 0), S( 1,26), S(26, 57), S(20, 58), S( 1, 38), S(23, 50) } }  // Weak Major
   };
 
   // ThreatenedByPawn[PieceType] contains a penalty according to which piece
   // type is attacked by an enemy pawn.
   const Score ThreatenedByPawn[PIECE_TYPE_NB] = {
-    S(0, 0), S(0, 0), S(107, 138), S(84, 122), S(114, 203), S(121, 217)
+    S(0, 0), S(0, 0), S(106, 137), S(82, 118), S(115, 206), S(119, 220)
   };
 
   // Assorted bonuses and penalties used by evaluation
