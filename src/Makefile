@@ -140,7 +140,7 @@ endif
 
 ### 3.1 Selecting compiler (default = gcc)
 
-CXXFLAGS += -Wall -Wcast-qual -fno-exceptions -fno-rtti -std=c++11 $(EXTRACXXFLAGS)
+CXXFLAGS += -Wall -Wcast-qual -fno-exceptions -fno-rtti $(EXTRACXXFLAGS)
 LDFLAGS += $(EXTRALDFLAGS)
 
 ifeq ($(COMP),)
@@ -150,8 +150,7 @@ endif
 ifeq ($(COMP),gcc)
 	comp=gcc
 	CXX=g++
-	CXXFLAGS += -pedantic -Wno-long-long -Wextra -Wshadow
-	LDFLAGS += -Wl,--no-as-needed
+	CXXFLAGS += -ansi -pedantic -Wno-long-long -Wextra -Wshadow
 endif
 
 ifeq ($(COMP),mingw)
@@ -171,9 +170,6 @@ ifeq ($(COMP),clang)
 	comp=clang
 	CXX=clang++
 	CXXFLAGS += -pedantic -Wno-long-long -Wextra -Wshadow
-	ifeq ($(UNAME),Darwin)
-		CXXFLAGS += -std=c++0x -stdlib=libc++
-	endif
 endif
 
 ifeq ($(comp),icc)
@@ -189,8 +185,8 @@ else
 endif
 
 ifeq ($(UNAME),Darwin)
-	CXXFLAGS += -arch $(arch) -mmacosx-version-min=10.10
-	LDFLAGS += -arch $(arch) -mmacosx-version-min=10.10
+	CXXFLAGS += -arch $(arch) -mmacosx-version-min=10.6
+	LDFLAGS += -arch $(arch) -mmacosx-version-min=10.6
 endif
 
 ### On mingw use Windows threads, otherwise POSIX
