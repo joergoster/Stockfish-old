@@ -714,6 +714,10 @@ namespace {
     if (ei.mi->specialized_eval_exists())
         return ei.mi->evaluate(pos);
 
+    // 50-move rule scaling of material
+    if (pos.rule50_count() > 10)
+        score = score * (101 - pos.rule50_count()) / 90;
+
     // Probe the pawn hash table
     ei.pi = Pawns::probe(pos);
     score += ei.pi->pawns_score() * Weights[PawnStructure];
