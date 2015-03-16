@@ -826,7 +826,7 @@ moves_loop: // When in check and at SpNode search starts from here
               continue;
 
           moveCount = ++splitPoint->moveCount;
-          splitPoint->mutex.unlock();
+          splitPoint->spinlock.release();
       }
       else
           ++moveCount;
@@ -895,7 +895,7 @@ moves_loop: // When in check and at SpNode search starts from here
               && moveCount >= FutilityMoveCounts[improving][depth])
           {
               if (SpNode)
-                  splitPoint->mutex.lock();
+                  splitPoint->spinlock.acquire();
 
               continue;
           }
@@ -914,7 +914,7 @@ moves_loop: // When in check and at SpNode search starts from here
 
                   if (SpNode)
                   {
-                      splitPoint->mutex.lock();
+                      splitPoint->spinlock.acquire();
                       if (bestValue > splitPoint->bestValue)
                           splitPoint->bestValue = bestValue;
                   }
@@ -926,7 +926,7 @@ moves_loop: // When in check and at SpNode search starts from here
           if (predictedDepth < 4 * ONE_PLY && pos.see_sign(move) < VALUE_ZERO)
           {
               if (SpNode)
-                  splitPoint->mutex.lock();
+                  splitPoint->spinlock.acquire();
 
               continue;
           }
@@ -1026,7 +1026,7 @@ moves_loop: // When in check and at SpNode search starts from here
       // Step 18. Check for new best move
       if (SpNode)
       {
-          splitPoint->mutex.lock();
+          splitPoint->spinlock.acquire();
           bestValue = splitPoint->bestValue;
           alpha = splitPoint->alpha;
       }
@@ -1595,8 +1595,25 @@ void Thread::idle_loop() {
 
   assert(!this_sp || (this_sp->master == this && searching));
 
-  while (!exit)
+  while (   !exit
+         && !(this_sp && this_sp->slavesMask.none()))
   {
+      // If there is nothing to do, sleep.
+      while(   !exit
+            && !(this_sp && this_sp->slavesMask.none())
+            && !searching)
+      {
+          if (   !this_sp 
+              && !Threads.main()->thinking)
+          {
+              std::unique_lock<Mutex> lk(mutex);
+              while (!exit && !Threads.main()->thinking)
+                    sleepCondition.wait(lk);
+          }
+          else
+              std::this_thread::yield();
+      }
+
       // If this thread has been assigned work, launch a search
       while (searching)
       {
@@ -1613,7 +1630,7 @@ void Thread::idle_loop() {
           std::memcpy(ss-2, sp->ss-2, 5 * sizeof(Stack));
           ss->splitPoint = sp;
 
-          sp->mutex.lock();
+          sp->spinlock.acquire();
 
           assert(activePosition == nullptr);
 
@@ -1639,19 +1656,10 @@ void Thread::idle_loop() {
           sp->allSlavesSearching = false;
           sp->nodes += pos.nodes_searched();
 
-          // Wake up the master thread so to allow it to return from the idle
-          // loop in case we are the last slave of the split point.
-          if (this != sp->master && sp->slavesMask.none())
-          {
-              assert(!sp->master->searching);
-
-              sp->master->notify_one();
-          }
-
           // After releasing the lock we can't access any SplitPoint related data
           // in a safe way because it could have been released under our feet by
           // the sp master.
-          sp->mutex.unlock();
+          sp->spinlock.release();
 
           // Try to late join to another split point if none of its slaves has
           // already finished.
@@ -1691,12 +1699,12 @@ void Thread::idle_loop() {
               sp = bestSp;
 
               // Recheck the conditions under lock protection
-              sp->mutex.lock();
+              sp->spinlock.acquire();
 
               if (   sp->allSlavesSearching
                   && sp->slavesMask.count() < MAX_SLAVES_PER_SPLITPOINT)
               {
-                  mutex.lock();
+                  spinlock.acquire();
 
                   if (can_join(sp))
                   {
@@ -1705,27 +1713,12 @@ void Thread::idle_loop() {
                       searching = true;
                   }
 
-                  mutex.unlock();
+                  spinlock.release();
               }
 
-              sp->mutex.unlock();
+              sp->spinlock.release();
           }
       }
-
-      // Avoid races with notify_one() fired from last slave of the split point
-      std::unique_lock<Mutex> lk(mutex);
-
-      // If we are master and all slaves have finished then exit idle_loop
-      if (this_sp && this_sp->slavesMask.none())
-      {
-          assert(!searching);
-          break;
-      }
-
-      // If we are not searching, wait for a condition to be signaled instead of
-      // wasting CPU time polling for work.
-      if (!searching && !exit)
-          sleepCondition.wait(lk);
   }
 }
 
@@ -1774,7 +1767,7 @@ void check_time() {
           {
               SplitPoint& sp = th->splitPoints[i];
 
-              sp.mutex.lock();
+              sp.spinlock.acquire();
 
               nodes += sp.nodes;
 
@@ -1782,7 +1775,7 @@ void check_time() {
                   if (sp.slavesMask.test(idx) && Threads[idx]->activePosition)
                       nodes += Threads[idx]->activePosition->nodes_searched();
 
-              sp.mutex.unlock();
+              sp.spinlock.release();
           }
 
       if (nodes >= Limits.nodes)
