@@ -765,6 +765,11 @@ namespace {
     if (pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) >= 10775)
         score += (evaluate_space<WHITE>(pos, ei) - evaluate_space<BLACK>(pos, ei)) * Weights[Space];
 
+    // Now scale down when we start to run into the 50-move rule (like in Crafty)
+    // See for example this discussion: http://www.stmintz.com/ccc/index.php?id=138042
+    if (pos.rule50_count() > 80)
+        score = score * (101 - pos.rule50_count()) / 20;
+
     // Scale winning side if position is more drawish than it appears
     Color strongSide = eg_value(score) > VALUE_DRAW ? WHITE : BLACK;
     ScaleFactor sf = ei.mi->scale_factor(pos, strongSide);
