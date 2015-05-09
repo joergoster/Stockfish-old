@@ -48,8 +48,8 @@ public:
   Spinlock() { lock = 1; } // Init here to workaround a bug with MSVC 2013
   void acquire() {
       while (lock.fetch_sub(1, std::memory_order_acquire) != 1)
-          for (int cnt = 0; lock.load(std::memory_order_relaxed) <= 0; ++cnt)
-              if (cnt >= 10000) std::this_thread::yield(); // Be nice to hyperthreading
+          while (lock.load(std::memory_order_relaxed) <= 0)
+              std::this_thread::yield(); // Be nice to hyperthreading
   }
   void release() { lock.store(1, std::memory_order_release); }
 };
@@ -89,14 +89,13 @@ struct SplitPoint {
 /// ThreadBase struct is the base of the hierarchy from where we derive all the
 /// specialized thread classes.
 
-struct ThreadBase {
+struct ThreadBase : public std::thread {
 
   virtual ~ThreadBase() = default;
   virtual void idle_loop() = 0;
   void notify_one();
   void wait_for(volatile const bool& b);
 
-  std::thread nativeThread;
   Mutex mutex;
   Spinlock spinlock;
   ConditionVariable sleepCondition;
@@ -137,6 +136,7 @@ struct Thread : public ThreadBase {
 
 struct MainThread : public Thread {
   virtual void idle_loop();
+  void join();
   volatile bool thinking = true; // Avoid a race with start_thinking()
 };
 
@@ -162,11 +162,9 @@ struct ThreadPool : public std::vector<Thread*> {
   MainThread* main() { return static_cast<MainThread*>(at(0)); }
   void read_uci_options();
   Thread* available_slave(const SplitPoint* sp) const;
-  void wait_for_think_finished();
   void start_thinking(const Position&, const Search::LimitsType&, Search::StateStackPtr&);
 
   Depth minimumSplitDepth;
-  ConditionVariable sleepCondition;
   TimerThread* timer;
 };
 

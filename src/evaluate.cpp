@@ -109,19 +109,19 @@ namespace {
   // friendly pieces.
   const Score MobilityBonus[][32] = {
     {}, {},
-    { S(-67,-48), S(-41,-27), S(-4, -7), S( 7,  4), S(14, 16), S(21, 29), // Knights
-      S( 27, 39), S( 31, 43), S(34, 44) },
-    { S(-48,-48), S(-21,-21), S(16, -2), S(30, 13), S(44, 25), S(57, 34), // Bishops
-      S( 69, 47), S( 78, 53), S(78, 56), S(83, 58), S(88, 64), S(90, 68),
-      S( 90, 74), S( 91, 76) },
-    { S(-47,-56), S(-28,-27), S(-9,  1), S( 0, 22), S( 2, 33), S( 7, 47), // Rooks
-      S(  9, 62), S( 14, 78), S(21, 89), S(23,105), S(25,113), S(26,114),
-      S( 27,115), S( 29,118), S(32,122) },
-    { S(-46,-37), S(-33,-18), S(-9,-10), S(-3, -7), S( 7,  1), S( 9,  5), // Queens
-      S( 12, 10), S( 20, 19), S(23, 22), S(24, 29), S(30, 30), S(32, 34),
-      S( 37, 35), S( 47, 38), S(47, 41), S(47, 42), S(52, 42), S(55, 42),
-      S( 58, 43), S( 60, 49), S(60, 52), S(61, 56), S(65, 57), S(68, 57),
-      S( 68, 59), S( 71, 61), S(72, 63), S(76, 63) }
+    { S(-68,-49), S(-46,-33), S(-3,-12), S( 5, -4), S( 9, 11), S(15, 16), // Knights
+      S( 23, 27), S( 33, 28), S(37, 29) },
+    { S(-49,-44), S(-23,-16), S(16,  1), S(29, 16), S(40, 25), S(51, 34), // Bishops
+      S( 55, 43), S( 61, 49), S(64, 51), S(68, 52), S(73, 55), S(75, 60),
+      S( 80, 65), S( 86, 66) },
+    { S(-50,-57), S(-28,-22), S(-11, 7), S(-1, 29), S( 0, 39), S( 1, 46), // Rooks
+      S( 10, 66), S( 16, 79), S(22, 86), S(23,103), S(30,109), S(33,111),
+      S( 37,115), S( 38,119), S(48,124) },
+    { S(-43,-30), S(-27,-15), S( 1, -5), S( 2, -3), S(14, 10), S(18, 24), // Queens
+      S( 20, 27), S( 33, 37), S(33, 38), S(34, 43), S(40, 46), S(43, 56),
+      S( 46, 61), S( 52, 63), S(52, 63), S(57, 65), S(60, 70), S(61, 74),
+      S( 67, 80), S( 76, 82), S(77, 88), S(82, 94), S(86, 95), S(90, 96),
+      S( 94, 99), S( 96,100), S(99,111), S(99,112) }
   };
 
   // Outpost[Bishop/Knight][Square] contains bonuses for knights and bishops
@@ -157,6 +157,8 @@ namespace {
   const Score ThreatenedByPawn[PIECE_TYPE_NB] = {
     S(0, 0), S(0, 0), S(106, 137), S(82, 118), S(115, 206), S(119, 220)
   };
+
+  const Score ThreatenedByHangingPawn = S(40, 60);
 
   // Assorted bonuses and penalties used by evaluation
   const Score KingOnOne          = S( 2, 58);
@@ -305,11 +307,6 @@ namespace {
 
         mobility[Us] += MobilityBonus[Pt][mob];
 
-        // Decrease score if we are attacked by an enemy pawn. The remaining part
-        // of threat evaluation must be done later when we have full attack info.
-        if (ei.attackedBy[Them][PAWN] & s)
-            score -= ThreatenedByPawn[Pt];
-
         if (Pt == BISHOP || Pt == KNIGHT)
         {
             // Bonus for outpost square
@@ -445,7 +442,7 @@ namespace {
         {
             // ...and then remove squares not supported by another enemy piece
             b &= (  ei.attackedBy[Them][PAWN]   | ei.attackedBy[Them][KNIGHT]
-                  | ei.attackedBy[Them][BISHOP] | ei.attackedBy[Them][QUEEN]);
+                  | ei.attackedBy[Them][BISHOP]);
 
             if (b)
                 attackUnits += RookContactCheck * popcount<Max15>(b);
@@ -505,8 +502,25 @@ namespace {
     enum { Defended, Weak };
     enum { Minor, Major };
 
-    Bitboard b, weak, defended;
+    Bitboard b, weak, defended, safeThreats;
     Score score = SCORE_ZERO;
+
+    // Non-pawn enemies attacked by a pawn
+    weak = (pos.pieces(Them) ^ pos.pieces(Them, PAWN)) & ei.attackedBy[Us][PAWN];
+
+    if (weak)
+    {
+        b = pos.pieces(Us, PAWN) & ( ~ei.attackedBy[Them][ALL_PIECES]
+                                    | ei.attackedBy[Us][ALL_PIECES]);
+
+        safeThreats = (shift_bb<Right>(b) | shift_bb<Left>(b)) & weak;
+
+        if (weak ^ safeThreats)
+            score += ThreatenedByHangingPawn;
+
+        while (safeThreats)
+            score += ThreatenedByPawn[type_of(pos.piece_on(pop_lsb(&safeThreats)))];
+    }
 
     // Non-pawn enemies defended by a pawn
     defended = (pos.pieces(Them) ^ pos.pieces(Them, PAWN)) & ei.attackedBy[Them][PAWN];

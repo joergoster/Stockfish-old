@@ -26,7 +26,7 @@
 #include "position.h"
 #include "search.h"
 #include "thread.h"
-#include "tt.h"
+#include "timeman.h"
 #include "uci.h"
 
 using namespace std;
@@ -68,7 +68,7 @@ namespace {
         return;
 
     pos.set(fen, Options["UCI_Chess960"], Threads.main());
-    SetupStates = Search::StateStackPtr(new std::stack<StateInfo>());
+    SetupStates = Search::StateStackPtr(new std::stack<StateInfo>);
 
     // Parse move list (if any)
     while (is >> token && (m = UCI::to_move(pos, token)) != MOVE_NONE)
@@ -178,8 +178,12 @@ void UCI::loop(int argc, char* argv[]) {
                     << "\n"       << Options
                     << "\nuciok"  << sync_endl;
 
+      else if (token == "ucinewgame")
+      {
+          Search::reset();
+          Time.availableNodes = 0;
+      }
       else if (token == "isready")    sync_cout << "readyok" << sync_endl;
-      else if (token == "ucinewgame") TT.clear();
       else if (token == "go")         go(pos, is);
       else if (token == "position")   position(pos, is);
       else if (token == "setoption")  setoption(is);
@@ -205,7 +209,7 @@ void UCI::loop(int argc, char* argv[]) {
 
   } while (token != "quit" && argc == 1); // Passed args have one-shot behaviour
 
-  Threads.wait_for_think_finished(); // Cannot quit whilst the search is running
+  Threads.main()->join(); // Cannot quit whilst the search is running
 }
 
 

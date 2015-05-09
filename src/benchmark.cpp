@@ -104,7 +104,7 @@ void benchmark(const Position& current, istream& is) {
 
   Options["Hash"]    = ttSize;
   Options["Threads"] = threads;
-  TT.clear();
+  Search::reset();
 
   if (limitType == "time")
       limits.movetime = stoi(limit); // movetime is in ms
@@ -158,7 +158,7 @@ void benchmark(const Position& current, istream& is) {
       else
       {
           Threads.start_thinking(pos, limits, st);
-          Threads.wait_for_think_finished();
+          Threads.main()->join();
           nodes += Search::RootPos.nodes_searched();
       }
   }
