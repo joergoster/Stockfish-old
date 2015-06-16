@@ -69,7 +69,7 @@ namespace {
   // bsf_index() returns the index into BSFTable[] to look up the bitscan. Uses
   // Matt Taylor's folding for 32 bit case, extended to 64 bit by Kim Walisch.
 
-  FORCE_INLINE unsigned bsf_index(Bitboard b) {
+  unsigned bsf_index(Bitboard b) {
     b ^= b - 1;
     return Is64Bit ? (b * DeBruijn64) >> 58
                    : ((unsigned(b) ^ unsigned(b >> 32)) * DeBruijn32) >> 26;
@@ -201,17 +201,15 @@ void Bitboards::init() {
       PseudoAttacks[QUEEN][s1]  = PseudoAttacks[BISHOP][s1] = attacks_bb<BISHOP>(s1, 0);
       PseudoAttacks[QUEEN][s1] |= PseudoAttacks[  ROOK][s1] = attacks_bb<  ROOK>(s1, 0);
 
-      for (Square s2 = SQ_A1; s2 <= SQ_H8; ++s2)
-      {
-          Piece pc = (PseudoAttacks[BISHOP][s1] & s2) ? W_BISHOP :
-                     (PseudoAttacks[ROOK][s1]   & s2) ? W_ROOK   : NO_PIECE;
+      for (Piece pc = W_BISHOP; pc <= W_ROOK; ++pc)
+          for (Square s2 = SQ_A1; s2 <= SQ_H8; ++s2)
+          {
+              if (!(PseudoAttacks[pc][s1] & s2))
+                  continue;
 
-          if (pc == NO_PIECE)
-              continue;
-
-          LineBB[s1][s2] = (attacks_bb(pc, s1, 0) & attacks_bb(pc, s2, 0)) | s1 | s2;
-          BetweenBB[s1][s2] = attacks_bb(pc, s1, SquareBB[s2]) & attacks_bb(pc, s2, SquareBB[s1]);
-      }
+              LineBB[s1][s2] = (attacks_bb(pc, s1, 0) & attacks_bb(pc, s2, 0)) | s1 | s2;
+              BetweenBB[s1][s2] = attacks_bb(pc, s1, SquareBB[s2]) & attacks_bb(pc, s2, SquareBB[s1]);
+          }
   }
 }
 
@@ -249,7 +247,9 @@ namespace {
                              {  728, 10316, 55013, 32803, 12281, 15100,  16645,   255 } };
 
     Bitboard occupancy[4096], reference[4096], edges, b;
-    int i, size;
+    int age[4096], current = 0, i, size;
+
+    std::memset(age, 0, sizeof(age));
 
     // attacks[s] is a pointer to the beginning of the attacks table for square 's'
     attacks[SQ_A1] = table;
@@ -275,7 +275,7 @@ namespace {
             reference[size] = sliding_attack(deltas, s, b);
 
             if (HasPext)
-                attacks[s][_pext_u64(b, masks[s])] = reference[size];
+                attacks[s][pext(b, masks[s])] = reference[size];
 
             size++;
             b = (b - masks[s]) & masks[s];
@@ -298,22 +298,21 @@ namespace {
                 magics[s] = rng.sparse_rand<Bitboard>();
             while (popcount<Max15>((magics[s] * masks[s]) >> 56) < 6);
 
-            std::memset(attacks[s], 0, size * sizeof(Bitboard));
-
             // A good magic must map every possible occupancy to an index that
             // looks up the correct sliding attack in the attacks[s] database.
             // Note that we build up the database for square 's' as a side
             // effect of verifying the magic.
-            for (i = 0; i < size; ++i)
+            for (++current, i = 0; i < size; ++i)
             {
-                Bitboard& attack = attacks[s][index(s, occupancy[i])];
+                unsigned idx = index(s, occupancy[i]);
 
-                if (attack && attack != reference[i])
+                if (age[idx] < current)
+                {
+                    age[idx] = current;
+                    attacks[s][idx] = reference[i];
+                }
+                else if (attacks[s][idx] != reference[i])
                     break;
-
-                assert(reference[i]);
-
-                attack = reference[i];
             }
         } while (i < size);
     }
