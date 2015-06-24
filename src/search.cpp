@@ -959,7 +959,7 @@ moves_loop: // When in check and at SpNode search starts from here
                                         [pos.piece_on(to_sq(move))][to_sq(move)] <= VALUE_ZERO))
               ss->reduction += ONE_PLY;
 
-          if (move == countermove || bestValue == VALUE_DRAW)
+          if (move == countermove || RootMoves[PVIdx].previousScore == VALUE_DRAW)
               ss->reduction = std::max(DEPTH_ZERO, ss->reduction - ONE_PLY);
 
           // Decrease reduction for moves that escape a capture
