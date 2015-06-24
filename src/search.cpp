@@ -1100,8 +1100,9 @@ moves_loop: // When in check and at SpNode search starts from here
       {
           assert(bestValue > -VALUE_INFINITE && bestValue < beta);
 
+          Depth sp_reduction = PvNode ? DEPTH_ZERO : ONE_PLY;
           thisThread->split(pos, ss, alpha, beta, &bestValue, &bestMove,
-                            depth, moveCount, &mp, NT, cutNode);
+                            depth - sp_reduction, moveCount, &mp, NT, cutNode);
 
           if (Signals.stop || thisThread->cutoff_occurred())
               return VALUE_ZERO;
