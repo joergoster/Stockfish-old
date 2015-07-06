@@ -298,7 +298,8 @@ Score Entry::do_king_safety(const Position& pos, Square ksq) {
       while (!(DistanceRingBB[ksq][minKingPawnDistance++] & pawns)) {}
 
   if (relative_rank(Us, ksq) > RANK_4)
-      return make_score(0, -16 * minKingPawnDistance);
+      return pos.pieces(~Us, PAWN) ? make_score(0, -16 * minKingPawnDistance)
+                                   : make_score(0, 0);
 
   Value bonus = shelter_storm<Us>(pos, ksq);
 
@@ -307,7 +308,7 @@ Score Entry::do_king_safety(const Position& pos, Square ksq) {
       bonus = std::max(bonus, shelter_storm<Us>(pos, relative_square(Us, SQ_G1)));
 
   if (pos.can_castle(MakeCastling<Us, QUEEN_SIDE>::right))
-      bonus = std::max(bonus, shelter_storm<Us>(pos, relative_square(Us, SQ_B1)));
+      bonus = std::max(bonus, shelter_storm<Us>(pos, relative_square(Us, SQ_C1)));
 
   return make_score(bonus, -16 * minKingPawnDistance);
 }
