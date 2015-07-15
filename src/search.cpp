@@ -135,6 +135,7 @@ namespace {
   HistoryStats History;
   CounterMovesHistoryStats CounterMovesHistory;
   MovesStats Countermoves;
+  int iter;
 
   template <NodeType NT, bool SpNode>
   Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth, bool cutNode);
@@ -347,6 +348,7 @@ namespace {
     BestMoveChanges = 0;
     bestValue = delta = alpha = -VALUE_INFINITE;
     beta = VALUE_INFINITE;
+    iter = 0;
 
     TT.new_search();
 
@@ -363,6 +365,8 @@ namespace {
     // Iterative deepening loop until requested to stop or target depth reached
     while (++depth < DEPTH_MAX && !Signals.stop && (!Limits.depth || depth <= Limits.depth))
     {
+        iter++;
+
         // Age out PV variability metric
         BestMoveChanges *= 0.5;
 
@@ -672,7 +676,7 @@ namespace {
 
     // Step 6. Razoring (skipped when in check)
     if (   !PvNode
-        &&  depth < 4 * ONE_PLY
+        &&  depth < (1 + iter / 5) * ONE_PLY
         &&  eval + razor_margin(depth) <= alpha
         &&  ttMove == MOVE_NONE)
     {
