@@ -676,7 +676,7 @@ namespace {
 
     // Step 6. Razoring (skipped when in check)
     if (   !PvNode
-        &&  depth < (1 + iter / 5) * ONE_PLY
+        &&  depth < 4 * ONE_PLY
         &&  eval + razor_margin(depth) <= alpha
         &&  ttMove == MOVE_NONE)
     {
@@ -692,7 +692,7 @@ namespace {
 
     // Step 7. Futility pruning: child node (skipped when in check)
     if (   !RootNode
-        &&  depth < 7 * ONE_PLY
+        &&  depth < std::min(2 + iter / 4, 7) * ONE_PLY
         &&  eval - futility_margin(depth) >= beta
         &&  eval < VALUE_KNOWN_WIN  // Do not return unproven wins
         &&  pos.non_pawn_material(pos.side_to_move()))
@@ -903,7 +903,7 @@ moves_loop: // When in check and at SpNode search starts from here
           predictedDepth = newDepth - reduction<PvNode>(improving, depth, moveCount);
 
           // Futility pruning: parent node
-          if (predictedDepth < 7 * ONE_PLY)
+          if (predictedDepth < std::min(2 + iter / 4, 7) * ONE_PLY)
           {
               futilityValue = ss->staticEval + futility_margin(predictedDepth) + 256;
 
