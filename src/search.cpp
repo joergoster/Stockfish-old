@@ -419,7 +419,7 @@ namespace {
                 // re-search, otherwise exit the loop.
                 if (bestValue <= alpha)
                 {
-                    beta = (alpha + beta) / 2;
+                    beta -= delta / 3;
                     alpha = std::max(bestValue - delta, -VALUE_INFINITE);
 
                     Signals.failedLowAtRoot = true;
@@ -427,13 +427,13 @@ namespace {
                 }
                 else if (bestValue >= beta)
                 {
-                    alpha = (alpha + beta) / 2;
+                    alpha += delta / 3;
                     beta = std::min(bestValue + delta, VALUE_INFINITE);
                 }
                 else
                     break;
 
-                delta *= 2;
+                delta += delta / 2;
 
                 assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE);
             }
