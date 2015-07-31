@@ -851,8 +851,12 @@ moves_loop: // When in check and at SpNode search starts from here
                  || type_of(move) != NORMAL
                  || pos.advanced_pawn_push(move);
 
-      // Step 12. Extend checks
+      // Step 12. Extend checks or captures and promotions in late endgames
       if (givesCheck && pos.see_sign(move) >= VALUE_ZERO)
+          extension = ONE_PLY;
+
+      else if (   captureOrPromotion 
+               && pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) <= 2 * BishopValueMg)
           extension = ONE_PLY;
 
       // Singular extension search. If all moves but one fail low on a search of
