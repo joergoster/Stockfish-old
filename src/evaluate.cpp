@@ -588,7 +588,7 @@ namespace {
                 // If there is a rook or queen attacking/defending the pawn from behind,
                 // consider all the squaresToQueen. Otherwise consider only the squares
                 // in the pawn's path attacked or occupied by the enemy.
-                defendedSquares = unsafeSquares = squaresToQueen = forward_bb(Us, s) | s;
+                defendedSquares = unsafeSquares = squaresToQueen = forward_bb(Us, s);
 
                 Bitboard bb = forward_bb(Them, s) & pos.pieces(ROOK, QUEEN) & pos.attacks_from<ROOK>(s);
 
@@ -609,6 +609,10 @@ namespace {
 
                 else if (defendedSquares & blockSq)
                     k += 4;
+
+                // Assign a small bonus if the passer is defended
+                if (ei.attackedBy[Us][ALL_PIECES] & s)
+                    k += 2;
 
                 mbonus += k * rr, ebonus += k * rr;
             }
