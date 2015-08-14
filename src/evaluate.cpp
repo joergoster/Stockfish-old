@@ -124,23 +124,11 @@ namespace {
       S( 94, 99), S( 96,100), S(99,111), S(99,112) }
   };
 
-  // Outpost[Bishop/Knight][Square] contains bonuses for knights and bishops
-  // outposts, indexed by piece type and square (from white's point of view).
-  const Value Outpost[][SQUARE_NB] = {
-  {// A     B     C     D     E     F     G     H
-    V(0), V(0), V(0), V(0), V(0), V(0), V(0), V(0), // Knights
-    V(0), V(0), V(0), V(0), V(0), V(0), V(0), V(0),
-    V(0), V(0), V(3), V(9), V(9), V(3), V(0), V(0),
-    V(0), V(4),V(18),V(25),V(25),V(18), V(4), V(0),
-    V(4), V(9),V(29),V(38),V(38),V(29), V(9), V(4),
-    V(2), V(9),V(19),V(15),V(15),V(19), V(9), V(2) },
-  {
-    V(0), V(0), V(0), V(0), V(0), V(0), V(0), V(0), // Bishops
-    V(0), V(0), V(0), V(0), V(0), V(0), V(0), V(0),
-    V(2), V(4), V(3), V(8), V(8), V(3), V(4), V(2),
-    V(1), V(9), V(9),V(13),V(13), V(9), V(9), V(1),
-    V(2), V(8),V(21),V(24),V(24),V(21), V(8), V(2),
-    V(0), V(4), V(6), V(6), V(6), V(6), V(4), V(0) }
+  // Outpost[knight/bishop][supported by pawn] contains bonuses for knights and bishops
+  // outposts, bigger if outpost piece is supported by a pawn.
+  const Score Outpost[][2] = {
+    { S(28, 7), S(42,11) }, // Knights
+    { S(12, 3), S(18, 5) }  // Bishops
   };
 
   // Threat[defended/weak][minor/major attacking][attacked PieceType] contains
@@ -156,6 +144,17 @@ namespace {
   // type is attacked by an enemy pawn.
   const Score ThreatenedByPawn[PIECE_TYPE_NB] = {
     S(0, 0), S(0, 0), S(107, 138), S(84, 122), S(114, 203), S(121, 217)
+  };
+
+  // PassedPawnsBonusMg[Rank] and PassedPawnsBonusEg[Rank]
+  //contains bonuses for midgame and endgame for passed pawns according to
+  //the rank of the pawn.
+  const Value PassedPawnsBonusMg[6] = {
+    V(0), V(1), V(34), V(90), V(214), V(328)
+  };
+
+  const Value PassedPawnsBonusEg[6] = {
+    V(7), V(14), V(37), V(63), V(134), V(189)
   };
 
   const Score ThreatenedByHangingPawn = S(40, 60);
@@ -220,7 +219,7 @@ namespace {
 
     ei.pinnedPieces[Us] = pos.pinned_pieces(Us);
     ei.attackedBy[Us][ALL_PIECES] = ei.attackedBy[Us][PAWN] = ei.pi->pawn_attacks(Us);
-    Bitboard b = ei.attackedBy[Them][KING] = pos.attacks_from<KING>(pos.king_square(Them));
+    Bitboard b = ei.attackedBy[Them][KING] = pos.attacks_from<KING>(pos.square<KING>(Them));
 
     // Init king safety tables only if we are going to use them
     if (pos.non_pawn_material(Us) >= QueenValueMg)
@@ -235,33 +234,6 @@ namespace {
   }
 
 
-  // evaluate_outpost() evaluates bishop and knight outpost squares
-
-  template<PieceType Pt, Color Us>
-  Score evaluate_outpost(const Position& pos, const EvalInfo& ei, Square s) {
-
-    const Color Them = (Us == WHITE ? BLACK : WHITE);
-
-    assert (Pt == BISHOP || Pt == KNIGHT);
-
-    // Initial bonus based on square
-    Value bonus = Outpost[Pt == BISHOP][relative_square(Us, s)];
-
-    // Increase bonus if supported by pawn, especially if the opponent has
-    // no minor piece which can trade with the outpost piece.
-    if (bonus && (ei.attackedBy[Us][PAWN] & s))
-    {
-        if (   !pos.pieces(Them, KNIGHT)
-            && !(squares_of_color(s) & pos.pieces(Them, BISHOP)))
-            bonus += bonus + bonus / 2;
-        else
-            bonus += bonus / 2;
-    }
-
-    return make_score(bonus * 2, bonus / 2);
-  }
-
-
   // evaluate_pieces() assigns bonuses and penalties to the pieces of a given color
 
   template<PieceType Pt, Color Us, bool Trace>
@@ -273,7 +245,7 @@ namespace {
 
     const PieceType NextPt = (Us == WHITE ? Pt : PieceType(Pt + 1));
     const Color Them = (Us == WHITE ? BLACK : WHITE);
-    const Square* pl = pos.list<Pt>(Us);
+    const Square* pl = pos.squares<Pt>(Us);
 
     ei.attackedBy[Us][Pt] = 0;
 
@@ -285,7 +257,7 @@ namespace {
                          : pos.attacks_from<Pt>(s);
 
         if (ei.pinnedPieces[Us] & s)
-            b &= LineBB[pos.king_square(Us)][s];
+            b &= LineBB[pos.square<KING>(Us)][s];
 
         ei.attackedBy[Us][ALL_PIECES] |= ei.attackedBy[Us][Pt] |= b;
 
@@ -310,8 +282,9 @@ namespace {
         if (Pt == BISHOP || Pt == KNIGHT)
         {
             // Bonus for outpost square
-            if (!(pos.pieces(Them, PAWN) & pawn_attack_span(Us, s)))
-                score += evaluate_outpost<Pt, Us>(pos, ei, s);
+            if (   relative_rank(Us, s) >= RANK_4
+                && !(pos.pieces(Them, PAWN) & pawn_attack_span(Us, s)))
+                score += Outpost[Pt == BISHOP][!!(ei.attackedBy[Us][PAWN] & s)];
 
             // Bonus when behind a pawn
             if (    relative_rank(Us, s) < RANK_5
@@ -354,7 +327,7 @@ namespace {
             // Penalize when trapped by the king, even more if king cannot castle
             if (mob <= 3 && !ei.pi->semiopen_file(Us, file_of(s)))
             {
-                Square ksq = pos.king_square(Us);
+                Square ksq = pos.square<KING>(Us);
 
                 if (   ((file_of(ksq) < FILE_E) == (file_of(s) < file_of(ksq)))
                     && (rank_of(ksq) == rank_of(s) || relative_rank(Us, ksq) == RANK_1)
@@ -386,7 +359,7 @@ namespace {
 
     Bitboard undefended, b, b1, b2, safe;
     int attackUnits;
-    const Square ksq = pos.king_square(Us);
+    const Square ksq = pos.square<KING>(Us);
 
     // King shelter and enemy pawns storm
     Score score = ei.pi->king_safety<Us>(pos, ksq);
@@ -605,20 +578,20 @@ namespace {
         int r = relative_rank(Us, s) - RANK_2;
         int rr = r * (r - 1);
 
-        // Base bonus based on rank
-        Value mbonus = Value(17 * rr), ebonus = Value(7 * (rr + r + 1));
+        Value mbonus = PassedPawnsBonusMg[r],
+              ebonus = PassedPawnsBonusEg[r];
 
         if (rr)
         {
             Square blockSq = s + pawn_push(Us);
 
             // Adjust bonus based on the king's proximity
-            ebonus +=  distance(pos.king_square(Them), blockSq) * 5 * rr
-                     - distance(pos.king_square(Us  ), blockSq) * 2 * rr;
+            ebonus +=  distance(pos.square<KING>(Them), blockSq) * 5 * rr
+                     - distance(pos.square<KING>(Us  ), blockSq) * 2 * rr;
 
             // If blockSq is not the queening square then consider also a second push
             if (relative_rank(Us, blockSq) != RANK_8)
-                ebonus -= distance(pos.king_square(Us), blockSq + pawn_push(Us)) * rr;
+                ebonus -= distance(pos.square<KING>(Us), blockSq + pawn_push(Us)) * rr;
 
             // If the pawn is free to advance, then increase the bonus
             if (pos.empty(blockSq))
@@ -739,9 +712,18 @@ namespace {
     ei.attackedBy[WHITE][ALL_PIECES] |= ei.attackedBy[WHITE][KING];
     ei.attackedBy[BLACK][ALL_PIECES] |= ei.attackedBy[BLACK][KING];
 
-    // Do not include in mobility squares protected by enemy pawns or occupied by our pawns or king
-    Bitboard mobilityArea[] = { ~(ei.attackedBy[BLACK][PAWN] | pos.pieces(WHITE, PAWN, KING)),
-                                ~(ei.attackedBy[WHITE][PAWN] | pos.pieces(BLACK, PAWN, KING)) };
+    // Pawns blocked or on ranks 2 and 3. Will be excluded from the mobility area
+    Bitboard blockedPawns[] = {
+      pos.pieces(WHITE, PAWN) & (shift_bb<DELTA_S>(pos.pieces()) | Rank2BB | Rank3BB),
+      pos.pieces(BLACK, PAWN) & (shift_bb<DELTA_N>(pos.pieces()) | Rank7BB | Rank6BB)
+    };
+
+    // Do not include in mobility squares protected by enemy pawns, or occupied
+    // by our blocked pawns or king.
+    Bitboard mobilityArea[] = {
+      ~(ei.attackedBy[BLACK][PAWN] | blockedPawns[WHITE] | pos.square<KING>(WHITE)),
+      ~(ei.attackedBy[WHITE][PAWN] | blockedPawns[BLACK] | pos.square<KING>(BLACK))
+    };
 
     // Evaluate pieces and mobility
     score += evaluate_pieces<KNIGHT, WHITE, Trace>(pos, ei, mobility, mobilityArea);
@@ -801,7 +783,7 @@ namespace {
         // pawns are drawish.
         else if (    abs(eg_value(score)) <= BishopValueEg
                  &&  ei.pi->pawn_span(strongSide) <= 1
-                 && !pos.pawn_passed(~strongSide, pos.king_square(~strongSide)))
+                 && !pos.pawn_passed(~strongSide, pos.square<KING>(~strongSide)))
                  sf = ei.pi->pawn_span(strongSide) ? ScaleFactor(56) : ScaleFactor(38);
     }
 
