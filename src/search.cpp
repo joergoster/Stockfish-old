@@ -131,6 +131,7 @@ namespace {
   size_t PVIdx;
   EasyMoveManager EasyMove;
   double BestMoveChanges;
+  int iter;
   Value DrawValue[COLOR_NB];
   HistoryStats History;
   CounterMovesHistoryStats CounterMovesHistory;
@@ -345,6 +346,7 @@ namespace {
 
     depth = DEPTH_ZERO;
     BestMoveChanges = 0;
+    iter = 0;
     bestValue = delta = alpha = -VALUE_INFINITE;
     beta = VALUE_INFINITE;
 
@@ -365,6 +367,7 @@ namespace {
     {
         // Age out PV variability metric
         BestMoveChanges *= 0.5;
+        iter++;
 
         // Save the last iteration's scores before first PV line is searched and
         // all the move scores except the (new) PV are set to -VALUE_INFINITE.
@@ -697,7 +700,7 @@ namespace {
     // Step 8. Null move search with verification search (is omitted in PV nodes)
     if (   !PvNode
         &&  depth >= 2 * ONE_PLY
-        &&  ss->ply >= 6
+        &&  ss->ply > iter / 5
         &&  eval >= beta
         &&  pos.non_pawn_material(pos.side_to_move()))
     {
