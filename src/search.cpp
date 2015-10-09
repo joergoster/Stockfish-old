@@ -401,7 +401,7 @@ void Thread::search(bool isMainThread) {
       }
       else
           // This can cause a thread to search with the same depth for many iterations
-          depth = Threads.main()->depth + Depth(3 * log(1 + th->idx));
+          depth = Threads.main()->depth + Depth(3 * log(1 + this->idx));
 
       if (depth >= DEPTH_MAX || Signals.stop || (Limits.depth && depth > Limits.depth))
           break;
