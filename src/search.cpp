@@ -127,7 +127,7 @@ namespace {
   };
 
   EasyMoveManager EasyMove;
-  double BestMoveChanges;
+  double BestMoveChanges, timeFactor;
   Value DrawValue[COLOR_NB];
   CounterMovesHistoryStats CounterMovesHistory;
 
@@ -227,6 +227,7 @@ void MainThread::think() {
 
   Color us = pos.side_to_move();
   Time.init(Limits, us, pos.game_ply(), now());
+  timeFactor = Threads.size() > 1 ? 0.09 : 0.1;
 
   int contempt = Options["Contempt"] * PawnValueEg / 100; // From centipawns
   DrawValue[ us] = VALUE_DRAW - Value(contempt);
@@ -532,7 +533,7 @@ void Thread::search(bool isMainThread) {
                   || Time.elapsed() > Time.available()
                   || (   rootMoves[0].pv[0] == easyMove
                       && BestMoveChanges < 0.03
-                      && Time.elapsed() > Time.available() / 10))
+                      && Time.elapsed() > Time.available() * timeFactor))
               {
                   // If we are allowed to ponder do not stop the search now but
                   // keep pondering until the GUI sends "ponderhit" or "stop".
