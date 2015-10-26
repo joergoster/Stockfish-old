@@ -115,7 +115,7 @@ void TimeManagement::init(Search::LimitsType& limits, Color us, int ply)
   {
       // Calculate thinking time for hypothetical "moves to go"-value
       int hypMyTime =  limits.time[us]
-                     + limits.inc[us] * (hypMTG - 1)
+                     + (9 * limits.inc[us] / 10) * (hypMTG - 1)
                      - moveOverhead * (2 + std::min(hypMTG, 40));
 
       hypMyTime = std::max(hypMyTime, 0);
