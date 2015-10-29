@@ -499,6 +499,7 @@ void Thread::search(bool isMainThread) {
               // from the previous search and just did a fast verification.
               if (   rootMoves.size() == 1
                   || Time.elapsed() > Time.available()
+                  || Time.elapsed() > 9 * Time.maximum() / 10
                   || (   rootMoves[0].pv[0] == easyMove
                       && BestMoveChanges < 0.03
                       && Time.elapsed() > Time.available() / 10))
