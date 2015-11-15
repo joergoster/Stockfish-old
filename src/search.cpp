@@ -1126,7 +1126,7 @@ moves_loop: // When in check search starts from here
         prevCmh.update(pos.piece_on(prevSq), prevSq, bonus);
     }
 
-    tte->save(posKey, value_to_tt(bestValue, ss->ply),
+    tte->save(posKey, bestValue == VALUE_DRAW ? VALUE_NONE : value_to_tt(bestValue, ss->ply),
               bestValue >= beta ? BOUND_LOWER :
               PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
               depth, bestMove, ss->staticEval, TT.generation());
@@ -1339,7 +1339,7 @@ moves_loop: // When in check search starts from here
     if (InCheck && bestValue == -VALUE_INFINITE)
         return mated_in(ss->ply); // Plies to mate from the root
 
-    tte->save(posKey, value_to_tt(bestValue, ss->ply),
+    tte->save(posKey, bestValue == VALUE_DRAW ? VALUE_NONE : value_to_tt(bestValue, ss->ply),
               PvNode && bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER,
               ttDepth, bestMove, ss->staticEval, TT.generation());
 
