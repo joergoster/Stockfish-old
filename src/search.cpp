@@ -893,8 +893,9 @@ moves_loop: // When in check and at SpNode search starts from here
               continue;
           }
 
-          // History Score Pruning
-          if (   depth <= 3 * ONE_PLY
+          // History based pruning
+          if (   depth <= 4 * ONE_PLY
+              && move != ss->killers[0]
               && History[pos.moved_piece(move)][to_sq(move)] < VALUE_ZERO
               && CounterMovesHistory[pos.piece_on(prevMoveSq)][prevMoveSq]
                                     [pos.moved_piece(move)][to_sq(move)] < VALUE_ZERO)
