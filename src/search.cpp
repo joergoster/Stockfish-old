@@ -63,8 +63,8 @@ using namespace Search;
 
 namespace {
 
-  // Different node types, used as template parameter
-  enum NodeType { Root, PV, NonPV };
+  // Different node types, used as a template parameter
+  enum NodeType { NonPV, PV };
 
   // Razoring and futility margin based on depth
   int razor_margin[4] = {483, 570, 603, 554};
@@ -388,7 +388,7 @@ namespace {
             // high/low anymore.
             while (true)
             {
-                bestValue = search<Root, false>(pos, ss, alpha, beta, depth, false);
+                bestValue = search<PV, false>(pos, ss, alpha, beta, depth, false);
 
                 // Bring the best move to the front. It is critical that sorting
                 // is done with a stable algorithm because all the values but the
@@ -516,8 +516,8 @@ namespace {
   template <NodeType NT, bool SpNode>
   Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth, bool cutNode) {
 
-    const bool RootNode = NT == Root;
-    const bool PvNode   = NT == PV || NT == Root;
+    const bool PvNode = NT == PV;
+    const bool rootNode = PvNode && (ss-1)->ply == 0;
 
     assert(-VALUE_INFINITE <= alpha && alpha < beta && beta <= VALUE_INFINITE);
     assert(PvNode || (alpha == beta - 1));
@@ -562,7 +562,7 @@ namespace {
     if (PvNode && thisThread->maxPly < ss->ply)
         thisThread->maxPly = ss->ply;
 
-    if (!RootNode)
+    if (!rootNode)
     {
         // Step 2. Check for aborted search and immediate draw
         if (Signals.stop || pos.is_draw() || ss->ply >= MAX_PLY)
@@ -592,7 +592,8 @@ namespace {
     excludedMove = ss->excludedMove;
     posKey = excludedMove ? pos.exclusion_key() : pos.key();
     tte = TT.probe(posKey, ttHit);
-    ss->ttMove = ttMove = RootNode ? RootMoves[PVIdx].pv[0] : ttHit ? tte->move() : MOVE_NONE;
+    ss->ttMove = ttMove =  rootNode ? RootMoves[PVIdx].pv[0]
+                         : ttHit ? tte->move() : MOVE_NONE;
     ttValue = ttHit ? value_from_tt(tte->value(), ss->ply) : VALUE_NONE;
 
     // At non-PV nodes we check for a fail high/low. We don't prune at PV nodes
@@ -613,7 +614,7 @@ namespace {
     }
 
     // Step 4a. Tablebase probe
-    if (!RootNode && TB::Cardinality)
+    if (!rootNode && TB::Cardinality)
     {
         int piecesCnt = pos.count<ALL_PIECES>(WHITE) + pos.count<ALL_PIECES>(BLACK);
 
@@ -688,7 +689,7 @@ namespace {
     }
 
     // Step 7. Futility pruning: child node (skipped when in check)
-    if (   !RootNode
+    if (   !rootNode
         &&  depth < 7 * ONE_PLY
         &&  eval - futility_margin(depth) >= beta
         &&  eval < VALUE_KNOWN_WIN  // Do not return unproven wins
@@ -772,7 +773,7 @@ namespace {
     {
         Depth d = depth - 2 * ONE_PLY - (PvNode ? DEPTH_ZERO : depth / 4);
         ss->skipEarlyPruning = true;
-        search<PvNode ? PV : NonPV, false>(pos, ss, alpha, beta, d, true);
+        search<NT, false>(pos, ss, alpha, beta, d, true);
         ss->skipEarlyPruning = false;
 
         tte = TT.probe(posKey, ttHit);
@@ -791,7 +792,7 @@ moves_loop: // When in check and at SpNode search starts from here
                || ss->staticEval == VALUE_NONE
                ||(ss-2)->staticEval == VALUE_NONE;
 
-    singularExtensionNode =   !RootNode
+    singularExtensionNode =   !rootNode
                            && !SpNode
                            &&  depth >= 8 * ONE_PLY
                            &&  ttMove != MOVE_NONE
@@ -813,7 +814,7 @@ moves_loop: // When in check and at SpNode search starts from here
       // At root obey the "searchmoves" option and skip moves not listed in Root
       // Move List. As a consequence any illegal move is also skipped. In MultiPV
       // mode we also skip PV moves which have been already searched.
-      if (RootNode && !std::count(RootMoves.begin() + PVIdx, RootMoves.end(), move))
+      if (rootNode && !std::count(RootMoves.begin() + PVIdx, RootMoves.end(), move))
           continue;
 
       if (SpNode)
@@ -828,7 +829,7 @@ moves_loop: // When in check and at SpNode search starts from here
       else
           ss->moveCount = ++moveCount;
 
-      if (RootNode)
+      if (rootNode)
       {
           Signals.firstRootMove = (moveCount == 1);
 
@@ -877,7 +878,7 @@ moves_loop: // When in check and at SpNode search starts from here
       newDepth = depth - ONE_PLY + extension;
 
       // Step 13. Pruning at shallow depth
-      if (   !RootNode
+      if (   !rootNode
           && !captureOrPromotion
           && !inCheck
           && !givesCheck
@@ -942,7 +943,7 @@ moves_loop: // When in check and at SpNode search starts from here
       prefetch(TT.first_entry(pos.key_after(move)));
 
       // Check for legality just before making the move
-      if (!RootNode && !SpNode && !pos.legal(move, ci.pinned))
+      if (!rootNode && !SpNode && !pos.legal(move, ci.pinned))
       {
           ss->moveCount = --moveCount;
           continue;
@@ -1009,8 +1010,8 @@ moves_loop: // When in check and at SpNode search starts from here
 
       // For PV nodes only, do a full PV search on the first move or after a fail
       // high (in the latter case search only if value < beta), otherwise let the
-      // parent node fail low with value <= alpha and to try another move.
-      if (PvNode && (moveCount == 1 || (value > alpha && (RootNode || value < beta))))
+      // parent node fail low with value <= alpha and try another move.
+      if (PvNode && (moveCount == 1 || (value > alpha && (rootNode || value < beta))))
       {
           (ss+1)->pv = pv;
           (ss+1)->pv[0] = MOVE_NONE;
@@ -1040,7 +1041,7 @@ moves_loop: // When in check and at SpNode search starts from here
       if (Signals.stop || thisThread->cutoff_occurred())
           return VALUE_ZERO;
 
-      if (RootNode)
+      if (rootNode)
       {
           RootMove& rm = *std::find(RootMoves.begin(), RootMoves.end(), move);
 
@@ -1082,7 +1083,7 @@ moves_loop: // When in check and at SpNode search starts from here
 
               bestMove = SpNode ? splitPoint->bestMove = move : move;
 
-              if (PvNode && !RootNode) // Update pv even in fail-high case
+              if (PvNode && !rootNode) // Update pv even in fail-high case
                   update_pv(SpNode ? splitPoint->ss->pv : ss->pv, move, (ss+1)->pv);
 
               if (PvNode && value < beta) // Update alpha! Always alpha < beta
@@ -1181,7 +1182,6 @@ moves_loop: // When in check and at SpNode search starts from here
 
     const bool PvNode = NT == PV;
 
-    assert(NT == PV || NT == NonPV);
     assert(InCheck == !!pos.checkers());
     assert(alpha >= -VALUE_INFINITE && alpha < beta && beta <= VALUE_INFINITE);
     assert(PvNode || (alpha == beta - 1));
@@ -1645,8 +1645,8 @@ void Thread::idle_loop() {
           else if (sp->nodeType == PV)
               search<PV, true>(pos, ss, sp->alpha, sp->beta, sp->depth, sp->cutNode);
 
-          else if (sp->nodeType == Root)
-              search<Root, true>(pos, ss, sp->alpha, sp->beta, sp->depth, sp->cutNode);
+//          else if (sp->nodeType == Root)
+//              search<Root, true>(pos, ss, sp->alpha, sp->beta, sp->depth, sp->cutNode);
 
           else
               assert(false);
