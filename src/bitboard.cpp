@@ -2,6 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
+  Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -18,7 +19,6 @@
 */
 
 #include <algorithm>
-#include <cstring>   // For std::memset
 
 #include "bitboard.h"
 #include "bitcount.h"
@@ -247,9 +247,7 @@ namespace {
                              {  728, 10316, 55013, 32803, 12281, 15100,  16645,   255 } };
 
     Bitboard occupancy[4096], reference[4096], edges, b;
-    int age[4096], current = 0, i, size;
-
-    std::memset(age, 0, sizeof(age));
+    int age[4096] = {0}, current = 0, i, size;
 
     // attacks[s] is a pointer to the beginning of the attacks table for square 's'
     attacks[SQ_A1] = table;

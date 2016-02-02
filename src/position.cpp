@@ -2,6 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
+  Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -57,7 +58,7 @@ const string PieceToChar(" PNBRQK  pnbrqk");
 // from the bitboards and scan for new X-ray attacks behind it.
 
 template<int Pt>
-PieceType min_attacker(const Bitboard* bb, const Square& to, const Bitboard& stmAttackers,
+PieceType min_attacker(const Bitboard* bb, Square to, Bitboard stmAttackers,
                        Bitboard& occupied, Bitboard& attackers) {
 
   Bitboard b = stmAttackers & bb[Pt];
@@ -77,14 +78,14 @@ PieceType min_attacker(const Bitboard* bb, const Square& to, const Bitboard& stm
 }
 
 template<>
-PieceType min_attacker<KING>(const Bitboard*, const Square&, const Bitboard&, Bitboard&, Bitboard&) {
+PieceType min_attacker<KING>(const Bitboard*, Square, Bitboard, Bitboard&, Bitboard&) {
   return KING; // No need to update bitboards: it is the last cycle
 }
 
 } // namespace
 
 
-/// CheckInfo c'tor
+/// CheckInfo constructor
 
 CheckInfo::CheckInfo(const Position& pos) {
 
@@ -118,7 +119,7 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
   }
 
   os << "\nFen: " << pos.fen() << "\nKey: " << std::hex << std::uppercase
-     << std::setfill('0') << std::setw(16) << pos.st->key << std::dec << "\nCheckers: ";
+     << std::setfill('0') << std::setw(16) << pos.key() << std::dec << "\nCheckers: ";
 
   for (Bitboard b = pos.checkers(); b; )
       os << UCI::square(pop_lsb(&b)) << " ";
