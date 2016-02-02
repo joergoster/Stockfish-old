@@ -38,25 +38,25 @@ namespace {
     //            OUR PIECES
     // pair pawn knight bishop rook queen
     {   0                               }, // Bishop pair
-    {  40,    2                         }, // Pawn
+    {   0,    2                         }, // Pawn
     {  32,  255,  -3                    }, // Knight      OUR PIECES
     {   0,  104,   4,    0              }, // Bishop
-    { -26,   -2,  47,   105,  -149      }, // Rook
-    {-185,   24, 122,   137,  -134,   0 }  // Queen
+    {   0,   -2,  47,   105,  -149      }, // Rook
+    {   0,   24, 122,   137,  -134,   0 }  // Queen
   };
 
    int QuadraticTheirs[][PIECE_TYPE_NB] = {
     //           THEIR PIECES
     // pair pawn knight bishop rook queen
     {   0                               }, // Bishop pair
-    {  36,    0                         }, // Pawn
+    {   0,    0                         }, // Pawn
     {   9,   63,   0                    }, // Knight      OUR PIECES
     {  59,   65,  42,     0             }, // Bishop
-    {  46,   39,  24,   -24,    0       }, // Rook
-    { 101,  100, -37,   141,  268,    0 }  // Queen
+    {   0,   39,  24,   -24,    0       }, // Rook
+    {   0,  100, -37,   141,  268,    0 }  // Queen
   };
 
-  TUNE(Linear, QuadraticOurs, QuadraticTheirs);
+  TUNE(SetRange(-1000, 1000), Linear, QuadraticOurs, QuadraticTheirs);
 
   // Endgame evaluation and scaling functions are accessed directly and not through
   // the function maps because they correspond to more than one material hash key.
