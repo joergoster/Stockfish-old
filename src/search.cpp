@@ -259,7 +259,8 @@ void Search::think() {
   else
   {
       if (TB::Cardinality >=  RootPos.count<ALL_PIECES>(WHITE)
-                            + RootPos.count<ALL_PIECES>(BLACK))
+                            + RootPos.count<ALL_PIECES>(BLACK)
+          && !RootPos.can_castle(ANY_CASTLING))
       {
           // If the current root position is in the tablebases then RootMoves
           // contains only moves that preserve the draw or win.
@@ -632,7 +633,8 @@ namespace {
 
         if (    piecesCnt <= TB::Cardinality
             && (piecesCnt <  TB::Cardinality || depth >= TB::ProbeDepth)
-            &&  pos.rule50_count() == 0)
+            &&  pos.rule50_count() == 0
+            && !pos.can_castle(ANY_CASTLING))
         {
             int found, v = Tablebases::probe_wdl(pos, &found);
 
@@ -982,10 +984,11 @@ moves_loop: // When in check and at SpNode search starts from here
                   && cmh[pos.piece_on(to_sq(move))][to_sq(move)] <= VALUE_ZERO))
               ss->reduction += ONE_PLY;
 
-          // Decrease reduction for moves with a good history
-          if (   history[pos.piece_on(to_sq(move))][to_sq(move)] > VALUE_ZERO
-              && cmh[pos.piece_on(to_sq(move))][to_sq(move)] > VALUE_ZERO)
-              ss->reduction = std::max(DEPTH_ZERO, ss->reduction - ONE_PLY);
+          // Decrease reduction for moves with a good history and
+          // increase reduction for moves with a bad history.
+          int rDecrease = (  history[pos.piece_on(to_sq(move))][to_sq(move)]
+                           + cmh[pos.piece_on(to_sq(move))][to_sq(move)]) / 14980;
+          ss->reduction = std::max(DEPTH_ZERO, ss->reduction - rDecrease * ONE_PLY);
 
           // Decrease reduction for moves that escape a capture. Filter out castling
           // moves because are coded as "king captures rook" and break make_move().
