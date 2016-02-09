@@ -1015,6 +1015,11 @@ moves_loop: // When in check search starts from here
                   && cmh[pos.piece_on(to_sq(move))][to_sq(move)] <= VALUE_ZERO))
               r += ONE_PLY;
 
+          // Decrease/increase reduction for moves with a good/bad history
+          int rHist = (  thisThread->history[pos.piece_on(to_sq(move))][to_sq(move)]
+                       + cmh[pos.piece_on(to_sq(move))][to_sq(move)]) / 14980;
+          r = std::max(DEPTH_ZERO, r - rHist * ONE_PLY);
+
           // Decrease reduction for moves that escape a capture. Filter out
           // castling moves, because they are coded as "king captures rook" and
           // hence break make_move(). Also use see() instead of see_sign(),
@@ -1024,11 +1029,6 @@ moves_loop: // When in check search starts from here
               && type_of(pos.piece_on(to_sq(move))) != PAWN
               && pos.see(make_move(to_sq(move), from_sq(move))) < VALUE_ZERO)
               r = std::max(DEPTH_ZERO, r - ONE_PLY);
-
-          // Decrease/increase reduction for moves with a good/bad history
-          int rHist = (  thisThread->history[pos.piece_on(to_sq(move))][to_sq(move)]
-                       + cmh[pos.piece_on(to_sq(move))][to_sq(move)]) / 14980;
-          r = r - rHist * ONE_PLY;
 
           Depth d = std::max(newDepth - r, ONE_PLY);
 
