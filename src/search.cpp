@@ -924,7 +924,7 @@ moves_loop: // When in check and at SpNode search starts from here
               continue;
           }
 
-          predictedDepth = newDepth - reduction<PvNode>(improving, depth, moveCount);
+          predictedDepth = std::max(newDepth - reduction<PvNode>(improving, depth, moveCount), DEPTH_ZERO);
 
           // Futility pruning: parent node
           if (predictedDepth < 7 * ONE_PLY)
