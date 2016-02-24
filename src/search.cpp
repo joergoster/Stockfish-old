@@ -1315,7 +1315,7 @@ moves_loop: // When in check search starts from here
               continue;
           }
 
-          if (futilityBase <= alpha && pos.see(move) <= VALUE_ZERO)
+          if (futilityBase <= alpha && pos.see(move) <= VALUE_ZERO - PawnValueMg)
           {
               bestValue = std::max(bestValue, futilityBase);
               continue;
