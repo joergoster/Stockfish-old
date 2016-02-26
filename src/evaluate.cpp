@@ -724,6 +724,13 @@ namespace {
                  &&  ei.pi->pawn_span(strongSide) <= 1
                  && !pos.pawn_passed(~strongSide, pos.square<KING>(~strongSide)))
             sf = ei.pi->pawn_span(strongSide) ? ScaleFactor(51) : ScaleFactor(37);
+
+        // Two knights are very often not enough to win
+        else if (   !pos.count<PAWN>(strongSide)
+                 &&  pos.count<KNIGHT>(strongSide) == 2
+                 &&  pos.non_pawn_material(strongSide) == 2 * KnightValueMg
+                 && !pos.non_pawn_material(~strongSide))
+            sf = ScaleFactor(24);
     }
 
     return sf;
