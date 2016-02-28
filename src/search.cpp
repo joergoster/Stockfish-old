@@ -979,16 +979,17 @@ moves_loop: // When in check and at SpNode search starts from here
       {
           ss->reduction = reduction<PvNode>(improving, depth, moveCount);
 
+          Value hValue = history[pos.piece_on(to_sq(move))][to_sq(move)];
+          Value cmhValue = cmh[pos.piece_on(to_sq(move))][to_sq(move)];
+
           // Increase reduction for cut nodes and moves with a bad history
           if (   (!PvNode && cutNode)
-              || (   history[pos.piece_on(to_sq(move))][to_sq(move)] < VALUE_ZERO
-                  && cmh[pos.piece_on(to_sq(move))][to_sq(move)] <= VALUE_ZERO))
+              || (hValue < VALUE_ZERO && cmhValue <= VALUE_ZERO))
               ss->reduction += ONE_PLY;
 
           // Decrease reduction for moves with a good history and
           // increase reduction for moves with a bad history.
-          int rDecrease = (  history[pos.piece_on(to_sq(move))][to_sq(move)]
-                           + cmh[pos.piece_on(to_sq(move))][to_sq(move)]) / 14980;
+          int rDecrease = (hValue + cmhValue) / 14980;
           ss->reduction = std::max(DEPTH_ZERO, ss->reduction - rDecrease * ONE_PLY);
 
           // Decrease reduction for moves that escape a capture. Filter out castling
