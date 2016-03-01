@@ -181,7 +181,7 @@ namespace {
   // Assorted bonuses and penalties used by evaluation
   const Score MinorBehindPawn     = S(16,  0);
   const Score BishopPawns         = S( 8, 12);
-  const Score KingsideFianchetto = S(18,  0);
+  const Score KingsideFianchetto  = S(16,  0);
   const Score RookOnPawn          = S( 7, 27);
   const Score TrappedRook         = S(92,  0);
   const Score Checked             = S(20, 20);
@@ -314,10 +314,11 @@ namespace {
 
             // Bonus for a fianchettoed bishop on the kingside
             if (   Pt == BISHOP
+                && pos.game_phase() == PHASE_MIDGAME
                 && s == relative_square(Us, SQ_G2)
                 && pos.piece_on(s + pawn_push(Us)) == make_piece(Us, PAWN)
-                && pos.piece_on(s + DELTA_E) == make_piece(Us, PAWN)
-                && pos.piece_on(s + DELTA_W) == make_piece(Us, PAWN))
+                && ei.attackedBy[Us][PAWN] & (s + pawn_push(Us)) 
+                && distance(s, pos.square<KING>(Us)) == 1) 
                 score += KingsideFianchetto;
 
             // An important Chess960 pattern: A cornered bishop blocked by a friendly
