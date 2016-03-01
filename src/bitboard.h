@@ -2,12 +2,12 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
+  Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
-
 
   Stockfish is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -200,14 +200,6 @@ inline Bitboard passed_pawn_mask(Color c, Square s) {
 }
 
 
-/// squares_of_color() returns a bitboard representing all the squares of the
-/// same color of the given one.
-
-inline Bitboard squares_of_color(Square s) {
-  return DarkSquares & s ? DarkSquares : ~DarkSquares;
-}
-
-
 /// aligned() returns true if the squares s1, s2 and s3 are aligned either on a
 /// straight or on a diagonal line.
 
@@ -231,7 +223,7 @@ template<> inline int distance<Rank>(Square x, Square y) { return distance(rank_
 /// piece of type Pt (bishop or rook) placed on 's'. The helper magic_index()
 /// looks up the index using the 'magic bitboards' approach.
 template<PieceType Pt>
-FORCE_INLINE unsigned magic_index(Square s, Bitboard occupied) {
+inline unsigned magic_index(Square s, Bitboard occupied) {
 
   Bitboard* const Masks  = Pt == ROOK ? RookMasks  : BishopMasks;
   Bitboard* const Magics = Pt == ROOK ? RookMagics : BishopMagics;
@@ -271,13 +263,13 @@ inline Bitboard attacks_bb(Piece pc, Square s, Bitboard occupied) {
 
 #  if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
 
-FORCE_INLINE Square lsb(Bitboard b) {
+inline Square lsb(Bitboard b) {
   unsigned long idx;
   _BitScanForward64(&idx, b);
   return (Square) idx;
 }
 
-FORCE_INLINE Square msb(Bitboard b) {
+inline Square msb(Bitboard b) {
   unsigned long idx;
   _BitScanReverse64(&idx, b);
   return (Square) idx;
@@ -285,28 +277,28 @@ FORCE_INLINE Square msb(Bitboard b) {
 
 #  elif defined(__arm__)
 
-FORCE_INLINE int lsb32(uint32_t v) {
+inline int lsb32(uint32_t v) {
   __asm__("rbit %0, %1" : "=r"(v) : "r"(v));
   return __builtin_clz(v);
 }
 
-FORCE_INLINE Square msb(Bitboard b) {
+inline Square msb(Bitboard b) {
   return (Square) (63 - __builtin_clzll(b));
 }
 
-FORCE_INLINE Square lsb(Bitboard b) {
+inline Square lsb(Bitboard b) {
   return (Square) (uint32_t(b) ? lsb32(uint32_t(b)) : 32 + lsb32(uint32_t(b >> 32)));
 }
 
 #  else // Assumed gcc or compatible compiler
 
-FORCE_INLINE Square lsb(Bitboard b) { // Assembly code by Heinz van Saanen
+inline Square lsb(Bitboard b) { // Assembly code by Heinz van Saanen
   Bitboard idx;
   __asm__("bsfq %1, %0": "=r"(idx): "rm"(b) );
   return (Square) idx;
 }
 
-FORCE_INLINE Square msb(Bitboard b) {
+inline Square msb(Bitboard b) {
   Bitboard idx;
   __asm__("bsrq %1, %0": "=r"(idx): "rm"(b) );
   return (Square) idx;
@@ -324,7 +316,7 @@ Square msb(Bitboard b);
 
 /// pop_lsb() finds and clears the least significant bit in a non-zero bitboard
 
-FORCE_INLINE Square pop_lsb(Bitboard* b) {
+inline Square pop_lsb(Bitboard* b) {
   const Square s = lsb(*b);
   *b &= *b - 1;
   return s;

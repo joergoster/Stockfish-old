@@ -2,6 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
+  Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -30,46 +31,44 @@
 
 
 /// The Stats struct stores moves statistics. According to the template parameter
-/// the class can store History, Gains and Countermoves. History records how often
+/// the class can store History and Countermoves. History records how often
 /// different moves have been successful or unsuccessful during the current search
-/// and is used for reduction and move ordering decisions. Gains records the move's
-/// best evaluation gain from one ply to the next and is used for pruning decisions.
+/// and is used for reduction and move ordering decisions.
 /// Countermoves store the move that refute a previous one. Entries are stored
 /// using only the moving piece and destination square, hence two moves with
 /// different origin but same destination and piece will be considered identical.
-template<bool Gain, typename T>
+template<typename T, bool CM = false>
 struct Stats {
 
-  static const Value Max = Value(250);
+  static const Value Max = Value(1 << 28);
 
   const T* operator[](Piece pc) const { return table[pc]; }
+  T* operator[](Piece pc) { return table[pc]; }
   void clear() { std::memset(table, 0, sizeof(table)); }
 
   void update(Piece pc, Square to, Move m) {
 
-    if (m == table[pc][to].first)
-        return;
-
-    table[pc][to].second = table[pc][to].first;
-    table[pc][to].first = m;
+    if (m != table[pc][to])
+        table[pc][to] = m;
   }
 
   void update(Piece pc, Square to, Value v) {
 
-    if (Gain)
-        table[pc][to] = std::max(v, table[pc][to] - 1);
+    if (abs(int(v)) >= 324)
+        return;
 
-    else if (abs(table[pc][to] + v) < Max)
-        table[pc][to] +=  v;
+    table[pc][to] -= table[pc][to] * abs(int(v)) / (CM ? 936 : 324);
+    table[pc][to] += int(v) * 32;
   }
 
 private:
   T table[PIECE_NB][SQUARE_NB];
 };
 
-typedef Stats< true, Value> GainsStats;
-typedef Stats<false, Value> HistoryStats;
-typedef Stats<false, std::pair<Move, Move> > MovesStats;
+typedef Stats<Move> MoveStats;
+typedef Stats<Value, false> HistoryStats;
+typedef Stats<Value,  true> CounterMoveStats;
+typedef Stats<CounterMoveStats> CounterMoveHistoryStats;
 
 
 /// MovePicker class is used to pick one pseudo legal move at a time from the
@@ -80,33 +79,35 @@ typedef Stats<false, std::pair<Move, Move> > MovesStats;
 /// to get a cut-off first.
 
 class MovePicker {
-
-  MovePicker& operator=(const MovePicker&); // Silence a warning under MSVC
-
 public:
-  MovePicker(const Position&, Move, Depth, const HistoryStats&, Square);
-  MovePicker(const Position&, Move, const HistoryStats&, PieceType);
-  MovePicker(const Position&, Move, Depth, const HistoryStats&, Move*, Move*, Search::Stack*);
+  MovePicker(const MovePicker&) = delete;
+  MovePicker& operator=(const MovePicker&) = delete;
 
-  template<bool SpNode> Move next_move();
+  MovePicker(const Position&, Move, Depth, const HistoryStats&, Square);
+  MovePicker(const Position&, Move, const HistoryStats&, Value);
+  MovePicker(const Position&, Move, Depth, const HistoryStats&, const CounterMoveStats&, Move, Search::Stack*);
+
+  Move next_move();
 
 private:
   template<GenType> void score();
   void generate_next_stage();
+  ExtMove* begin() { return moves; }
+  ExtMove* end() { return endMoves; }
 
   const Position& pos;
   const HistoryStats& history;
+  const CounterMoveStats* counterMoveHistory;
   Search::Stack* ss;
-  Move* countermoves;
-  Move* followupmoves;
+  Move countermove;
   Depth depth;
   Move ttMove;
-  ExtMove killers[6];
+  ExtMove killers[3];
   Square recaptureSquare;
-  Value captureThreshold;
+  Value threshold;
   int stage;
-  ExtMove *cur, *end, *endQuiets, *endBadCaptures;
-  ExtMove moves[MAX_MOVES];
+  ExtMove *endQuiets, *endBadCaptures = moves + MAX_MOVES - 1;
+  ExtMove moves[MAX_MOVES], *cur = moves, *endMoves = moves;
 };
 
 #endif // #ifndef MOVEPICK_H_INCLUDED

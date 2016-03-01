@@ -7,6 +7,8 @@
   this code to other chess engines.
 */
 
+#define NOMINMAX
+
 #include <algorithm>
 
 #include "../position.h"
@@ -622,7 +624,7 @@ int Tablebases::probe_dtz(Position& pos, int *success)
       if (v1 >= 0)
         v = v1;
     } else if (v < 0) {
-      if (v1 >= 0 || v1 < 100)
+      if (v1 >= 0 || v1 < -100)
         v = v1;
     } else if (v > 100) {
       if (v1 > 0)
