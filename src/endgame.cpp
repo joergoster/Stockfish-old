@@ -114,8 +114,6 @@ Endgames::Endgames() {
   add<KNNK>("KNNK");
   add<KBNK>("KBNK");
   add<KRKP>("KRKP");
-  add<KRKB>("KRKB");
-  add<KRKN>("KRKN");
   add<KQKP>("KQKP");
   add<KQKR>("KQKR");
 
@@ -263,34 +261,6 @@ Value Endgame<KRKP>::operator()(const Position& pos) const {
                                   - distance(bksq, psq + DELTA_S)
                                   - distance(psq, queeningSq));
 
-  return strongSide == pos.side_to_move() ? result : -result;
-}
-
-
-/// KR vs KB. This is very simple, and always returns drawish scores.  The
-/// score is slightly bigger when the defending king is close to the edge.
-template<>
-Value Endgame<KRKB>::operator()(const Position& pos) const {
-
-  assert(verify_material(pos, strongSide, RookValueMg, 0));
-  assert(verify_material(pos, weakSide, BishopValueMg, 0));
-
-  Value result = Value(PushToEdges[pos.square<KING>(weakSide)]);
-  return strongSide == pos.side_to_move() ? result : -result;
-}
-
-
-/// KR vs KN. The attacking side has slightly better winning chances than
-/// in KR vs KB, particularly if the king and the knight are far apart.
-template<>
-Value Endgame<KRKN>::operator()(const Position& pos) const {
-
-  assert(verify_material(pos, strongSide, RookValueMg, 0));
-  assert(verify_material(pos, weakSide, KnightValueMg, 0));
-
-  Square bksq = pos.square<KING>(weakSide);
-  Square bnsq = pos.square<KNIGHT>(weakSide);
-  Value result = Value(PushToEdges[bksq] + PushAway[distance(bksq, bnsq)]);
   return strongSide == pos.side_to_move() ? result : -result;
 }
 
