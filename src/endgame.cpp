@@ -115,7 +115,6 @@ Endgames::Endgames() {
   add<KBNK>("KBNK");
   add<KRKP>("KRKP");
   add<KQKP>("KQKP");
-  add<KQKR>("KQKR");
 
   add<KNPK>("KNPK");
   add<KNPKB>("KNPKB");
@@ -285,28 +284,6 @@ Value Endgame<KQKP>::operator()(const Position& pos) const {
       || distance(loserKSq, pawnSq) != 1
       || !((FileABB | FileCBB | FileFBB | FileHBB) & pawnSq))
       result += QueenValueEg - PawnValueEg;
-
-  return strongSide == pos.side_to_move() ? result : -result;
-}
-
-
-/// KQ vs KR.  This is almost identical to KX vs K:  We give the attacking
-/// king a bonus for having the kings close together, and for forcing the
-/// defending king towards the edge. If we also take care to avoid null move for
-/// the defending side in the search, this is usually sufficient to win KQ vs KR.
-template<>
-Value Endgame<KQKR>::operator()(const Position& pos) const {
-
-  assert(verify_material(pos, strongSide, QueenValueMg, 0));
-  assert(verify_material(pos, weakSide, RookValueMg, 0));
-
-  Square winnerKSq = pos.square<KING>(strongSide);
-  Square loserKSq = pos.square<KING>(weakSide);
-
-  Value result =  QueenValueEg
-                - RookValueEg
-                + PushToEdges[loserKSq]
-                + PushClose[distance(winnerKSq, loserKSq)];
 
   return strongSide == pos.side_to_move() ? result : -result;
 }
