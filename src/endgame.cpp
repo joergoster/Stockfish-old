@@ -814,32 +814,3 @@ ScaleFactor Endgame<KNPKB>::operator()(const Position& pos) const {
 
   return SCALE_FACTOR_NONE;
 }
-
-
-/// KP vs KP. This is done by removing the weakest side's pawn and probing the
-/// KP vs K bitbase: If the weakest side has a draw without the pawn, it probably
-/// has at least a draw with the pawn as well. The exception is when the stronger
-/// side's pawn is far advanced and not on a rook file; in this case it is often
-/// possible to win (e.g. 8/4k3/3p4/3P4/6K1/8/8/8 w - - 0 1).
-template<>
-ScaleFactor Endgame<KPKP>::operator()(const Position& pos) const {
-
-  assert(verify_material(pos, strongSide, VALUE_ZERO, 1));
-  assert(verify_material(pos, weakSide,   VALUE_ZERO, 1));
-
-  // Assume strongSide is white and the pawn is on files A-D
-  Square wksq = normalize(pos, strongSide, pos.square<KING>(strongSide));
-  Square bksq = normalize(pos, strongSide, pos.square<KING>(weakSide));
-  Square psq  = normalize(pos, strongSide, pos.square<PAWN>(strongSide));
-
-  Color us = strongSide == pos.side_to_move() ? WHITE : BLACK;
-
-  // If the pawn has advanced to the fifth rank or further, and is not a
-  // rook pawn, it's too dangerous to assume that it's at least a draw.
-  if (rank_of(psq) >= RANK_5 && file_of(psq) != FILE_A)
-      return SCALE_FACTOR_NONE;
-
-  // Probe the KPK bitbase with the weakest side's pawn removed. If it's a draw,
-  // it's probably at least a draw even with the pawn.
-  return Bitbases::probe(wksq, psq, bksq, us) ? SCALE_FACTOR_NONE : SCALE_FACTOR_DRAW;
-}
