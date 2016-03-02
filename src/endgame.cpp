@@ -33,32 +33,32 @@ namespace {
   // Table used to drive the king towards the edge of the board
   // in KX vs K and KQ vs KR endgames.
   const int PushToEdges[SQUARE_NB] = {
-    100, 90, 80, 70, 70, 80, 90, 100,
-     90, 70, 60, 50, 50, 60, 70,  90,
-     80, 60, 40, 30, 30, 40, 60,  80,
-     70, 50, 30, 20, 20, 30, 50,  70,
-     70, 50, 30, 20, 20, 30, 50,  70,
-     80, 60, 40, 30, 30, 40, 60,  80,
-     90, 70, 60, 50, 50, 60, 70,  90,
-    100, 90, 80, 70, 70, 80, 90, 100
+    400, 360, 320, 280, 280, 320, 360, 400,
+    360, 280, 240, 200, 200, 240, 280, 360,
+    320, 240, 160, 120, 120, 160, 240, 320,
+    280, 200, 120,  80,  80, 120, 200, 280,
+    280, 200, 120,  80,  80, 120, 200, 280,
+    320, 240, 160, 120, 120, 160, 240, 320,
+    360, 280, 240, 200, 200, 240, 280, 360,
+    400, 360, 320, 280, 280, 320, 360, 400,
   };
 
   // Table used to drive the king towards a corner square of the
   // right color in KBN vs K endgames.
   const int PushToCorners[SQUARE_NB] = {
-    200, 190, 180, 170, 160, 150, 140, 130,
-    190, 180, 170, 160, 150, 140, 130, 140,
-    180, 170, 155, 140, 140, 125, 140, 150,
-    170, 160, 140, 120, 110, 140, 150, 160,
-    160, 150, 140, 110, 120, 140, 160, 170,
-    150, 140, 125, 140, 140, 155, 170, 180,
-    140, 130, 140, 150, 160, 170, 180, 190,
-    130, 140, 150, 160, 170, 180, 190, 200
+    800, 700, 600, 500, 400, 300, 200, 100,
+    700, 560, 460, 360, 260, 160,  60, 200,
+    600, 460, 320, 220, 120,  20, 160, 300,
+    500, 360, 220,  50, -50, 120, 260, 400,
+    400, 260, 120, -50,  50, 220, 360, 500,
+    300, 160,  20, 120, 220, 320, 460, 600,
+    200,  60, 160, 260, 360, 460, 560, 700,
+    100, 200, 300, 400, 500, 600, 700, 800
   };
 
   // Tables used to drive a piece towards or away from another piece
-  const int PushClose[8] = { 0, 0, 100, 80, 60, 40, 20, 10 };
-  const int PushAway [8] = { 0, 5, 20, 40, 60, 80, 90, 100 };
+  const int PushClose[8] = { 0, 0, 400, 320, 240, 160, 80, 40 };
+  const int PushAway [8] = { 0, 20, 80, 160, 240, 320, 360, 400 };
 
   // Pawn Rank based scaling factors used in KRPPKRP endgame
   const int KRPPKRPScaleFactors[RANK_NB] = { 0, 9, 10, 14, 21, 44, 0, 0 };
@@ -112,7 +112,6 @@ Endgames::Endgames() {
 
   add<KPK>("KPK");
   add<KNNK>("KNNK");
-  add<KBNK>("KBNK");
   add<KRKP>("KRKP");
   add<KQKP>("KQKP");
 
@@ -134,10 +133,11 @@ void Endgames::add(const string& code) {
 }
 
 
-/// Mate with KX vs K. This function is used to evaluate positions with
-/// king and plenty of material vs a lone king. It simply gives the
-/// attacking side a bonus for driving the defending king towards the edge
-/// of the board, and for keeping the distance between the two kings small.
+/// Mate with KX vs K. This function is used to evaluate positions with king and
+/// plenty of material vs a lone king. It simply gives the attacking side
+/// a bonus for driving the defending king towards the edge of the board,
+/// for keeping the distance between the two kings small, and, in case of KBNK,
+/// to drive the defending king towards a corner square of the right color.
 template<>
 Value Endgame<KXK>::operator()(const Position& pos) const {
 
@@ -148,49 +148,37 @@ Value Endgame<KXK>::operator()(const Position& pos) const {
   if (pos.side_to_move() == weakSide && !MoveList<LEGAL>(pos).size())
       return VALUE_DRAW;
 
+  // Draw detection with 2 or more bishops of the same color (and no pawns!)
+  if (    pos.count<BISHOP>(strongSide) > 1
+      && !(   pos.pieces(strongSide, BISHOP) &  DarkSquares
+           && pos.pieces(strongSide, BISHOP) & ~DarkSquares)
+      && !pos.count<PAWN  >(strongSide)  // to
+      && !pos.count<KNIGHT>(strongSide)  // avoid
+      && !pos.count<ROOK  >(strongSide)  // false
+      && !pos.count<QUEEN >(strongSide)) // positives!
+      return VALUE_DRAW;
+
   Square winnerKSq = pos.square<KING>(strongSide);
   Square loserKSq = pos.square<KING>(weakSide);
 
-  Value result =  pos.non_pawn_material(strongSide)
-                + pos.count<PAWN>(strongSide) * PawnValueEg
+  Value result =  VALUE_KNOWN_WIN
+                + pos.non_pawn_material(strongSide) / 10
                 + PushToEdges[loserKSq]
                 + PushClose[distance(winnerKSq, loserKSq)];
 
-  if (   pos.count<QUEEN>(strongSide)
-      || pos.count<ROOK>(strongSide)
-      ||(pos.count<BISHOP>(strongSide) && pos.count<KNIGHT>(strongSide))
-      ||(pos.count<BISHOP>(strongSide) > 1 && opposite_colors(pos.squares<BISHOP>(strongSide)[0],
-                                                              pos.squares<BISHOP>(strongSide)[1])))
-      result = std::min(result + VALUE_KNOWN_WIN, VALUE_MATE_IN_MAX_PLY - 1);
-
-  return strongSide == pos.side_to_move() ? result : -result;
-}
-
-
-/// Mate with KBN vs K. This is similar to KX vs K, but we have to drive the
-/// defending king towards a corner square of the right color.
-template<>
-Value Endgame<KBNK>::operator()(const Position& pos) const {
-
-  assert(verify_material(pos, strongSide, KnightValueMg + BishopValueMg, 0));
-  assert(verify_material(pos, weakSide, VALUE_ZERO, 0));
-
-  Square winnerKSq = pos.square<KING>(strongSide);
-  Square loserKSq = pos.square<KING>(weakSide);
-  Square bishopSq = pos.square<BISHOP>(strongSide);
-
-  // kbnk_mate_table() tries to drive toward corners A1 or H8. If we have a
-  // bishop that cannot reach the above squares, we flip the kings in order
-  // to drive the enemy toward corners A8 or H1.
-  if (opposite_colors(bishopSq, SQ_A1))
+  if (   pos.count<BISHOP>(strongSide) == 1
+      && pos.count<KNIGHT>(strongSide) == 1)
   {
-      winnerKSq = ~winnerKSq;
-      loserKSq  = ~loserKSq;
-  }
+      Square bishopSq = pos.square<BISHOP>(strongSide);
 
-  Value result =  VALUE_KNOWN_WIN
-                + PushClose[distance(winnerKSq, loserKSq)]
-                + PushToCorners[loserKSq];
+      if (opposite_colors(bishopSq, SQ_A1))
+      {
+          winnerKSq = ~winnerKSq;
+          loserKSq  = ~loserKSq;
+      }
+
+      result += PushToCorners[loserKSq];
+  }
 
   return strongSide == pos.side_to_move() ? result : -result;
 }
