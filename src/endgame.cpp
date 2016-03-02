@@ -201,7 +201,7 @@ Value Endgame<KPK>::operator()(const Position& pos) const {
   if (!Bitbases::probe(wksq, psq, bksq, us))
       return VALUE_DRAW;
 
-  Value result = VALUE_KNOWN_WIN + PawnValueEg + Value(rank_of(psq));
+  Value result = VALUE_KNOWN_WIN - PawnValueEg / 4 * (7 - rank_of(psq));
 
   return strongSide == pos.side_to_move() ? result : -result;
 }
@@ -225,15 +225,25 @@ Value Endgame<KRKP>::operator()(const Position& pos) const {
   Square queeningSq = make_square(file_of(psq), RANK_1);
   Value result;
 
+  // If both, the pawn and the king of the weaker side, are not beyond
+  // the 3rd rank and it's the stronger side to move, it's a win.
+  if (   rank_of(bksq) >= RANK_6
+      && rank_of(psq ) >= RANK_6
+      && pos.side_to_move() == strongSide)
+      result = VALUE_KNOWN_WIN + RookValueEg / 10 - PawnValueEg;
+
   // If the stronger side's king is in front of the pawn, it's a win
-  if (wksq < psq && file_of(wksq) == file_of(psq))
-      result = RookValueEg - distance(wksq, psq);
+  else if (    wksq < psq
+           && distance<File>(wksq, psq) <= 1
+           && (rank_of(psq) >= RANK_3 || distance(bksq, psq) >= 2))
+      result = VALUE_KNOWN_WIN + RookValueEg / 10 - PawnValueEg;
 
   // If the weaker side's king is too far from the pawn and the rook,
   // it's a win.
-  else if (   distance(bksq, psq) >= 3 + (pos.side_to_move() == weakSide)
-           && distance(bksq, rsq) >= 3)
-      result = RookValueEg - distance(wksq, psq);
+  else if (    distance(bksq, psq) >= 3 + (pos.side_to_move() == weakSide)
+           &&  distance(bksq, rsq) >= 2
+           && (rank_of(psq) != RANK_2 || distance(wksq, queeningSq) <= 1))
+      result = VALUE_KNOWN_WIN + RookValueEg / 10 - PawnValueEg;
 
   // If the pawn is far advanced and supported by the defending king,
   // the position is drawish
@@ -266,12 +276,12 @@ Value Endgame<KQKP>::operator()(const Position& pos) const {
   Square loserKSq = pos.square<KING>(weakSide);
   Square pawnSq = pos.square<PAWN>(weakSide);
 
-  Value result = Value(PushClose[distance(winnerKSq, loserKSq)]);
+  Value result = Value(PushClose[distance(winnerKSq, loserKSq)] / (pos.rule50_count() + 1));
 
   if (   relative_rank(weakSide, pawnSq) != RANK_7
       || distance(loserKSq, pawnSq) != 1
       || !((FileABB | FileCBB | FileFBB | FileHBB) & pawnSq))
-      result += QueenValueEg - PawnValueEg;
+      result += VALUE_KNOWN_WIN + QueenValueEg / 10 - PawnValueEg;
 
   return strongSide == pos.side_to_move() ? result : -result;
 }
