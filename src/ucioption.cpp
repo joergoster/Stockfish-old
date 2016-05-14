@@ -170,6 +170,11 @@ Option& Option::operator=(const string& v) {
 #include <iostream>
 #include <sstream>
 
+bool Tune::update_on_last;
+const UCI::Option* LastOption = nullptr;
+BoolConditions Conditions;
+static std::map<std::string, int> TuneResults;
+
 string Tune::next(string& names, bool pop) {
 
   string name;
@@ -189,7 +194,11 @@ string Tune::next(string& names, bool pop) {
   return name;
 }
 
-static void on_tune(const UCI::Option&) { Tune::read_options(); }
+static void on_tune(const UCI::Option& o) {
+
+  if (!Tune::update_on_last || LastOption == &o)
+      Tune::read_options();
+}
 
 static void make_option(const string& n, int v, const SetRange& r) {
 
@@ -197,7 +206,11 @@ static void make_option(const string& n, int v, const SetRange& r) {
   if (r(v).first == r(v).second)
       return;
 
+  if (TuneResults.count(n))
+      v = TuneResults[n];
+
   Options[n] << UCI::Option(v, r(v).first, r(v).second, on_tune);
+  LastOption = &Options[n];
 
   // Print formatted parameters, ready to be copy-pasted in fishtest
   std::cout << n << ","
@@ -228,10 +241,48 @@ template<> void Tune::Entry<Score>::init_option() {
 }
 
 template<> void Tune::Entry<Score>::read_option() {
-  if (Options.count("m" + name) || Options.count("e" + name))
-      value = make_score(Options["m" + name], Options["e" + name]);
+  if (Options.count("m" + name))
+      value = make_score(Options["m" + name], eg_value(value));
+
+  if (Options.count("e" + name))
+      value = make_score(mg_value(value), Options["e" + name]);
 }
 
 // Instead of a variable here we have a PostUpdate function: just call it
 template<> void Tune::Entry<Tune::PostUpdate>::init_option() {}
 template<> void Tune::Entry<Tune::PostUpdate>::read_option() { value(); }
+
+
+// Set binary conditions according to a probability that depends
+// on the corresponding parameter value.
+
+void BoolConditions::set() {
+
+  static PRNG rng(now());
+  static bool startup = true; // To workaround fishtest bench
+
+  for (size_t i = 0; i < binary.size(); i++)
+      binary[i] = !startup && (values[i] + int(rng.rand<unsigned>() % variance) > threshold);
+
+  startup = false;
+
+  for (size_t i = 0; i < binary.size(); i++)
+      sync_cout << binary[i] << sync_endl;
+}
+
+
+// Init options with tuning session results instead of default values. Useful to
+// get correct bench signature after a tuning session or to test tuned values.
+// Just copy fishtest tuning results in a result.txt file and extract the
+// values with:
+//
+// cat results.txt | sed 's/^param: \([^,]*\), best: \([^,]*\).*/  TuneResults["\1"] = int(round(\2));/'
+//
+// Then paste the output below, as the function body
+
+#include <cmath>
+
+void Tune::read_results() {
+
+  /* ...insert your values here... */
+}
