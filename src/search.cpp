@@ -529,7 +529,7 @@ namespace {
     Key posKey;
     Move ttMove, move, excludedMove, bestMove;
     Depth extension, newDepth, predictedDepth;
-    Value bestValue, value, ttValue, eval, nullValue, futilityValue;
+    Value bestValue, value, ttValue, eval, nullValue;
     bool ttHit, inCheck, givesCheck, singularExtensionNode, improving;
     bool captureOrPromotion, doFullDepthSearch;
     int moveCount, quietCount;
@@ -928,22 +928,16 @@ moves_loop: // When in check and at SpNode search starts from here
           predictedDepth = std::max(newDepth - reduction<PvNode>(improving, depth, moveCount), DEPTH_ZERO);
 
           // Futility pruning: parent node
-          if (predictedDepth < 7 * ONE_PLY)
+          if (   predictedDepth < 7 * ONE_PLY
+              && ss->staticEval + futility_margin(predictedDepth) + 256 <= alpha)
           {
-              futilityValue = ss->staticEval + futility_margin(predictedDepth) + 256;
-
-              if (futilityValue <= alpha)
-              {
-                  bestValue = std::max(bestValue, futilityValue);
-
                   if (SpNode)
                   {
                       splitPoint->spinlock.acquire();
                       if (bestValue > splitPoint->bestValue)
                           splitPoint->bestValue = bestValue;
                   }
-                  continue;
-              }
+              continue;
           }
 
           // Prune moves with negative SEE at low depths
