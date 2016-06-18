@@ -257,7 +257,8 @@ void MainThread::search() {
   Color us = rootPos.side_to_move();
   Time.init(Limits, us, rootPos.game_ply());
 
-  int contempt = Options["Contempt"] * PawnValueEg / 100; // From centipawns
+  int pieceCnt = std::max(popcount(rootPos.pieces()) - 4, 0);
+  int contempt = Options["Contempt"] * PawnValueEg / 100 + pieceCnt; // From centipawns
   DrawValue[ us] = VALUE_DRAW - Value(contempt);
   DrawValue[~us] = VALUE_DRAW + Value(contempt);
 
