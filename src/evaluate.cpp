@@ -824,6 +824,10 @@ Value Eval::evaluate(const Position& pos) {
   // Evaluate scale factor for the winning side
   ScaleFactor sf = evaluate_scale_factor(pos, ei, eg_value(score));
 
+  // Scale the midgame score by total number of pieces to reflect winning chances
+  int chances = mg_value(score) * (100 + popcount(pos.pieces())) / 132;
+  score = make_score(chances, eg_value(score));
+
   // Interpolate between a middlegame and a (scaled by 'sf') endgame score
   Value v =  mg_value(score) * int(ei.me->game_phase())
            + eg_value(score) * int(PHASE_MIDGAME - ei.me->game_phase()) * sf / SCALE_FACTOR_NORMAL;
