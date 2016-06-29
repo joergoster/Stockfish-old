@@ -215,7 +215,7 @@ void Search::clear() {
       th->counterMoves.clear();
   }
 
-  Threads.main()->previousScore = VALUE_ZERO;
+  Threads.main()->previousScore = VALUE_INFINITE;
 }
 
 
@@ -494,15 +494,15 @@ void Thread::search() {
               const int F[] = { mainThread->failedLow,
                                 bestValue - mainThread->previousScore };
 
-              int improvingFactor = std::max(680, std::min(1140, 420 + 47 * F[0] + 68 * F[1]));
+              int improvingFactor = std::max(39, std::min(113, 61 + 24 * F[0] - 3 * F[1]));
               double unstablePvFactor = 1 + mainThread->bestMoveChanges;
 
               bool doEasyMove =   rootMoves[0].pv[0] == easyMove
                                && mainThread->bestMoveChanges < 0.03
-                               && Time.elapsed() > Time.optimum() / 4;
+                               && Time.elapsed() > Time.optimum() * 6 / 100;
 
               if (   rootMoves.size() == 1
-                  || Time.elapsed() > Time.optimum() * unstablePvFactor * improvingFactor / 1000
+                  || Time.elapsed() > Time.optimum() * unstablePvFactor * improvingFactor / 100
                   || (mainThread->easyMovePlayed = doEasyMove))
               {
                   // If we are allowed to ponder do not stop the search now but
