@@ -45,7 +45,9 @@ namespace {
   Score Connected[2][2][2][RANK_NB];
 
   // Doubled pawn penalty
-  const Score Doubled = S(18,38);
+  Score Doubled[FILE_NB] = {
+    S(11, 34), S(17, 38), S(19, 38), S(19, 38),
+    S(19, 38), S(19, 38), S(17, 38), S(11, 34) };
 
   // Lever bonus by rank
   const Score Lever[RANK_NB] = {
@@ -81,6 +83,8 @@ namespace {
   // Max bonus for king safety. Corresponds to start position with all the pawns
   // in front of the king and no enemy pawn on the horizon.
   const Value MaxSafetyBonus = V(258);
+
+  TUNE(SetRange(0, 60), Doubled);
 
   #undef S
   #undef V
@@ -166,7 +170,7 @@ namespace {
             score += Connected[opposed][!!phalanx][more_than_one(supported)][relative_rank(Us, s)];
 
         if (doubled)
-            score -= Doubled;
+            score -= Doubled[f];
 
         if (lever)
             score += Lever[relative_rank(Us, s)];
