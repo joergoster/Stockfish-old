@@ -700,7 +700,7 @@ namespace {
                   ss->staticEval, TT.generation());
     }
 
-    if (ss->skipEarlyPruning)
+    if (ss->skipEarlyPruning || thisThread->rootDepth <= 8 * ONE_PLY)
         goto moves_loop;
 
     // Step 6. Razoring (skipped when in check)
