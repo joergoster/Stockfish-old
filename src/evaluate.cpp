@@ -822,6 +822,9 @@ Value Eval::evaluate(const Position& pos) {
   // Evaluate position potential for the winning side
   score += evaluate_initiative(pos, ei.pi->pawn_asymmetry(), eg_value(score));
 
+  // Add a simple material bonus for the side to move
+  score += make_score(popcount(pos.pieces()) * (pos.side_to_move() == WHITE ? 1 : -1), 0);
+
   // Evaluate scale factor for the winning side
   ScaleFactor sf = evaluate_scale_factor(pos, ei, eg_value(score));
 
