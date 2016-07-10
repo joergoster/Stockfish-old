@@ -499,7 +499,7 @@ void Thread::search() {
 
               bool doEasyMove =   rootMoves[0].pv[0] == easyMove
                                && mainThread->bestMoveChanges < 0.03
-                               && Time.elapsed() > Time.optimum() / (rootPos.captured_piece_type() >= KNIGHT ? 10 : 5);
+                               && Time.elapsed() > Time.optimum() / (rootPos.captured_piece_type() >= PAWN ? 12 : 7);
 
               if (   rootMoves.size() == 1
                   || Time.elapsed() > Time.optimum() * unstablePvFactor * improvingFactor / 628
