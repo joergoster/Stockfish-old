@@ -596,7 +596,7 @@ namespace {
                                                   : DrawValue[pos.side_to_move()];
         // Step 2b. Check for immediate draw
         if (pos.rule50_count() > 3 && pos.is_draw())
-            return DrawValue[pos.side_to_move()];
+            return DrawValue[pos.side_to_move()] - Eval::Tempo;
 
         // Step 3. Mate distance pruning. Even if we mate at the next move our score
         // would be at best mate_in(ss->ply+1), but if alpha is already bigger because
