@@ -1174,12 +1174,15 @@ moves_loop: // When in check search starts from here
     ss->currentMove = bestMove = MOVE_NONE;
     ss->ply = (ss-1)->ply + 1;
 
-    // Check for an instant draw or if the maximum ply has been reached
-    if (pos.is_draw() || ss->ply >= MAX_PLY)
-        return ss->ply >= MAX_PLY && !InCheck ? evaluate(pos)
-                                              : DrawValue[pos.side_to_move()] - Eval::Tempo;
+    // Check if the maximum ply has been reached
+    if (ss->ply >= MAX_PLY)
+        return !InCheck ? evaluate(pos) : DrawValue[pos.side_to_move()];
 
     assert(0 <= ss->ply && ss->ply < MAX_PLY);
+
+    // Check for an instant draw
+    if (pos.rule50_count() > 3 && pos.is_draw())
+        return DrawValue[pos.side_to_move()] - Eval::Tempo;
 
     // Decide whether or not to include checks: this fixes also the type of
     // TT entry depth that we are going to use. Note that in qsearch we use
