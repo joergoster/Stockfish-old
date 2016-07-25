@@ -1177,7 +1177,7 @@ moves_loop: // When in check search starts from here
     // Check for an instant draw or if the maximum ply has been reached
     if (pos.is_draw() || ss->ply >= MAX_PLY)
         return ss->ply >= MAX_PLY && !InCheck ? evaluate(pos)
-                                              : DrawValue[pos.side_to_move()];
+                                              : DrawValue[pos.side_to_move()] - Eval::Tempo;
 
     assert(0 <= ss->ply && ss->ply < MAX_PLY);
 
