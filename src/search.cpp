@@ -557,7 +557,7 @@ namespace {
     Key posKey;
     Move ttMove, move, excludedMove, bestMove;
     Depth extension, newDepth, predictedDepth;
-    Value bestValue, value, ttValue, eval, nullValue;
+    Value material, bestValue, value, ttValue, eval, nullValue;
     bool ttHit, inCheck, givesCheck, singularExtensionNode, improving;
     bool captureOrPromotion, doFullDepthSearch, moveCountPruning;
     Piece moved_piece;
@@ -566,6 +566,7 @@ namespace {
     // Step 1. Initialize node
     Thread* thisThread = pos.this_thread();
     inCheck = pos.checkers();
+    material = pos.side_to_move() == WHITE ? mg_value(pos.psq_score()) : -mg_value(pos.psq_score());
     moveCount = quietCount =  ss->moveCount = 0;
     bestValue = -VALUE_INFINITE;
     ss->ply = (ss-1)->ply + 1;
@@ -596,7 +597,7 @@ namespace {
                                                   : DrawValue[pos.side_to_move()];
         // Step 2b. Check for immediate draw
         if (pos.rule50_count() > 3 && pos.is_draw())
-            return DrawValue[pos.side_to_move()] - Eval::Tempo;
+            return DrawValue[pos.side_to_move()] + (material > 0 ? 2 : material < 0 ? -2 : 0);
 
         // Step 3. Mate distance pruning. Even if we mate at the next move our score
         // would be at best mate_in(ss->ply+1), but if alpha is already bigger because
@@ -1160,7 +1161,7 @@ moves_loop: // When in check search starts from here
     TTEntry* tte;
     Key posKey;
     Move ttMove, move, bestMove;
-    Value bestValue, value, ttValue, futilityValue, futilityBase, oldAlpha;
+    Value material, bestValue, value, ttValue, futilityValue, futilityBase, oldAlpha;
     bool ttHit, givesCheck, evasionPrunable;
     Depth ttDepth;
 
@@ -1171,6 +1172,7 @@ moves_loop: // When in check search starts from here
         ss->pv[0] = MOVE_NONE;
     }
 
+    material = pos.side_to_move() == WHITE ? mg_value(pos.psq_score()) : -mg_value(pos.psq_score());
     ss->currentMove = bestMove = MOVE_NONE;
     ss->ply = (ss-1)->ply + 1;
 
@@ -1182,7 +1184,7 @@ moves_loop: // When in check search starts from here
 
     // Check for an instant draw
     if (pos.rule50_count() > 3 && pos.is_draw())
-        return DrawValue[pos.side_to_move()] - Eval::Tempo;
+        return DrawValue[pos.side_to_move()] + (material > 0 ? 2 : material < 0 ? -2 : 0);
 
     // Decide whether or not to include checks: this fixes also the type of
     // TT entry depth that we are going to use. Note that in qsearch we use
