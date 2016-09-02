@@ -719,7 +719,7 @@ namespace {
                   ss->staticEval, TT.generation());
     }
 
-    if (ss->skipEarlyPruning)
+    if (ss->skipEarlyPruning || thisThread->rootDepth < 6 * ONE_PLY)
         goto moves_loop;
 
     // Step 6. Razoring (skipped when in check)
@@ -924,6 +924,7 @@ moves_loop: // When in check search starts from here
           && !captureOrPromotion
           && !inCheck
           && !givesCheck
+          &&  thisThread->rootDepth > 5 * ONE_PLY
           &&  bestValue > VALUE_MATED_IN_MAX_PLY
           && !pos.advanced_pawn_push(move))
       {
