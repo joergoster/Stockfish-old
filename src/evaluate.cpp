@@ -203,6 +203,9 @@ namespace {
   // happen in Chess960 games.
   const Score TrappedBishopA1H1 = S(50, 50);
 
+  Value spaceThreshold = V(12222);
+  TUNE(spaceThreshold);
+
   #undef S
   #undef V
 
@@ -849,7 +852,7 @@ Value Eval::evaluate(const Position& pos) {
   }
 
   // Evaluate space for both sides, only during opening
-  if (pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) >= 12222)
+  if (pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) >= spaceThreshold)
       score +=  evaluate_space<WHITE>(pos, ei)
               - evaluate_space<BLACK>(pos, ei);
 
