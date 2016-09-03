@@ -2,6 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
+  Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -17,7 +18,6 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <istream>
@@ -27,14 +27,13 @@
 #include "position.h"
 #include "search.h"
 #include "thread.h"
-#include "tt.h"
 #include "uci.h"
 
 using namespace std;
 
 namespace {
 
-const char* Defaults[] = {
+const vector<string> Defaults = {
   "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
   "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 10",
   "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 11",
@@ -77,7 +76,7 @@ const char* Defaults[] = {
   "8/8/3P3k/8/1p6/8/1P6/1K3n2 b - - 0 1",  // Nd2 - draw
 
   // 7-man positions
-  "8/R7/2q5/8/6k1/8/1P5p/K6R w - - 0 124", // Draw
+  "8/R7/2q5/8/6k1/8/1P5p/K6R w - - 0 124"  // Draw
 };
 
 } // namespace
@@ -93,8 +92,8 @@ const char* Defaults[] = {
 void benchmark(const Position& current, istream& is) {
 
   string token;
-  Search::LimitsType limits;
   vector<string> fens;
+  Search::LimitsType limits;
 
   // Assign default values to missing arguments
   string ttSize    = (is >> token) ? token : "16";
@@ -105,22 +104,22 @@ void benchmark(const Position& current, istream& is) {
 
   Options["Hash"]    = ttSize;
   Options["Threads"] = threads;
-  TT.clear();
+  Search::clear();
 
   if (limitType == "time")
-      limits.movetime = atoi(limit.c_str()); // movetime is in ms
+      limits.movetime = stoi(limit); // movetime is in millisecs
 
   else if (limitType == "nodes")
-      limits.nodes = atoi(limit.c_str());
+      limits.nodes = stoi(limit);
 
   else if (limitType == "mate")
-      limits.mate = atoi(limit.c_str());
+      limits.mate = stoi(limit);
 
   else
-      limits.depth = atoi(limit.c_str());
+      limits.depth = stoi(limit);
 
   if (fenFile == "default")
-      fens.assign(Defaults, Defaults + 37);
+      fens = Defaults;
 
   else if (fenFile == "current")
       fens.push_back(current.fen());
@@ -128,7 +127,7 @@ void benchmark(const Position& current, istream& is) {
   else
   {
       string fen;
-      ifstream file(fenFile.c_str());
+      ifstream file(fenFile);
 
       if (!file.is_open())
       {
@@ -144,29 +143,31 @@ void benchmark(const Position& current, istream& is) {
   }
 
   uint64_t nodes = 0;
-  Search::StateStackPtr st;
-  Time::point elapsed = Time::now();
+  TimePoint elapsed = now();
+  Position pos;
 
   for (size_t i = 0; i < fens.size(); ++i)
   {
-      Position pos(fens[i], Options["UCI_Chess960"], Threads.main());
+      StateListPtr states(new std::deque<StateInfo>(1));
+      pos.set(fens[i], Options["UCI_Chess960"], &states->back(), Threads.main());
 
       cerr << "\nPosition: " << i + 1 << '/' << fens.size() << endl;
 
       if (limitType == "perft")
-          nodes += Search::perft<true>(pos, limits.depth * ONE_PLY);
+          nodes += Search::perft(pos, limits.depth * ONE_PLY);
 
       else
       {
-          Threads.start_thinking(pos, limits, st);
-          Threads.wait_for_think_finished();
-          nodes += Search::RootPos.nodes_searched();
+          limits.startTime = now();
+          Threads.start_thinking(pos, states, limits);
+          Threads.main()->wait_for_search_finished();
+          nodes += Threads.nodes_searched();
       }
   }
 
-  elapsed = std::max(Time::now() - elapsed, Time::point(1)); // Avoid a 'divide by zero'
+  elapsed = now() - elapsed + 1; // Ensure positivity to avoid a 'divide by zero'
 
-  dbg_print(); // Just before to exit
+  dbg_print(); // Just before exiting
 
   cerr << "\n==========================="
        << "\nTotal time (ms) : " << elapsed
