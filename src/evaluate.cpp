@@ -203,11 +203,16 @@ namespace {
   // happen in Chess960 games.
   const Score TrappedBishopA1H1 = S(50, 50);
 
-  Value spaceThreshold = V(12222);
-  TUNE(spaceThreshold);
-
   #undef S
   #undef V
+
+  // Space threshold array
+  Value spaceThreshold[375];
+
+  // Index for looking-up space threshold
+  int spaceIndex = 332;
+
+  TUNE(SetRange(0, 374), spaceIndex);
 
   // King danger constants and variables. The king danger scores are looked-up
   // in KingDanger[]. Various little "meta-bonuses" measuring the strength
@@ -852,7 +857,7 @@ Value Eval::evaluate(const Position& pos) {
   }
 
   // Evaluate space for both sides, only during opening
-  if (pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) >= spaceThreshold)
+  if (pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) >= spaceThreshold[spaceIndex])
       score +=  evaluate_space<WHITE>(pos, ei)
               - evaluate_space<BLACK>(pos, ei);
 
@@ -938,4 +943,17 @@ void Eval::init() {
       t = std::min(Peak, std::min(i * i - 16, t + MaxSlope));
       KingDanger[i] = make_score(t * 268 / 7700, 0);
   }
+
+  int i = 0;
+  for (int n = 0; n <= 4; n++) 
+      for (int b = 0; b <= 4; b++) 
+          for (int r = 0; r <= 4; r++)
+              for (int q = 0; q <= 2; q++)
+              {
+                  spaceThreshold[i] = n * KnightValueMg + b * BishopValueMg + r * RookValueMg + q * QueenValueMg;
+                  i++;
+              }
+
+  std::sort(spaceThreshold, spaceThreshold + 375);
+
 }
