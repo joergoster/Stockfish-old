@@ -720,7 +720,7 @@ void Position::do_move(Move m, StateInfo& newSt, bool givesCheck) {
       st->psq -= PSQT::psq[captured][capsq];
 
       // Reset rule 50 counter
-      st->rule50 = 0;
+      if (st->rule50 < 101) st->rule50 = 0;
   }
 
   // Update hash key
@@ -784,7 +784,7 @@ void Position::do_move(Move m, StateInfo& newSt, bool givesCheck) {
       prefetch(thisThread->pawnsTable[st->pawnKey]);
 
       // Reset rule 50 draw counter
-      st->rule50 = 0;
+      if (st->rule50 < 101) st->rule50 = 0;
   }
 
   // Update incremental scores
@@ -1053,9 +1053,6 @@ Value Position::see(Move m) const {
 /// or by repetition. It does not detect stalemates.
 
 bool Position::is_draw() const {
-
-  if (st->rule50 > 99 && (!checkers() || MoveList<LEGAL>(*this).size()))
-      return true;
 
   StateInfo* stp = st;
   for (int i = 2, e = std::min(st->rule50, st->pliesFromNull); i <= e; i += 2)

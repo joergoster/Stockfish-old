@@ -1161,6 +1161,10 @@ moves_loop: // When in check search starts from here
               PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
               depth, bestMove, ss->staticEval, TT.generation());
 
+    // Scale down when heading towards the 50-moves rule
+    if (pos.rule50_count() > 68 && abs(bestValue) < VALUE_KNOWN_WIN / 2)
+        bestValue *= (1 - (std::min(pos.rule50_count(), 101) - 69) / 32);
+
     assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
 
     return bestValue;
