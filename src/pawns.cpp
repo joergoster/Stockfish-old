@@ -52,6 +52,9 @@ namespace {
     S( 0,  0), S( 0,  0), S(0, 0), S(0, 0),
     S(17, 16), S(33, 32), S(0, 0), S(0, 0) };
 
+  // Penalty for each pawn group
+  const Score Groups = S(2, 8);
+
   // Weakness of our pawn shelter in front of the king by [distance from edge][rank]
   const Value ShelterWeakness[][RANK_NB] = {
     { V( 97), V(21), V(26), V(51), V(87), V( 89), V( 99) },
@@ -99,11 +102,12 @@ namespace {
     Score score = SCORE_ZERO;
     const Square* pl = pos.squares<PAWN>(Us);
     const Bitboard* pawnAttacksBB = StepAttacksBB[make_piece(Us, PAWN)];
+    int filesWithPawns = 0;
 
     Bitboard ourPawns   = pos.pieces(Us  , PAWN);
     Bitboard theirPawns = pos.pieces(Them, PAWN);
 
-    e->passedPawns[Us] = e->pawnAttacksSpan[Us] = 0;
+    e->passedPawns[Us] = e->pawnAttacksSpan[Us] = e->pawnGroups[Us] = 0;
     e->kingSquares[Us] = SQ_NONE;
     e->semiopenFiles[Us] = 0xFF;
     e->pawnAttacks[Us] = shift_bb<Right>(ourPawns) | shift_bb<Left>(ourPawns);
@@ -171,6 +175,24 @@ namespace {
         if (lever)
             score += Lever[relative_rank(Us, s)];
     }
+
+    // Finally, give a small penalty for each pawn group
+    for (File f = FILE_A; f <= FILE_H; ++f)
+    {
+        if (file_bb(f) & ourPawns)
+            filesWithPawns++;
+
+        else if (filesWithPawns) // If there were pawns, increase pawnGroups
+        {
+            filesWithPawns = 0;
+            e->pawnGroups[Us]++;
+        }
+    }
+
+    if (filesWithPawns) // Still some pawns?
+        e->pawnGroups[Us]++;
+
+    score -= e->pawnGroups[Us] * Groups;
 
     return score;
   }
