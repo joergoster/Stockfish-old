@@ -903,7 +903,7 @@ moves_loop: // When in check search starts from here
           && !extension
           &&  pos.legal(move))
       {
-          Value rBeta = std::max(std::min(ttValue, beta) - 2 * depth / ONE_PLY, -VALUE_MATE);
+          Value rBeta = std::max(std::min(ttValue - 2 * depth / ONE_PLY, beta), -VALUE_MATE);
           Depth d = (depth / (2 * ONE_PLY)) * ONE_PLY;
           ss->excludedMove = move;
           ss->skipEarlyPruning = true;
