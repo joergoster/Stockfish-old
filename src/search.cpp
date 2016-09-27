@@ -885,7 +885,6 @@ moves_loop: // When in check search starts from here
                   : pos.gives_check(move);
 
       moveCountPruning =   depth < 16 * ONE_PLY
-                        && (ss-1)->currentMove != MOVE_NULL
                         && moveCount >= FutilityMoveCounts[improving][depth / ONE_PLY];
 
       // Step 12. Extend checks
@@ -920,8 +919,9 @@ moves_loop: // When in check search starts from here
       newDepth = depth - ONE_PLY + extension;
 
       // Step 13. Pruning at shallow depth
-      if (  !rootNode
+      if (   !rootNode
           && !inCheck
+          && (ss-1)->currentMove != MOVE_NULL
           &&  bestValue > VALUE_MATED_IN_MAX_PLY)
       {
           if (   !captureOrPromotion
