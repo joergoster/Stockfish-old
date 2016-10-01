@@ -2,6 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
+  Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -64,23 +65,23 @@ struct Tie: public streambuf { // MSVC requires split streambuf for cin and cout
 class Logger {
 
   Logger() : in(cin.rdbuf(), file.rdbuf()), out(cout.rdbuf(), file.rdbuf()) {}
- ~Logger() { start(false); }
+ ~Logger() { start(""); }
 
   ofstream file;
   Tie in, out;
 
 public:
-  static void start(bool b) {
+  static void start(const std::string& fname) {
 
     static Logger l;
 
-    if (b && !l.file.is_open())
+    if (!fname.empty() && !l.file.is_open())
     {
-        l.file.open("io_log.txt", ifstream::out);
+        l.file.open(fname, ifstream::out);
         cin.rdbuf(&l.in);
         cout.rdbuf(&l.out);
     }
-    else if (!b && l.file.is_open())
+    else if (fname.empty() && l.file.is_open())
     {
         cout.rdbuf(l.out.buf);
         cin.rdbuf(l.in.buf);
@@ -156,7 +157,7 @@ std::ostream& operator<<(std::ostream& os, SyncCout sc) {
 
 
 /// Trampoline helper to avoid moving Logger to misc.h
-void start_logger(bool b) { Logger::start(b); }
+void start_logger(const std::string& fname) { Logger::start(fname); }
 
 
 /// prefetch() preloads the given address in L1/L2 cache. This is a non-blocking
