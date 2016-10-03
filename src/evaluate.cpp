@@ -190,7 +190,6 @@ namespace {
   const Score RookOnPawn          = S( 8, 24);
   const Score TrappedRook         = S(92,  0);
   const Score CloseEnemies        = S( 7,  0);
-  const Score SafeCheck           = S(20, 20);
   const Score OtherCheck          = S(10, 10);
   const Score ThreatByHangingPawn = S(71, 61);
   const Score LooseEnemies        = S( 0, 25);
@@ -212,10 +211,10 @@ namespace {
 
   // Penalties for enemy's safe checks
   const int QueenContactCheck = 997;
-  const int QueenCheck        = 695;
-  const int RookCheck         = 638;
-  const int BishopCheck       = 538;
-  const int KnightCheck       = 874;
+  const int QueenCheck        = 750;
+  const int RookCheck         = 700;
+  const int BishopCheck       = 610;
+  const int KnightCheck       = 939;
 
 
   // eval_init() initializes king and attack bitboards for a given color
@@ -446,7 +445,7 @@ namespace {
 
         // Enemy queen safe checks
         if ((b1 | b2) & ei.attackedBy[Them][QUEEN] & safe)
-            kingDanger += QueenCheck, score -= SafeCheck;
+            kingDanger += QueenCheck;
 
         // For other pieces, also consider the square safe if attacked twice,
         // and only defended by a queen.
@@ -456,14 +455,14 @@ namespace {
 
         // Enemy rooks safe and other checks
         if (b1 & ei.attackedBy[Them][ROOK] & safe)
-            kingDanger += RookCheck, score -= SafeCheck;
+            kingDanger += RookCheck;
 
         else if (b1 & ei.attackedBy[Them][ROOK] & other)
             score -= OtherCheck;
 
         // Enemy bishops safe and other checks
         if (b2 & ei.attackedBy[Them][BISHOP] & safe)
-            kingDanger += BishopCheck, score -= SafeCheck;
+            kingDanger += BishopCheck;
 
         else if (b2 & ei.attackedBy[Them][BISHOP] & other)
             score -= OtherCheck;
@@ -471,14 +470,14 @@ namespace {
         // Enemy knights safe and other checks
         b = pos.attacks_from<KNIGHT>(ksq) & ei.attackedBy[Them][KNIGHT];
         if (b & safe)
-            kingDanger += KnightCheck, score -= SafeCheck;
+            kingDanger += KnightCheck;
 
         else if (b & other)
             score -= OtherCheck;
 
         // Compute the king danger score and subtract it from the evaluation
         if (kingDanger > 0)
-            score -= make_score(std::min(kingDanger * kingDanger / 4096,  2 * int(BishopValueMg)), 0);
+            score -= make_score(std::min(kingDanger * kingDanger / 4096,  2 * int(BishopValueMg)), 10);
     }
 
     // King tropism: firstly, find squares that opponent attacks in our king flank
