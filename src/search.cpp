@@ -892,6 +892,12 @@ moves_loop: // When in check search starts from here
           &&  pos.see_sign(move) >= VALUE_ZERO)
           extension = ONE_PLY;
 
+      // Pawn push endgame extension
+      else if (depth < 16 * ONE_PLY
+               && pos.advanced_pawn_push(move)
+               && pos.non_pawn_material(pos.side_to_move()) <= RookValueMg)
+          extension = ONE_PLY;
+
       // Singular extension search. If all moves but one fail low on a search of
       // (alpha-s, beta-s), and just one fails high on (alpha, beta), then that move
       // is singular and should be extended. To verify this we do a reduced search
