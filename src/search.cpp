@@ -1293,7 +1293,8 @@ moves_loop: // When in check search starts from here
       if (   !InCheck
           && !givesCheck
           &&  futilityBase > -VALUE_KNOWN_WIN
-          && !pos.advanced_pawn_push(move))
+          && !pos.advanced_pawn_push(move)
+          &&  pos.non_pawn_material(pos.side_to_move())) 
       {
           assert(type_of(move) != ENPASSANT); // Due to !pos.advanced_pawn_push
 
