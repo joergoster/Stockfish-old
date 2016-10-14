@@ -919,7 +919,9 @@ moves_loop: // When in check search starts from here
       newDepth = depth - ONE_PLY + extension;
 
       // Step 13. Pruning at shallow depth
-      if (  !rootNode
+      if (   !rootNode
+          &&  pos.count<PAWN>(pos.side_to_move())
+          &&  pos.non_pawn_material(pos.side_to_move())
           &&  bestValue > VALUE_MATED_IN_MAX_PLY)
       {
           if (   !captureOrPromotion
