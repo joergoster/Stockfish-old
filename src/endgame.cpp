@@ -343,6 +343,7 @@ Value Endgame<KQKR>::operator()(const Position& pos) const {
 
 
 /// Some cases of trivial draws
+template<> Value Endgame<KmKm>::operator()(const Position&) const { return VALUE_DRAW; }
 template<> Value Endgame<KNNK>::operator()(const Position&) const { return VALUE_DRAW; }
 
 
