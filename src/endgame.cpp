@@ -151,6 +151,16 @@ Value Endgame<KXK>::operator()(const Position& pos) const {
   if (pos.side_to_move() == weakSide && !MoveList<LEGAL>(pos).size())
       return VALUE_DRAW;
 
+  // Draw detection with 2 or more bishops of the same color (and no pawns!)
+  if (    pos.count<BISHOP>(strongSide) > 1
+      && !(   pos.pieces(strongSide, BISHOP) &  DarkSquares
+           && pos.pieces(strongSide, BISHOP) & ~DarkSquares)
+      && !pos.count<PAWN  >(strongSide)  // to
+      && !pos.count<KNIGHT>(strongSide)  // avoid
+      && !pos.count<ROOK  >(strongSide)  // false
+      && !pos.count<QUEEN >(strongSide)) // positives!
+      return VALUE_DRAW;
+
   Square winnerKSq = pos.square<KING>(strongSide);
   Square loserKSq = pos.square<KING>(weakSide);
 
@@ -239,6 +249,13 @@ Value Endgame<KRKP>::operator()(const Position& pos) const {
 
   Square queeningSq = make_square(file_of(psq), RANK_1);
   Value result;
+
+  // If both, the pawn and the king of the weaker side are not beyond
+  // the 3rd rank and it's the stronger side to move, it's a win.
+  if (   rank_of(bksq) >= RANK_6
+      && rank_of(psq ) >= RANK_6
+      && pos.side_to_move() == strongSide)
+      result = RookValueEg - distance(wksq, psq);
 
   // If the stronger side's king is in front of the pawn, it's a win
   if (wksq < psq && file_of(wksq) == file_of(psq))
