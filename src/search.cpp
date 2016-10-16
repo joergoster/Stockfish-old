@@ -778,6 +778,11 @@ namespace {
 
             // Do verification search at high depths
             ss->skipEarlyPruning = true;
+
+            // Reduce reduction at higher iterations
+            if (thisThread->rootDepth > 24 * ONE_PLY)
+                R = std::min(R, 5 * ONE_PLY);
+
             Value v = depth-R < ONE_PLY ? qsearch<NonPV, false>(pos, ss, beta-1, beta, DEPTH_ZERO)
                                         :  search<NonPV>(pos, ss, beta-1, beta, depth-R, false);
             ss->skipEarlyPruning = false;
