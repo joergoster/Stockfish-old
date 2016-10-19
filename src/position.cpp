@@ -1040,6 +1040,9 @@ bool Position::see_ge(Move m, Value v) const {
 
 bool Position::is_draw() const {
 
+  if (st->rule50 < 4) // Return immediately
+      return false;
+
   if (st->rule50 > 99 && (!checkers() || MoveList<LEGAL>(*this).size()))
       return true;
 

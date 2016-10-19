@@ -593,10 +593,13 @@ namespace {
 
     if (!rootNode)
     {
-        // Step 2. Check for aborted search and immediate draw
-        if (Signals.stop.load(std::memory_order_relaxed) || pos.is_draw() || ss->ply >= MAX_PLY)
-            return ss->ply >= MAX_PLY && !inCheck ? evaluate(pos)
-                                                  : DrawValue[pos.side_to_move()];
+        // Step 2a. Check for aborted search or reaching maximum search depth
+        if (Signals.stop.load(std::memory_order_relaxed) || ss->ply >= MAX_PLY)
+             return ss->ply >= MAX_PLY && !inCheck ? evaluate(pos) : VALUE_NONE;
+
+        // Step 2b. Check for immediate draw
+        if (pos.is_draw())
+            return DrawValue[pos.side_to_move()];
 
         // Step 3. Mate distance pruning. Even if we mate at the next move our score
         // would be at best mate_in(ss->ply+1), but if alpha is already bigger because
@@ -1207,12 +1210,15 @@ moves_loop: // When in check search starts from here
     ss->currentMove = bestMove = MOVE_NONE;
     ss->ply = (ss-1)->ply + 1;
 
-    // Check for an instant draw or if the maximum ply has been reached
-    if (pos.is_draw() || ss->ply >= MAX_PLY)
-        return ss->ply >= MAX_PLY && !InCheck ? evaluate(pos)
-                                              : DrawValue[pos.side_to_move()];
+    // Maximum search depth reached?
+    if (ss->ply >= MAX_PLY)
+         return !InCheck ? evaluate(pos) : VALUE_NONE;
 
     assert(0 <= ss->ply && ss->ply < MAX_PLY);
+
+    // Check for immediate draw
+    if (pos.is_draw())
+        return DrawValue[pos.side_to_move()];
 
     // Decide whether or not to include checks: this fixes also the type of
     // TT entry depth that we are going to use. Note that in qsearch we use
