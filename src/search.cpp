@@ -595,7 +595,7 @@ namespace {
     {
         // Step 2a. Check for aborted search or reaching maximum search depth
         if (Signals.stop.load(std::memory_order_relaxed) || ss->ply >= MAX_PLY)
-             return ss->ply >= MAX_PLY && !inCheck ? evaluate(pos) : VALUE_NONE;
+             return ss->ply >= MAX_PLY && !inCheck ? evaluate(pos) : beta;
 
         // Step 2b. Check for immediate draw
         if (pos.is_draw())
@@ -1212,7 +1212,7 @@ moves_loop: // When in check search starts from here
 
     // Maximum search depth reached?
     if (ss->ply >= MAX_PLY)
-         return !InCheck ? evaluate(pos) : VALUE_NONE;
+         return !InCheck ? evaluate(pos) : beta;
 
     assert(0 <= ss->ply && ss->ply < MAX_PLY);
 
