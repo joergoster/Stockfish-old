@@ -26,7 +26,7 @@
 
 /// TTEntry struct is the 10 bytes transposition table entry, defined as below:
 ///
-/// key        16 bit
+/// key        64 bit
 /// move       16 bit
 /// value      16 bit
 /// eval value 16 bit
@@ -47,16 +47,16 @@ struct TTEntry {
     assert(d / ONE_PLY * ONE_PLY == d);
 
     // Preserve any existing move for the same position
-    if (m || (k >> 48) != key16)
+    if (m || k != key)
         move16 = (uint16_t)m;
 
     // Don't overwrite more valuable entries
-    if (  (k >> 48) != key16
+    if (   k != key
         || d / ONE_PLY > depth8 - 4
      /* || g != (genBound8 & 0xFC) // Matching non-zero keys are already refreshed by probe() */
         || b == BOUND_EXACT)
     {
-        key16     = (uint16_t)(k >> 48);
+        key       = k;
         value16   = (int16_t)v;
         eval16    = (int16_t)ev;
         genBound8 = (uint8_t)(g | b);
@@ -67,7 +67,7 @@ struct TTEntry {
 private:
   friend class TranspositionTable;
 
-  uint16_t key16;
+  Key      key;
   uint16_t move16;
   int16_t  value16;
   int16_t  eval16;
@@ -76,24 +76,21 @@ private:
 };
 
 
-/// A TranspositionTable consists of a power of 2 number of clusters and each
-/// cluster consists of ClusterSize number of TTEntry. Each non-empty entry
-/// contains information of exactly one position. The size of a cluster should
-/// divide the size of a cache line size, to ensure that clusters never cross
-/// cache lines. This ensures best cache performance, as the cacheline is
-/// prefetched, as soon as possible.
+/// A TranspositionTable consists of a power of 2 number of clusters and each cluster
+/// consists of ClusterSize number of TTEntry. Each non-empty entry contains information
+/// of exactly one position. Clusters should not spread across cache lines for best
+/// performance (cacheline is prefetched as soon as possible).
 
 class TranspositionTable {
 
   static const int CacheLineSize = 64;
-  static const int ClusterSize = 3;
+  static const int ClusterSize = 4;
 
   struct Cluster {
     TTEntry entry[ClusterSize];
-    char padding[2]; // Align to a divisor of the cache line size
   };
 
-  static_assert(CacheLineSize % sizeof(Cluster) == 0, "Cluster size incorrect");
+  static_assert(sizeof(Cluster) == CacheLineSize, "Cluster size incorrect");
 
 public:
  ~TranspositionTable() { free(mem); }
