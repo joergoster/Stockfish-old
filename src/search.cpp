@@ -155,6 +155,7 @@ namespace {
 
   const size_t HalfDensitySize = std::extent<decltype(HalfDensity)>::value;
 
+  bool doNull;
   EasyMoveManager EasyMove;
   Value DrawValue[COLOR_NB];
 
@@ -260,6 +261,8 @@ void MainThread::search() {
   int contempt = Options["Contempt"] * PawnValueEg / 100; // From centipawns
   DrawValue[ us] = VALUE_DRAW + Value(contempt);
   DrawValue[~us] = VALUE_DRAW - Value(contempt);
+
+  doNull = Options["NullMove"];
 
   if (rootMoves.empty())
   {
@@ -745,7 +748,8 @@ namespace {
         return eval;
 
     // Step 8. Null move search with verification search (is omitted in PV nodes)
-    if (   !PvNode
+    if (    doNull
+        && !PvNode
         &&  eval >= beta
         && (ss->staticEval >= beta - 35 * (depth / ONE_PLY - 6) || depth >= 13 * ONE_PLY)
         &&  pos.non_pawn_material(pos.side_to_move()))
