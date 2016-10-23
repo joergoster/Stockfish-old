@@ -740,7 +740,7 @@ namespace {
     }
 
     // Step 7. Futility pruning: child node (skipped when in check)
-    if (   !rootNode
+    if (   !PvNode
         &&  depth < 7 * ONE_PLY
         &&  eval - futility_margin(depth) >= beta
         &&  eval < VALUE_KNOWN_WIN  // Do not return unproven wins
@@ -926,7 +926,7 @@ moves_loop: // When in check search starts from here
       newDepth = depth - ONE_PLY + extension;
 
       // Step 13. Pruning at shallow depth
-      if (  !rootNode
+      if (  !PvNode
           && pos.count<PAWN>(pos.side_to_move())
           && pos.non_pawn_material(pos.side_to_move())
           && bestValue > VALUE_MATED_IN_MAX_PLY)
@@ -1299,7 +1299,8 @@ moves_loop: // When in check search starts from here
                   : pos.gives_check(move);
 
       // Futility pruning
-      if (   !InCheck
+      if (   !PvNode
+          && !InCheck
           && !givesCheck
           &&  futilityBase > -VALUE_KNOWN_WIN
           && !pos.advanced_pawn_push(move)
