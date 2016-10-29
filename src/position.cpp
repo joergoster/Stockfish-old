@@ -725,7 +725,7 @@ void Position::do_move(Move m, StateInfo& newSt, bool givesCheck) {
       st->psq -= PSQT::psq[captured][capsq];
 
       // Reset rule 50 counter
-      st->rule50 = 0;
+      if (st->rule50 < 101) st->rule50 = 0;
   }
 
   // Update hash key
@@ -789,7 +789,7 @@ void Position::do_move(Move m, StateInfo& newSt, bool givesCheck) {
       prefetch(thisThread->pawnsTable[st->pawnKey]);
 
       // Reset rule 50 draw counter
-      st->rule50 = 0;
+      if (st->rule50 < 101) st->rule50 = 0;
   }
 
   // Update incremental scores
