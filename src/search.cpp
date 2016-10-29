@@ -1305,7 +1305,7 @@ moves_loop: // When in check search starts from here
           && !givesCheck
           &&  futilityBase > -VALUE_KNOWN_WIN
           && !pos.advanced_pawn_push(move)
-          &&  pos.non_pawn_material(pos.side_to_move())) 
+          &&  pos.non_pawn_material(pos.side_to_move()) > BishopValueMg)
       {
           assert(type_of(move) != ENPASSANT); // Due to !pos.advanced_pawn_push
 
