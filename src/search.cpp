@@ -155,9 +155,10 @@ namespace {
 
   const size_t HalfDensitySize = std::extent<decltype(HalfDensity)>::value;
 
-  bool doNull;
   EasyMoveManager EasyMove;
   Value DrawValue[COLOR_NB];
+  bool doRazor, doFutility, doNull, doProbcut, doPruning;
+  Depth maxLMR;
 
   template <NodeType NT>
   Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth, bool cutNode);
@@ -258,11 +259,18 @@ void MainThread::search() {
   Color us = rootPos.side_to_move();
   Time.init(Limits, us, rootPos.game_ply());
 
+  // Read contempt
   int contempt = Options["Contempt"] * PawnValueEg / 100; // From centipawns
   DrawValue[ us] = VALUE_DRAW + Value(contempt);
   DrawValue[~us] = VALUE_DRAW - Value(contempt);
 
+  // Read search options
+  doRazor = Options["Razoring"];
+  doFutility = Options["Futility"];
   doNull = Options["NullMove"];
+  doProbcut = Options["ProbCut"];
+  doPruning = Options["Pruning"];
+  maxLMR = Options["LMReduction"] * ONE_PLY;
 
   if (rootMoves.empty())
   {
@@ -722,7 +730,8 @@ namespace {
         goto moves_loop;
 
     // Step 6. Razoring (skipped when in check)
-    if (   !PvNode
+    if (    doRazor
+        && !PvNode
         &&  depth < 4 * ONE_PLY
         &&  ttMove == MOVE_NONE
         &&  eval + razor_margin[depth / ONE_PLY] <= alpha)
@@ -737,7 +746,8 @@ namespace {
     }
 
     // Step 7. Futility pruning: child node (skipped when in check)
-    if (   !PvNode
+    if (    doFutility
+        && !PvNode
         &&  depth < 7 * ONE_PLY
         &&  eval - futility_margin(depth) >= beta
         &&  eval < VALUE_KNOWN_WIN  // Do not return unproven wins
@@ -790,7 +800,8 @@ namespace {
     // Step 9. ProbCut (skipped when in check)
     // If we have a good enough capture and a reduced search returns a value
     // much above beta, we can (almost) safely prune the previous move.
-    if (   !PvNode
+    if (    doProbcut
+        && !PvNode
         &&  depth >= 5 * ONE_PLY
         &&  abs(beta) < VALUE_MATE_IN_MAX_PLY)
     {
@@ -919,10 +930,11 @@ moves_loop: // When in check search starts from here
       newDepth = depth - ONE_PLY + extension;
 
       // Step 13. Pruning at shallow depth
-      if (  !PvNode
-          && pos.count<PAWN>(pos.side_to_move())
-          && pos.non_pawn_material(pos.side_to_move())
-          && bestValue > VALUE_MATED_IN_MAX_PLY)
+      if (    doPruning
+          && !PvNode
+          &&  pos.count<PAWN>(pos.side_to_move())
+          &&  pos.non_pawn_material(pos.side_to_move())
+          &&  bestValue > VALUE_MATED_IN_MAX_PLY)
       {
           if (   !captureOrPromotion
               && !givesCheck
@@ -1017,6 +1029,9 @@ moves_loop: // When in check search starts from here
               // Decrease/increase reduction for moves with a good/bad history
               r = std::max(DEPTH_ZERO, (r / ONE_PLY - ss->history / 20000) * ONE_PLY);
           }
+
+          // Set maximum reduction
+          r = std::min(r, maxLMR);
 
           Depth d = std::max(newDepth - r, ONE_PLY);
 
