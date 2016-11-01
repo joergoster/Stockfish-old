@@ -970,6 +970,7 @@ moves_loop: // When in check search starts from here
       // re-searched at full depth.
       if (    depth >= 3 * ONE_PLY
           &&  moveCount > 1
+          &&  ss->ply > std::max(thisThread->rootDepth / (5 * ONE_PLY), 2)
           && (!captureOrPromotion || moveCountPruning))
       {
           Depth r = reduction<PvNode>(improving, depth, moveCount);
