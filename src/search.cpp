@@ -354,7 +354,8 @@ void Thread::search() {
 
   std::memset(ss-5, 0, 8 * sizeof(Stack));
 
-  bestValue = delta = alpha = -VALUE_INFINITE;
+  bestValue = alpha = -VALUE_INFINITE;
+  delta = VALUE_ZERO; // delta always >= 0
   beta = VALUE_INFINITE;
   completedDepth = DEPTH_ZERO;
 
@@ -378,8 +379,8 @@ void Thread::search() {
   multiPV = std::min(multiPV, rootMoves.size());
 
   // Iterative deepening loop until requested to stop or the target depth is reached
-  while (   (rootDepth += ONE_PLY) < DEPTH_MAX
-         && !Signals.stop
+  while (   !Signals.stop
+         && (rootDepth += ONE_PLY) < DEPTH_MAX
          && (!Limits.depth || Threads.main()->rootDepth / ONE_PLY <= Limits.depth))
   {
       // Set up the new depths for the helper threads skipping on average every
@@ -461,6 +462,7 @@ void Thread::search() {
 
               delta += delta / 4 + 5;
 
+              assert(delta >= VALUE_ZERO);
               assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE);
           }
 
