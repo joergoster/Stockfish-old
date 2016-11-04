@@ -1231,6 +1231,10 @@ moves_loop: // When in check search starts from here
     ss->currentMove = bestMove = MOVE_NONE;
     ss->ply = (ss-1)->ply + 1;
 
+    // Update selDepth if needed
+    if (PvNode && pos.this_thread()->maxPly < ss->ply)
+        pos.this_thread()->maxPly = ss->ply;
+
     // Maximum search depth reached?
     if (ss->ply >= MAX_PLY)
          return !InCheck ? evaluate(pos) : beta;
