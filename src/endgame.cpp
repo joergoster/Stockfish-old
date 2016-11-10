@@ -93,6 +93,7 @@ Endgames::Endgames() {
   add<KPK>("KPK");
   add<KNNK>("KNNK");
   add<KBNK>("KBNK");
+  add<KPKB>("KPKB");
   add<KRKP>("KRKP");
   add<KRKB>("KRKB");
   add<KRKN>("KRKN");
@@ -208,6 +209,34 @@ Value Endgame<KPK>::operator()(const Position& pos) const {
       return VALUE_DRAW;
 
   Value result = VALUE_KNOWN_WIN + PawnValueEg + Value(rank_of(psq));
+
+  return strongSide == pos.side_to_move() ? result : -result;
+}
+
+
+/// KP vs KB. Here I consider the side with the pawn the stronger side.
+template<>
+Value Endgame<KPKB>::operator()(const Position& pos) const {
+
+  assert(verify_material(pos, strongSide, VALUE_ZERO, 1));
+  assert(verify_material(pos, weakSide, BishopValueMg, 0));
+
+  Square loserKSq = pos.square<KING>(weakSide);
+  Square pawnSq = pos.square<PAWN>(strongSide);
+  Square bishopSq = pos.square<BISHOP>(weakSide);
+  Bitboard queeningPath = forward_bb(strongSide, pawnSq);
+
+  // If the pawn is not far advanced, it's a draw
+  if (relative_rank(strongSide, pawnSq) <= RANK_4)
+      return VALUE_DRAW;
+
+  // If the bishop controls the squares in front of the pawn,
+  // or the weak side king can block the pawn, it's a draw.
+  if (   pos.attacks_from<BISHOP>(bishopSq) & queeningPath
+      || queeningPath & loserKSq)
+      return VALUE_DRAW;
+
+  Value result = VALUE_KNOWN_WIN;
 
   return strongSide == pos.side_to_move() ? result : -result;
 }
