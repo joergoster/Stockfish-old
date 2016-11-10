@@ -322,6 +322,7 @@ Value Endgame<KQKP>::operator()(const Position& pos) const {
 /// king a bonus for having the kings close together, and for forcing the
 /// defending king towards the edge. If we also take care to avoid null move for
 /// the defending side in the search, this is usually sufficient to win KQ vs KR.
+/// Add a known draw position.
 template<>
 Value Endgame<KQKR>::operator()(const Position& pos) const {
 
@@ -329,10 +330,49 @@ Value Endgame<KQKR>::operator()(const Position& pos) const {
   assert(verify_material(pos, weakSide, RookValueMg, 0));
 
   Square winnerKSq = pos.square<KING>(strongSide);
+  Square queenSq = pos.square<QUEEN>(strongSide);
   Square loserKSq = pos.square<KING>(weakSide);
+  Square rookSq = pos.square<ROOK>(weakSide);
 
-  Value result =  QueenValueEg
-                - RookValueEg
+  // Known draw positions
+  if (    relative_square(strongSide, loserKSq) == SQ_C8
+      && (   relative_square(strongSide, rookSq) == SQ_A7
+          || relative_square(strongSide, rookSq) == SQ_B7
+          || relative_square(strongSide, rookSq) == SQ_C7)
+      &&  relative_square(strongSide, queenSq) == SQ_D6
+      &&  file_of(winnerKSq) <= file_of(queenSq)
+      &&  weakSide == pos.side_to_move())
+      return VALUE_DRAW;
+
+  if (    relative_square(strongSide, loserKSq) == SQ_C1
+      && (   relative_square(strongSide, rookSq) == SQ_A2
+          || relative_square(strongSide, rookSq) == SQ_B2
+          || relative_square(strongSide, rookSq) == SQ_C2)
+      &&  relative_square(strongSide, queenSq) == SQ_D3
+      &&  file_of(winnerKSq) <= file_of(queenSq)
+      &&  weakSide == pos.side_to_move())
+      return VALUE_DRAW;
+
+  if (    relative_square(strongSide, loserKSq) == SQ_F8
+      && (   relative_square(strongSide, rookSq) == SQ_F7
+          || relative_square(strongSide, rookSq) == SQ_G7
+          || relative_square(strongSide, rookSq) == SQ_H7)
+      &&  relative_square(strongSide, queenSq) == SQ_E6
+      &&  file_of(winnerKSq) >= file_of(queenSq)
+      &&  weakSide == pos.side_to_move())
+      return VALUE_DRAW;
+
+  if (    relative_square(strongSide, loserKSq) == SQ_F1
+      && (   relative_square(strongSide, rookSq) == SQ_F2
+          || relative_square(strongSide, rookSq) == SQ_G2
+          || relative_square(strongSide, rookSq) == SQ_H2)
+      &&  relative_square(strongSide, queenSq) == SQ_E3
+      &&  file_of(winnerKSq) >= file_of(queenSq)
+      &&  weakSide == pos.side_to_move())
+      return VALUE_DRAW;
+
+  // Otherwise, always a win
+  Value result =  VALUE_KNOWN_WIN
                 + PushToEdges[loserKSq]
                 + PushClose[distance(winnerKSq, loserKSq)];
 
