@@ -98,6 +98,8 @@ Endgames::Endgames() {
   add<KRKB>("KRKB");
   add<KRKN>("KRKN");
   add<KQKP>("KQKP");
+  add<KQKN>("KQKN");
+  add<KQKB>("KQKB");
   add<KQKR>("KQKR");
 
   add<KNPK>("KNPK");
@@ -342,6 +344,44 @@ Value Endgame<KQKP>::operator()(const Position& pos) const {
       || distance(loserKSq, pawnSq) != 1
       || !((FileABB | FileCBB | FileFBB | FileHBB) & pawnSq))
       result += QueenValueEg - PawnValueEg;
+
+  return strongSide == pos.side_to_move() ? result : -result;
+}
+
+
+/// KQ vs KN. Always a win, but guide the search by giving
+/// a bonus for double-attacking the king and the knight.
+template<>
+Value Endgame<KQKN>::operator()(const Position& pos) const {
+
+  assert(verify_material(pos, strongSide, QueenValueMg, 0));
+  assert(verify_material(pos, weakSide, KnightValueMg, 0));
+
+  Square winnerKSq = pos.square<KING>(strongSide);
+  Square loserKSq = pos.square<KING>(weakSide);
+
+  Value result =  VALUE_KNOWN_WIN
+                + PushToEdges[loserKSq]
+                + PushClose[distance(winnerKSq, loserKSq)];
+
+  return strongSide == pos.side_to_move() ? result : -result;
+}
+
+
+/// KQ vs KB. Always a win, but guide the search by giving
+/// a bonus for double-attacking the king and the bishop.
+template<>
+Value Endgame<KQKB>::operator()(const Position& pos) const {
+
+  assert(verify_material(pos, strongSide, QueenValueMg, 0));
+  assert(verify_material(pos, weakSide, BishopValueMg, 0));
+
+  Square winnerKSq = pos.square<KING>(strongSide);
+  Square loserKSq = pos.square<KING>(weakSide);
+
+  Value result =  VALUE_KNOWN_WIN
+                + PushToEdges[loserKSq]
+                + PushClose[distance(winnerKSq, loserKSq)];
 
   return strongSide == pos.side_to_move() ? result : -result;
 }
