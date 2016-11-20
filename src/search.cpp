@@ -939,6 +939,7 @@ moves_loop: // When in check search starts from here
       // Step 13. Pruning at shallow depth
       if (    doPruning
           && !PvNode
+          &&  moveCount > (thisThread->rootDepth / ONE_PLY * thisThread->rootDepth / ONE_PLY) / 200 + 1
           &&  pos.count<PAWN>(pos.side_to_move())
           &&  pos.non_pawn_material(pos.side_to_move())
           &&  bestValue > VALUE_MATED_IN_MAX_PLY)
