@@ -59,6 +59,9 @@ namespace {
   const int PushClose[8] = { 0, 0, 100, 80, 60, 40, 20, 10 };
   const int PushAway [8] = { 0, 5, 20, 40, 60, 80, 90, 100 };
 
+  // Mask used in KPKN endgame
+  const Bitboard kpkn_mask1 = 0xC080C080C0E0F5FFULL;
+
   // Pawn Rank based scaling factors used in KRPPKRP endgame
   const int KRPPKRPScaleFactors[RANK_NB] = { 0, 9, 10, 14, 21, 44, 0, 0 };
 
@@ -93,6 +96,7 @@ Endgames::Endgames() {
   add<KPK>("KPK");
   add<KNNK>("KNNK");
   add<KBNK>("KBNK");
+  add<KPKN>("KPKN");
   add<KPKB>("KPKB");
   add<KRKP>("KRKP");
   add<KRKB>("KRKB");
@@ -213,6 +217,51 @@ Value Endgame<KPK>::operator()(const Position& pos) const {
   Value result = VALUE_KNOWN_WIN + PawnValueEg + Value(rank_of(psq));
 
   return strongSide == pos.side_to_move() ? result : -result;
+}
+
+
+/// KP vs KN. Here I consider the side with the pawn the stronger side.
+/// There are 2 well known won positions for the stronger side, and
+/// one for the weaker side. Otherwise consider it a draw.
+template<>
+Value Endgame<KPKN>::operator()(const Position& pos) const {
+
+  assert(verify_material(pos, strongSide, VALUE_ZERO, 1));
+  assert(verify_material(pos, weakSide, KnightValueMg, 0));
+
+  // Assume strongSide is white and the pawn is on files A-D
+  Square strongKingSq = normalize(pos, strongSide, pos.square<KING>(strongSide));
+  Square pawnSq       = normalize(pos, strongSide, pos.square<PAWN>(strongSide));
+  Square weakKingSq   = normalize(pos, strongSide, pos.square<KING>(weakSide));
+  Square knightSq     = normalize(pos, strongSide, pos.square<KNIGHT>(weakSide));
+
+  // Winning position for the stronger side
+  // n7/P7/2K5/8/3k4/8/8/8 w - - 0 1
+  if (    pawnSq == SQ_A7
+      &&  strongKingSq == SQ_C6
+      &&  knightSq == SQ_A8
+      &&  strongSide == pos.side_to_move()
+      && (file_of(weakKingSq) >= FILE_F || rank_of(weakKingSq) <= RANK_4))
+      return VALUE_KNOWN_WIN;
+
+  // Losing position for the weaker side
+  // 8/1n1k4/P5K1/8/8/8/8/8 b - - 0 1
+  if (   pawnSq == SQ_A6
+      && weakKingSq == SQ_D7
+      && knightSq == SQ_B7
+      && kpkn_mask1 & strongKingSq
+      && weakSide == pos.side_to_move())
+      return -VALUE_KNOWN_WIN;
+
+  // Winning position for the weaker side
+  // 8/K1k5/P2n4/8/8/8/8/8 b - - 0 1
+  if (   pawnSq == SQ_A6
+      && strongKingSq == SQ_A7
+      && weakKingSq == SQ_C7
+      && knightSq == SQ_D6)
+      return strongSide == pos.side_to_move() ? -VALUE_KNOWN_WIN : VALUE_KNOWN_WIN;
+
+  return VALUE_DRAW;
 }
 
 
