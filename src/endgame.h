@@ -43,7 +43,6 @@ enum EndgameType {
   KBNK,  // KBN vs K
   KPK,   // KP vs K
   KPKN,  // KP vs KN
-  KNPK,  // KNP vs K
   KPKB,  // KP vs KB
   KRKP,  // KR vs KP
   KRKB,  // KR vs KB
@@ -66,6 +65,7 @@ enum EndgameType {
   KBPKB,   // KBP vs KB
   KBPPKB,  // KBPP vs KB
   KBPKN,   // KBP vs KN
+  KNPK,    // KNP vs K
   KNPKB,   // KNP vs KB
   KPKP     // KP vs KP
 };

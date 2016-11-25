@@ -97,7 +97,6 @@ Endgames::Endgames() {
   add<KNNK>("KNNK");
   add<KBNK>("KBNK");
   add<KPKN>("KPKN");
-  add<KNPK>("KNPK");
   add<KPKB>("KPKB");
   add<KRKP>("KRKP");
   add<KRKB>("KRKB");
@@ -107,6 +106,7 @@ Endgames::Endgames() {
   add<KQKB>("KQKB");
   add<KQKR>("KQKR");
 
+  add<KNPK>("KNPK");
   add<KNPKB>("KNPKB");
   add<KRPKR>("KRPKR");
   add<KRPKB>("KRPKB");
@@ -262,34 +262,6 @@ Value Endgame<KPKN>::operator()(const Position& pos) const {
       return strongSide == pos.side_to_move() ? -VALUE_KNOWN_WIN : VALUE_KNOWN_WIN;
 
   return VALUE_DRAW;
-}
-
-
-/// KNP vs K. There is a single rule: if the pawn is a rook pawn on the 7th rank
-/// and the defending king prevents the pawn from advancing, the position is drawn.
-template<>
-Value Endgame<KNPK>::operator()(const Position& pos) const {
-
-  assert(verify_material(pos, strongSide, KnightValueMg, 1));
-  assert(verify_material(pos, weakSide, VALUE_ZERO, 0));
-
-  // Assume strongSide is white and the pawn is on files A-D
-  Square pawnSq       = normalize(pos, strongSide, pos.square<PAWN>(strongSide));
-  Square knightSq     = normalize(pos, strongSide, pos.square<KNIGHT>(strongSide));
-  Square strongKingSq = normalize(pos, strongSide, pos.square<KING>(strongSide));
-  Square weakKingSq   = normalize(pos, strongSide, pos.square<KING>(weakSide));
-
-  if (pawnSq == SQ_A7)
-  {
-      if (weakKingSq == SQ_A8 || weakKingSq == SQ_B7)
-          return VALUE_DRAW;
-
-      else if ((weakKingSq == SQ_C8 || weakKingSq == SQ_C7)
-          &&  strongKingSq == SQ_A8
-          && (strongSide == pos.side_to_move()) == !opposite_colors(weakKingSq, knightSq))
-          return VALUE_DRAW;
-  }
-  return VALUE_KNOWN_WIN;
 }
 
 
@@ -972,6 +944,34 @@ ScaleFactor Endgame<KBPKN>::operator()(const Position& pos) const {
           || relative_rank(strongSide, weakKingSq) <= RANK_6))
       return SCALE_FACTOR_DRAW;
 
+  return SCALE_FACTOR_NONE;
+}
+
+
+/// KNP vs K. There is a single rule: if the pawn is a rook pawn on the 7th rank
+/// and the defending king prevents the pawn from advancing, the position is drawn.
+template<>
+ScaleFactor Endgame<KNPK>::operator()(const Position& pos) const {
+
+  assert(verify_material(pos, strongSide, KnightValueMg, 1));
+  assert(verify_material(pos, weakSide, VALUE_ZERO, 0));
+
+  // Assume strongSide is white and the pawn is on files A-D
+  Square pawnSq       = normalize(pos, strongSide, pos.square<PAWN>(strongSide));
+  Square knightSq     = normalize(pos, strongSide, pos.square<KNIGHT>(strongSide));
+  Square strongKingSq = normalize(pos, strongSide, pos.square<KING>(strongSide));
+  Square weakKingSq   = normalize(pos, strongSide, pos.square<KING>(weakSide));
+
+  if (pawnSq == SQ_A7)
+  {
+      if (weakKingSq == SQ_A8 || weakKingSq == SQ_B7)
+          return SCALE_FACTOR_DRAW;
+
+      else if ((weakKingSq == SQ_C8 || weakKingSq == SQ_C7)
+          &&  strongKingSq == SQ_A8
+          && (strongSide == pos.side_to_move()) == !opposite_colors(weakKingSq, knightSq))
+          return SCALE_FACTOR_DRAW;
+  }
   return SCALE_FACTOR_NONE;
 }
 
