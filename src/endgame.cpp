@@ -316,17 +316,20 @@ Value Endgame<KRKP>::operator()(const Position& pos) const {
   if (   rank_of(bksq) >= RANK_6
       && rank_of(psq ) >= RANK_6
       && pos.side_to_move() == strongSide)
-      result = RookValueEg - distance(wksq, psq);
+      result = VALUE_KNOWN_WIN + RookValueEg - PawnValueEg;
 
   // If the stronger side's king is in front of the pawn, it's a win
-  if (wksq < psq && file_of(wksq) == file_of(psq))
-      result = RookValueEg - distance(wksq, psq);
+  else if (    wksq < psq
+           && distance<File>(wksq, psq) <= 1
+           && (rank_of(psq) >= RANK_3 || distance(bksq, psq) >= 2))
+      result = VALUE_KNOWN_WIN + RookValueEg - PawnValueEg;
 
   // If the weaker side's king is too far from the pawn and the rook,
   // it's a win.
-  else if (   distance(bksq, psq) >= 3 + (pos.side_to_move() == weakSide)
-           && distance(bksq, rsq) >= 3)
-      result = RookValueEg - distance(wksq, psq);
+  else if (    distance(bksq, psq) >= 3 + (pos.side_to_move() == weakSide)
+           &&  distance(bksq, rsq) >= 2
+           && (rank_of(psq) != RANK_2 || distance(wksq, queeningSq) <= 1))
+      result = VALUE_KNOWN_WIN + RookValueEg - PawnValueEg;
 
   // If the pawn is far advanced and supported by the defending king,
   // the position is drawish
