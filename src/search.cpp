@@ -157,6 +157,8 @@ namespace {
 
   EasyMoveManager EasyMove;
   Value DrawValue[COLOR_NB];
+  int lastInfoFail, lastInfoPv, lastInfoCurrmove;
+  bool multipvSearch;
   bool doRazor, doFutility, doNull, doProbcut, doPruning;
   Depth maxLMR;
 
@@ -257,6 +259,7 @@ void MainThread::search() {
 
   Color us = rootPos.side_to_move();
   Time.init(Limits, us, rootPos.game_ply());
+  lastInfoFail = lastInfoPv = lastInfoCurrmove = Time.elapsed();
 
   // Read contempt
   int contempt = Options["Contempt"] * PawnValueEg / 100; // From centipawns
@@ -363,6 +366,7 @@ void Thread::search() {
       easyMove = EasyMove.get(rootPos.key());
       EasyMove.clear();
       mainThread->easyMovePlayed = mainThread->failedLow = false;
+      mainThread->newIteration = mainThread->newPVIdx = false;
       mainThread->bestMoveChanges = 0;
       TT.new_search();
   }
@@ -376,6 +380,7 @@ void Thread::search() {
       multiPV = std::max(multiPV, (size_t)4);
 
   multiPV = std::min(multiPV, rootMoves.size());
+  multipvSearch = multiPV > 1;
 
   // Iterative deepening loop until requested to stop or the target depth is reached
   while (   !Signals.stop
@@ -393,7 +398,11 @@ void Thread::search() {
 
       // Age out PV variability metric
       if (mainThread)
-          mainThread->bestMoveChanges *= 0.505, mainThread->failedLow = false;
+      {
+          mainThread->bestMoveChanges *= 0.505;
+          mainThread->failedLow = false;
+          mainThread->newIteration = true;
+      }
 
       // Save the last iteration's scores before first PV line is searched and
       // all the move scores except the (new) PV are set to -VALUE_INFINITE.
@@ -403,6 +412,9 @@ void Thread::search() {
       // MultiPV loop. We perform a full root search for each PV line
       for (PVIdx = 0; PVIdx < multiPV && !Signals.stop; ++PVIdx)
       {
+          if (mainThread)
+              mainThread->newPVIdx = true;
+
           // Reset aspiration window starting size
           if (rootDepth >= 5 * ONE_PLY)
           {
@@ -437,8 +449,11 @@ void Thread::search() {
               if (   mainThread
                   && multiPV == 1
                   && (bestValue <= alpha || bestValue >= beta)
-                  && Time.elapsed() > 3000)
+                  && Time.elapsed() - lastInfoFail >= 1000)
+              {
                   sync_cout << UCI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
+                  lastInfoFail = Time.elapsed();
+              }
 
               // In case of failing low/high increase aspiration window and
               // re-search, otherwise exit the loop.
@@ -474,8 +489,11 @@ void Thread::search() {
               continue;
 
           // ... and let the main thread update the GUI
-          if (Signals.stop || PVIdx + 1 == multiPV || Time.elapsed() > 3000)
+          if (Signals.stop || PVIdx + 1 == multiPV || Time.elapsed() - lastInfoPv >= 5000)
+          {
               sync_cout << UCI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
+              lastInfoPv = Time.elapsed();
+          }
       }
 
       if (!Signals.stop)
@@ -890,10 +908,28 @@ moves_loop: // When in check search starts from here
 
       ss->moveCount = ++moveCount;
 
-      if (rootNode && thisThread == Threads.main() && Time.elapsed() > 3000)
-          sync_cout << "info depth " << depth / ONE_PLY
-                    << " currmove " << UCI::move(move, pos.is_chess960())
-                    << " currmovenumber " << moveCount + thisThread->PVIdx << sync_endl;
+      if (   rootNode
+          && thisThread == Threads.main()
+          && Time.elapsed() > 500)
+      {   // needed for GUIs to correctly display move 1 after starting a new iteration
+          if ((Threads.main()->newIteration || Threads.main()->newPVIdx) && moveCount == 1)
+          {
+              sync_cout << "info depth " << depth / ONE_PLY
+                        << " currmove " << UCI::move(move, pos.is_chess960())
+                        << " currmovenumber " << moveCount + thisThread->PVIdx << sync_endl;
+              Threads.main()->newIteration = Threads.main()->newPVIdx = false;
+          }
+          // During a multi pv search only display the move numbers of the best k pv's,
+          // else limit output to 1 second as recommended by the UCI specs.
+          else if ( (!multipvSearch || moveCount == 1)
+                   && Time.elapsed() - lastInfoCurrmove > 1000)
+          {
+              sync_cout << "info depth " << depth / ONE_PLY
+                        << " currmove " << UCI::move(move, pos.is_chess960())
+                        << " currmovenumber " << moveCount + thisThread->PVIdx << sync_endl;
+              lastInfoCurrmove = Time.elapsed();
+          }
+      }
 
       if (PvNode)
           (ss+1)->pv = nullptr;
