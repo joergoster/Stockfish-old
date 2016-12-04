@@ -366,7 +366,7 @@ void Thread::search() {
       easyMove = EasyMove.get(rootPos.key());
       EasyMove.clear();
       mainThread->easyMovePlayed = mainThread->failedLow = false;
-      mainThread->newIteration = mainThread->newPVIdx = false;
+      mainThread->newPVIdx = false;
       mainThread->bestMoveChanges = 0;
       TT.new_search();
   }
@@ -401,7 +401,6 @@ void Thread::search() {
       {
           mainThread->bestMoveChanges *= 0.505;
           mainThread->failedLow = false;
-          mainThread->newIteration = true;
       }
 
       // Save the last iteration's scores before first PV line is searched and
@@ -912,12 +911,12 @@ moves_loop: // When in check search starts from here
           && thisThread == Threads.main()
           && Time.elapsed() > 500)
       {   // needed for GUIs to correctly display move 1 after starting a new iteration
-          if ((Threads.main()->newIteration || Threads.main()->newPVIdx) && moveCount == 1)
+          if (Threads.main()->newPVIdx && moveCount == 1)
           {
               sync_cout << "info depth " << depth / ONE_PLY
                         << " currmove " << UCI::move(move, pos.is_chess960())
                         << " currmovenumber " << moveCount + thisThread->PVIdx << sync_endl;
-              Threads.main()->newIteration = Threads.main()->newPVIdx = false;
+              Threads.main()->newPVIdx = false;
           }
           // During a multi pv search only display the move numbers of the best k pv's,
           // else limit output to 1 second as recommended by the UCI specs.
