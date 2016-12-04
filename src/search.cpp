@@ -465,12 +465,15 @@ void Thread::search() {
               assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE);
           }
 
-          // Sort the PV lines searched so far and update the GUI
+          // Sort the PV lines searched so far; this must be done by each thread
+          // because each thread has its own rootMoves struct.
           std::stable_sort(rootMoves.begin(), rootMoves.begin() + PVIdx + 1);
 
+          // Now let the helper threads continue searching the next PV ...
           if (!mainThread)
               continue;
 
+          // ... and let the main thread update the GUI
           if (Signals.stop || PVIdx + 1 == multiPV || Time.elapsed() > 3000)
               sync_cout << UCI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
       }
@@ -478,6 +481,7 @@ void Thread::search() {
       if (!Signals.stop)
           completedDepth = rootDepth;
 
+      // Let the helper threads continue with the next iteration
       if (!mainThread)
           continue;
 
