@@ -275,7 +275,7 @@ void MainThread::search() {
   doNull = Options["NullMove"];
   doProbcut = Options["ProbCut"];
   doPruning = Options["Pruning"];
-  maxLMR = Options["LMReduction"] * ONE_PLY;
+  maxLMR = Options["MaxLMR"] * ONE_PLY;
 
   if (rootMoves.empty())
   {
