@@ -162,7 +162,7 @@ namespace {
   Value DrawValue[COLOR_NB];
   int lastInfoFail, lastInfoPv, lastInfoCurrmove;
   bool multipvSearch;
-  bool doRazor, doFutility, doNull, doProbcut, doPruning;
+  bool doRazor, doFutility, doNull, doProbcut, doPruning, doLMR;
   Depth maxLMR;
 
   template <NodeType NT>
@@ -275,6 +275,7 @@ void MainThread::search() {
   doNull = Options["NullMove"];
   doProbcut = Options["ProbCut"];
   doPruning = Options["Pruning"];
+  doLMR = Options["LMR"];
   maxLMR = Options["MaxLMR"] * ONE_PLY;
 
   if (rootMoves.empty())
@@ -1036,7 +1037,8 @@ moves_loop: // When in check search starts from here
 
       // Step 15. Reduced depth search (LMR). If the move fails high it will be
       // re-searched at full depth.
-      if (    depth >= 3 * ONE_PLY
+      if (    doLMR
+          &&  depth >= 3 * ONE_PLY
           &&  moveCount > 1
           &&  ss->ply > std::max(thisThread->rootDepth / (5 * ONE_PLY), 2)
           && (!captureOrPromotion || moveCountPruning))

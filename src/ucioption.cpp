@@ -68,6 +68,7 @@ void init(OptionsMap& o) {
   o["NullMove"]              << Option(true);
   o["ProbCut"]               << Option(true);
   o["Pruning"]               << Option(true);
+  o["LMR"]                   << Option(true);
   o["MaxLMR"]                << Option(10, 0, 20);
   o["MultiPV"]               << Option(1, 1, 500);
   o["Skill Level"]           << Option(20, 0, 20);
