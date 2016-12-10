@@ -99,7 +99,10 @@ namespace {
         value += string(" ", value.empty() ? 0 : 1) + token;
 
     if (Options.count(name))
+    {
         Options[name] = value;
+        sync_cout << "option " << name << " set to " << value << sync_endl;
+    }
     else
         sync_cout << "No such option: " << name << sync_endl;
   }

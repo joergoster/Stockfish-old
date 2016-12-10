@@ -28,7 +28,7 @@ ifeq ($(KERNEL),Linux)
 endif
 
 ### Executable name
-EXE = sf-zander
+EXE = zander
 
 ### Installation dir definitions
 PREFIX = /usr/local
