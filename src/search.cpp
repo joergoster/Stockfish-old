@@ -933,10 +933,15 @@ moves_loop: // When in check search starts from here
       moveCountPruning =   depth < 16 * ONE_PLY
                         && moveCount >= FutilityMoveCounts[improving][depth / ONE_PLY];
 
-      // Step 12. Extend checks
+      // Step 12a. Extend checks
       if (    givesCheck
           && !moveCountPruning
           &&  pos.see_ge(move, VALUE_ZERO))
+          extension = ONE_PLY;
+
+      // Step 12b. Extend pawn captures in late endgame
+      else if (   pos.non_pawn_material(pos.side_to_move()) <= BishopValueMg
+               && type_of(pos.captured_piece()) == PAWN)
           extension = ONE_PLY;
 
       // Singular extension search. If all moves but one fail low on a search of
