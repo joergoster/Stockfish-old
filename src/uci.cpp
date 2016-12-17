@@ -101,10 +101,10 @@ namespace {
     if (Options.count(name))
     {
         Options[name] = value;
-        sync_cout << "option " << name << " set to " << value << sync_endl;
+        sync_cout << "info string " << name << " set to " << value << sync_endl;
     }
     else
-        sync_cout << "No such option: " << name << sync_endl;
+        sync_cout << "info string No such option: " << name << sync_endl;
   }
 
 
