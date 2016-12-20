@@ -872,12 +872,32 @@ ScaleFactor Endgame<KBPPKB>::operator()(const Position& pos) const {
   if (!opposite_colors(wbsq, bbsq))
       return SCALE_FACTOR_NONE;
 
-  Square ksq = pos.square<KING>(weakSide);
+  Square bksq = pos.square<KING>(weakSide);
   Square psq1 = pos.squares<PAWN>(strongSide)[0];
   Square psq2 = pos.squares<PAWN>(strongSide)[1];
   Rank r1 = rank_of(psq1);
   Rank r2 = rank_of(psq2);
   Square blockSq1, blockSq2;
+
+  switch (distance<File>(psq1, psq2))
+  {
+  case 0:
+    // Both pawns are on the same file. It's an easy draw if the defender firmly
+    // controls some square in the frontmost pawn's path.
+
+    blockSq1 = frontmost_sq(strongSide, pos.pieces(PAWN)) + pawn_push(strongSide);
+
+    if (   file_of(bksq) == file_of(blockSq1)
+        && relative_rank(strongSide, bksq) >= relative_rank(strongSide, blockSq1)
+        && opposite_colors(bksq, wbsq))
+        return SCALE_FACTOR_DRAW;
+    else
+        return SCALE_FACTOR_NONE;
+
+  case 1:
+    // Pawns on adjacent files. It's a draw if the defender firmly controls the
+    // square in front of the frontmost pawn's path, and the square diagonally
+    // behind this square on the file of the other pawn.
 
   if (relative_rank(strongSide, psq1) > relative_rank(strongSide, psq2))
   {
@@ -890,39 +910,44 @@ ScaleFactor Endgame<KBPPKB>::operator()(const Position& pos) const {
       blockSq2 = make_square(file_of(psq1), rank_of(psq2));
   }
 
-  switch (distance<File>(psq1, psq2))
-  {
-  case 0:
-    // Both pawns are on the same file. It's an easy draw if the defender firmly
-    // controls some square in the frontmost pawn's path.
-    if (   file_of(ksq) == file_of(blockSq1)
-        && relative_rank(strongSide, ksq) >= relative_rank(strongSide, blockSq1)
-        && opposite_colors(ksq, wbsq))
-        return SCALE_FACTOR_DRAW;
-    else
-        return SCALE_FACTOR_NONE;
-
-  case 1:
-    // Pawns on adjacent files. It's a draw if the defender firmly controls the
-    // square in front of the frontmost pawn's path, and the square diagonally
-    // behind this square on the file of the other pawn.
-    if (   ksq == blockSq1
-        && opposite_colors(ksq, wbsq)
+    if (   bksq == blockSq1
+        && opposite_colors(bksq, wbsq)
         && (   bbsq == blockSq2
             || (pos.attacks_from<BISHOP>(blockSq2) & pos.pieces(weakSide, BISHOP))
             || distance(r1, r2) >= 2))
         return SCALE_FACTOR_DRAW;
 
-    else if (   ksq == blockSq2
-             && opposite_colors(ksq, wbsq)
+    else if (   bksq == blockSq2
+             && opposite_colors(bksq, wbsq)
              && (   bbsq == blockSq1
                  || (pos.attacks_from<BISHOP>(blockSq1) & pos.pieces(weakSide, BISHOP))))
         return SCALE_FACTOR_DRAW;
     else
         return SCALE_FACTOR_NONE;
 
+  case 7:
+    // Pawns on a- and h-file. It's a draw if the defender controls the
+    // square(s) in front of one pawn with the bishop and the other with the king.
+    // Also the bishop of the stronger side must be of the wrong color
+    // for the pawn controlled by the king.
+
+    blockSq1 = psq1 + pawn_push(strongSide);
+    blockSq2 = psq2 + pawn_push(strongSide);
+
+    if (   distance(bksq, blockSq1) <= 1
+        && opposite_colors(bksq, wbsq)
+        && (bbsq == blockSq2 || pos.attacks_from<BISHOP>(blockSq2) & bbsq))
+        return SCALE_FACTOR_DRAW;
+
+    else if (   distance(bksq, blockSq2) <= 1
+             && opposite_colors(bksq, wbsq)
+             && (bbsq == blockSq1 || pos.attacks_from<BISHOP>(blockSq1) & bbsq))
+        return SCALE_FACTOR_DRAW;
+    else
+        return SCALE_FACTOR_NONE;
+
   default:
-    // The pawns are not on the same file or adjacent files. No scaling.
+    // The pawns are not on the same, adjacent or rook files. No scaling.
     return SCALE_FACTOR_NONE;
   }
 }
