@@ -899,16 +899,16 @@ ScaleFactor Endgame<KBPPKB>::operator()(const Position& pos) const {
     // square in front of the frontmost pawn's path, and the square diagonally
     // behind this square on the file of the other pawn.
 
-  if (relative_rank(strongSide, psq1) > relative_rank(strongSide, psq2))
-  {
-      blockSq1 = psq1 + pawn_push(strongSide);
-      blockSq2 = make_square(file_of(psq2), rank_of(psq1));
-  }
-  else
-  {
-      blockSq1 = psq2 + pawn_push(strongSide);
-      blockSq2 = make_square(file_of(psq1), rank_of(psq2));
-  }
+    if (relative_rank(strongSide, psq1) > relative_rank(strongSide, psq2))
+    {
+        blockSq1 = psq1 + pawn_push(strongSide);
+        blockSq2 = make_square(file_of(psq2), rank_of(psq1));
+    }
+    else
+    {
+        blockSq1 = psq2 + pawn_push(strongSide);
+        blockSq2 = make_square(file_of(psq1), rank_of(psq2));
+    }
 
     if (   bksq == blockSq1
         && opposite_colors(bksq, wbsq)
