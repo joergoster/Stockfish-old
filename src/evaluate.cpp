@@ -773,12 +773,21 @@ namespace {
             else
                 sf = ScaleFactor(46);
         }
+        // Endings with same-colored bishops and symmetrical pawn structure
+        // are also somewhat drawish.
+        else if (    abs(eg) <= BishopValueEg
+                 &&  pos.non_pawn_material( strongSide) == BishopValueMg
+                 &&  pos.non_pawn_material(~strongSide) == BishopValueMg
+                 &&  pos.count<PAWN>(strongSide) - pos.count<PAWN>(~strongSide) <= 1
+                 && !pos.pawn_passed(~strongSide, pos.square<KING>(~strongSide)))
+            sf = ScaleFactor(46 + 6 * ei.pi->pawn_asymmetry());
+
         // Endings where weaker side can place his king in front of the opponent's
         // pawns are drawish.
         else if (    abs(eg) <= BishopValueEg
-                 &&  pos.count<PAWN>(strongSide) - pos.count<PAWN>(~strongSide) <= 1
+                 &&  pos.count<PAWN>(strongSide) <= 2
                  && !pos.pawn_passed(~strongSide, pos.square<KING>(~strongSide)))
-            sf = ScaleFactor(37 + 7 * ei.pi->pawn_asymmetry());
+            sf = ScaleFactor(37 + 7 * pos.count<PAWN>(strongSide));
     }
 
     return sf;
