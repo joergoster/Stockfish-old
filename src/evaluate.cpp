@@ -28,6 +28,7 @@
 #include "evaluate.h"
 #include "material.h"
 #include "pawns.h"
+#include "uci.h"
 
 namespace {
 
@@ -111,6 +112,10 @@ namespace {
     Material::Entry* me;
     Pawns::Entry* pi;
   };
+
+  // Evaluation weights, initialized from UCI options
+  enum { MaterialT, Imbalance, PawnStructure, Mobility, PassedPawns, KingSafety, Threats, Space };
+  struct Weight { int mg, eg; } Weights[8];
 
   #define V(v) Value(v)
   #define S(mg, eg) make_score(mg, eg)
@@ -225,6 +230,12 @@ namespace {
   const int RookCheck         = 638;
   const int BishopCheck       = 538;
   const int KnightCheck       = 874;
+
+
+  // apply_weight() scales score 'v' by weight 'w'
+  Score apply_weight(Score v, const Weight& w) {
+    return make_score(mg_value(v) * w.mg / 100, eg_value(v) * w.eg / 100);
+  }
 
 
   // eval_init() initializes king and attack bitboards for a given color
@@ -510,9 +521,9 @@ namespace {
         score -= PawnlessFlank;
 
     if (DoTrace)
-        Trace::add(KING, Us, score);
+        Trace::add(KING, Us, apply_weight(score, Weights[KingSafety]));
 
-    return score;
+    return apply_weight(score, Weights[KingSafety]);
   }
 
 
@@ -607,9 +618,9 @@ namespace {
     score += ThreatByPawnPush * popcount(b);
 
     if (DoTrace)
-        Trace::add(THREAT, Us, score);
+        Trace::add(THREAT, Us, apply_weight(score, Weights[Threats]));
 
-    return score;
+    return apply_weight(score, Weights[Threats]);
   }
 
 
@@ -696,10 +707,10 @@ namespace {
     }
 
     if (DoTrace)
-        Trace::add(PASSED, Us, score);
+        Trace::add(PASSED, Us, apply_weight(score, Weights[PassedPawns]));
 
     // Add the scores to the middlegame and endgame eval
-    return score;
+    return apply_weight(score, Weights[PassedPawns]);
   }
 
 
@@ -823,11 +834,12 @@ Value Eval::evaluate(const Position& pos) {
   // Initialize score by reading the incrementally updated scores included in
   // the position object (material + piece square tables) and the material
   // imbalance. Score is computed internally from the white point of view.
-  Score score = pos.psq_score() + ei.me->imbalance();
+  Score score =  apply_weight(pos.psq_score(), Weights[MaterialT])
+               + apply_weight(ei.me->imbalance(), Weights[Imbalance]);
 
   // Probe the pawn hash table
   ei.pi = Pawns::probe(pos);
-  score += ei.pi->pawns_score();
+  score += apply_weight(ei.pi->pawns_score(), Weights[PawnStructure]);
 
   // Initialize attack and king safety bitboards
   ei.attackedBy[WHITE][ALL_PIECES] = ei.attackedBy[BLACK][ALL_PIECES] = 0;
@@ -851,7 +863,7 @@ Value Eval::evaluate(const Position& pos) {
 
   // Evaluate all pieces but king and pawns
   score += evaluate_pieces<DoTrace>(pos, ei, mobility, mobilityArea);
-  score += mobility[WHITE] - mobility[BLACK];
+  score += apply_weight(mobility[WHITE] - mobility[BLACK], Weights[Mobility]);
 
   // Evaluate kings after all other pieces because we need full attack
   // information when computing the king safety evaluation.
@@ -886,13 +898,14 @@ Value Eval::evaluate(const Position& pos) {
   // In case of tracing add all remaining individual evaluation terms
   if (DoTrace)
   {
-      Trace::add(MATERIAL, pos.psq_score());
-      Trace::add(IMBALANCE, ei.me->imbalance());
-      Trace::add(PAWN, ei.pi->pawns_score());
-      Trace::add(MOBILITY, mobility[WHITE], mobility[BLACK]);
-      if (pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) >= 12222)
-          Trace::add(SPACE, evaluate_space<WHITE>(pos, ei)
-                          , evaluate_space<BLACK>(pos, ei));
+      Trace::add(MATERIAL, apply_weight(pos.psq_score(), Weights[MaterialT]));
+      Trace::add(IMBALANCE, apply_weight(ei.me->imbalance(), Weights[Imbalance]));
+      Trace::add(PAWN, apply_weight(ei.pi->pawns_score(), Weights[PawnStructure]));
+      Trace::add(MOBILITY, apply_weight(mobility[WHITE], Weights[Mobility]),
+                           apply_weight(mobility[BLACK], Weights[Mobility]));
+      if (pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) >= 12317)
+          Trace::add(SPACE, apply_weight(evaluate_space<WHITE>(pos, ei), Weights[Space])
+                          , apply_weight(evaluate_space<BLACK>(pos, ei), Weights[Space]));
       Trace::add(TOTAL, score);
   }
 
@@ -938,4 +951,21 @@ std::string Eval::trace(const Position& pos) {
   ss << "\nTotal Evaluation: " << to_cp(v) << " (white side)\n";
 
   return ss.str();
+}
+
+
+namespace Eval {
+
+  // init() reads evaluation weights from the corresponding UCI parameters
+  void init() {
+
+      Weights[MaterialT]     = { Options["Material(MG)"], Options["Material(EG)"] };
+      Weights[Imbalance]     = { Options["Imbalance(MG)"], Options["Imbalance(EG)"] };
+      Weights[PawnStructure] = { Options["PawnStructure(MG)"], Options["PawnStructure(EG)"] };
+      Weights[Mobility]      = { Options["Mobility(MG)"], Options["Mobility(EG)"] };
+      Weights[PassedPawns]   = { Options["PassedPawns(MG)"], Options["PassedPawns(EG)"] };
+      Weights[KingSafety]    = { Options["KingSafety(MG)"], Options["KingSafety(EG)"] };
+      Weights[Threats]       = { Options["Threats(MG)"], Options["Threats(EG)"] };
+      Weights[Space]         = { Options["Space"], 0 };
+  }
 }
