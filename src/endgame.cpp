@@ -913,14 +913,14 @@ ScaleFactor Endgame<KBPPKB>::operator()(const Position& pos) const {
     if (   bksq == blockSq1
         && opposite_colors(bksq, wbsq)
         && (   bbsq == blockSq2
-            || (pos.attacks_from<BISHOP>(blockSq2) & pos.pieces(weakSide, BISHOP))
+            || (pos.attacks_from<BISHOP>(blockSq2) & bbsq)
             || distance(r1, r2) >= 2))
         return SCALE_FACTOR_DRAW;
 
     else if (   bksq == blockSq2
              && opposite_colors(bksq, wbsq)
              && (   bbsq == blockSq1
-                 || (pos.attacks_from<BISHOP>(blockSq1) & pos.pieces(weakSide, BISHOP))))
+                 || (pos.attacks_from<BISHOP>(blockSq1) & bbsq)))
         return SCALE_FACTOR_DRAW;
     else
         return SCALE_FACTOR_NONE;
