@@ -64,8 +64,8 @@ namespace {
 
   // FortressMask_KQKRPs[Color] used by KQ vs KR and one or more pawns endgame
   Bitboard FortressMask_KQKRPs[] = {
-      0x00FF7E4242C37E00ULL,
-      0x007EC342427EFF00ULL
+      0x00007E4242C37E00ULL,
+      0x007EC342427E0000ULL
   };
 
   // Pawn Rank based scaling factors used in KRPPKRP endgame
