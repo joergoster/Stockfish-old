@@ -37,9 +37,8 @@ namespace {
   // Backward pawn penalty by opposed flag
   const Score Backward[2] = { S(56, 33), S(41, 19) };
 
-  // Unsupported pawn penalty for pawns which are neither isolated or backward,
-  // by number of pawns it supports [less than 2 / exactly 2].
-  const Score Unsupported[2] = { S(17, 8), S(21, 12) };
+  // Unsupported pawn penalty for pawns which are neither isolated or backward
+  const Score Unsupported = S(17, 8);
 
   // Connected pawn bonus by opposed, phalanx, twice supported and rank
   Score Connected[2][2][2][RANK_NB];
@@ -50,33 +49,37 @@ namespace {
   // Lever bonus by rank
   const Score Lever[RANK_NB] = {
     S( 0,  0), S( 0,  0), S(0, 0), S(0, 0),
-    S(17, 16), S(33, 32), S(0, 0), S(0, 0) };
+    S(17, 16), S(33, 32), S(0, 0), S(0, 0)
+  };
 
   // Weakness of our pawn shelter in front of the king by [distance from edge][rank]
   const Value ShelterWeakness[][RANK_NB] = {
-    { V( 97), V(21), V(26), V(51), V(87), V( 89), V( 99) },
-    { V(120), V( 0), V(28), V(76), V(88), V(103), V(104) },
-    { V(101), V( 7), V(54), V(78), V(77), V( 92), V(101) },
-    { V( 80), V(11), V(44), V(68), V(87), V( 90), V(119) } };
+    { V(100), V(20), V(10), V(46), V(82), V( 86), V( 98) },
+    { V(116), V( 4), V(28), V(87), V(94), V(108), V(104) },
+    { V(109), V( 1), V(59), V(87), V(62), V( 91), V(116) },
+    { V( 75), V(12), V(43), V(59), V(90), V( 84), V(112) }
+  };
 
   // Danger of enemy pawns moving toward our king by [type][distance from edge][rank]
   const Value StormDanger[][4][RANK_NB] = {
-    { { V( 0),  V(  67), V( 134), V(38), V(32) },
-      { V( 0),  V(  57), V( 139), V(37), V(22) },
-      { V( 0),  V(  43), V( 115), V(43), V(27) },
-      { V( 0),  V(  68), V( 124), V(57), V(32) } },
-    { { V(20),  V(  43), V( 100), V(56), V(20) },
-      { V(23),  V(  20), V(  98), V(40), V(15) },
-      { V(23),  V(  39), V( 103), V(36), V(18) },
-      { V(28),  V(  19), V( 108), V(42), V(26) } },
-    { { V( 0),  V(   0), V(  75), V(14), V( 2) },
-      { V( 0),  V(   0), V( 150), V(30), V( 4) },
-      { V( 0),  V(   0), V( 160), V(22), V( 5) },
-      { V( 0),  V(   0), V( 166), V(24), V(13) } },
-    { { V( 0),  V(-283), V(-281), V(57), V(31) },
-      { V( 0),  V(  58), V( 141), V(39), V(18) },
-      { V( 0),  V(  65), V( 142), V(48), V(32) },
-      { V( 0),  V(  60), V( 126), V(51), V(19) } } };
+    { { V( 4),  V(  73), V( 132), V(46), V(31) },
+      { V( 1),  V(  64), V( 143), V(26), V(13) },
+      { V( 1),  V(  47), V( 110), V(44), V(24) },
+      { V( 0),  V(  72), V( 127), V(50), V(31) } },
+    { { V(22),  V(  45), V( 104), V(62), V( 6) },
+      { V(31),  V(  30), V(  99), V(39), V(19) },
+      { V(23),  V(  29), V(  96), V(41), V(15) },
+      { V(21),  V(  23), V( 116), V(41), V(15) } },
+    { { V( 0),  V(   0), V(  79), V(23), V( 1) },
+      { V( 0),  V(   0), V( 148), V(27), V( 2) },
+      { V( 0),  V(   0), V( 161), V(16), V( 1) },
+      { V( 0),  V(   0), V( 171), V(22), V(15) } },
+    { { V( 0),  V(-290), V(-274), V(57), V(41) },
+      { V( 0),  V(  60), V( 144), V(39), V(13) },
+      { V( 0),  V(  65), V( 141), V(41), V(34) },
+      { V( 0),  V(  53), V( 127), V(56), V(14) } }
+
+  };
 
   // Max bonus for king safety. Corresponds to start position with all the pawns
   // in front of the king and no enemy pawn on the horizon.
@@ -88,10 +91,10 @@ namespace {
   template<Color Us>
   Score evaluate(const Position& pos, Pawns::Entry* e) {
 
-    const Color  Them  = (Us == WHITE ? BLACK    : WHITE);
-    const Square Up    = (Us == WHITE ? DELTA_N  : DELTA_S);
-    const Square Right = (Us == WHITE ? DELTA_NE : DELTA_SW);
-    const Square Left  = (Us == WHITE ? DELTA_NW : DELTA_SE);
+    const Color  Them  = (Us == WHITE ? BLACK      : WHITE);
+    const Square Up    = (Us == WHITE ? NORTH      : SOUTH);
+    const Square Right = (Us == WHITE ? NORTH_EAST : SOUTH_WEST);
+    const Square Left  = (Us == WHITE ? NORTH_WEST : SOUTH_EAST);
 
     Bitboard b, neighbours, stoppers, doubled, supported, phalanx;
     Square s;
@@ -103,10 +106,10 @@ namespace {
     Bitboard ourPawns   = pos.pieces(Us  , PAWN);
     Bitboard theirPawns = pos.pieces(Them, PAWN);
 
-    e->passedPawns[Us] = e->pawnAttacksSpan[Us] = 0;
-    e->kingSquares[Us] = SQ_NONE;
+    e->passedPawns[Us]   = e->pawnAttacksSpan[Us] = 0;
     e->semiopenFiles[Us] = 0xFF;
-    e->pawnAttacks[Us] = shift_bb<Right>(ourPawns) | shift_bb<Left>(ourPawns);
+    e->kingSquares[Us]   = SQ_NONE;
+    e->pawnAttacks[Us]   = shift<Right>(ourPawns) | shift<Left>(ourPawns);
     e->pawnsOnSquares[Us][BLACK] = popcount(ourPawns & DarkSquares);
     e->pawnsOnSquares[Us][WHITE] = pos.count<PAWN>(Us) - e->pawnsOnSquares[Us][BLACK];
 
@@ -117,7 +120,7 @@ namespace {
 
         File f = file_of(s);
 
-        e->semiopenFiles[Us] &= ~(1 << f);
+        e->semiopenFiles[Us]   &= ~(1 << f);
         e->pawnAttacksSpan[Us] |= pawn_attack_span(Us, s);
 
         // Flag the pawn
@@ -142,7 +145,7 @@ namespace {
             // The pawn is backward when it cannot safely progress to that rank:
             // either there is a stopper in the way on this rank, or there is a
             // stopper on adjacent file which controls the way to that rank.
-            backward = (b | shift_bb<Up>(b & adjacent_files_bb(f))) & stoppers;
+            backward = (b | shift<Up>(b & adjacent_files_bb(f))) & stoppers;
 
             assert(!backward || !(pawn_attack_span(Them, s + Up) & neighbours));
         }
@@ -160,7 +163,7 @@ namespace {
             score -= Backward[opposed];
 
         else if (!supported)
-            score -= Unsupported[more_than_one(neighbours & pawnAttacksBB[s])];
+            score -= Unsupported;
 
         if (connected)
             score += Connected[opposed][!!phalanx][more_than_one(supported)][relative_rank(Us, s)];
@@ -171,9 +174,6 @@ namespace {
         if (lever)
             score += Lever[relative_rank(Us, s)];
     }
-
-    b = e->semiopenFiles[Us] ^ 0xFF;
-    e->pawnSpan[Us] = b ? int(msb(b) - lsb(b)) : 0;
 
     return score;
   }
@@ -186,8 +186,8 @@ namespace Pawns {
 /// hard-coded tables, when makes sense, we prefer to calculate them with a formula
 /// to reduce independent parameters and to allow easier tuning and better insight.
 
-void init()
-{
+void init() {
+
   static const int Seed[RANK_NB] = { 0, 8, 19, 13, 71, 94, 169, 324 };
 
   for (int opposed = 0; opposed <= 1; ++opposed)
@@ -197,7 +197,7 @@ void init()
   {
       int v = (Seed[r] + (phalanx ? (Seed[r + 1] - Seed[r]) / 2 : 0)) >> opposed;
       v += (apex ? v / 2 : 0);
-      Connected[opposed][phalanx][apex][r] = make_score(v, v * 5 / 8);
+      Connected[opposed][phalanx][apex][r] = make_score(v, v * (r-2) / 4);
   }
 }
 
@@ -218,6 +218,7 @@ Entry* probe(const Position& pos) {
   e->key = key;
   e->score = evaluate<WHITE>(pos, e) - evaluate<BLACK>(pos, e);
   e->asymmetry = popcount(e->semiopenFiles[WHITE] ^ e->semiopenFiles[BLACK]);
+  e->openFiles = popcount(e->semiopenFiles[WHITE] & e->semiopenFiles[BLACK]);
   return e;
 }
 
