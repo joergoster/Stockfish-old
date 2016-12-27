@@ -52,6 +52,9 @@ namespace {
     S(17, 16), S(33, 32), S(0, 0), S(0, 0)
   };
 
+  // Penalty for a blocked center pawn
+  const Score BlockedCenterPawn = S(24, 0);
+
   // Weakness of our pawn shelter in front of the king by [distance from edge][rank]
   const Value ShelterWeakness[][RANK_NB] = {
     { V(100), V(20), V(10), V(46), V(82), V( 86), V( 98) },
@@ -173,6 +176,12 @@ namespace {
 
         if (lever)
             score += Lever[relative_rank(Us, s)];
+
+        // Penalty for a blocked pawn on d2 or e2
+        if (   !backward
+            && (relative_square(Us, s) == SQ_D2 || relative_square(Us, s) == SQ_E2)
+            && (pos.pieces() ^ ourPawns) & (s + Up))
+            score -= BlockedCenterPawn;
     }
 
     return score;
