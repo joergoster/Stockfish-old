@@ -186,6 +186,7 @@ namespace {
 
   // Assorted bonuses and penalties used by evaluation
   const Score MinorBehindPawn     = S(16,  0);
+  const Score BlockedCenterPawn   = S(18,  0);
   const Score BishopPawns         = S( 8, 12);
   const Score RookOnPawn          = S( 8, 24);
   const Score TrappedRook         = S(92,  0);
@@ -312,6 +313,11 @@ namespace {
             if (    relative_rank(Us, s) < RANK_5
                 && (pos.pieces(PAWN) & (s + pawn_push(Us))))
                 score += MinorBehindPawn;
+
+            // Penalty if we block our own central pawn
+            if (   (relative_square(Us, s) == SQ_D3 || relative_square(Us, s) == SQ_E3)
+                && pos.pieces(Us, PAWN) & (s - pawn_push(Us)))
+                score -= BlockedCenterPawn;
 
             // Penalty for pawns on the same color square as the bishop
             if (Pt == BISHOP)
