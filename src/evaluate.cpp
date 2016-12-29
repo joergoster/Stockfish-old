@@ -314,10 +314,10 @@ namespace {
                 && (pos.pieces(PAWN) & (s + pawn_push(Us))))
                 score += MinorBehindPawn;
 
-            // Penalty if we block our own central pawn
-            if (   (relative_square(Us, s) == SQ_D3 || relative_square(Us, s) == SQ_E3)
-                && pos.pieces(Us, PAWN) & (s - pawn_push(Us)))
-                score -= BlockedCenterPawn;
+            // Bonus if we block their central pawn
+            if (   (s == relative_square(Us, SQ_D6) || s == relative_square(Us, SQ_E6))
+                && pos.pieces(Them, PAWN) & (s + pawn_push(Us)))
+                score += BlockedCenterPawn;
 
             // Penalty for pawns on the same color square as the bishop
             if (Pt == BISHOP)
