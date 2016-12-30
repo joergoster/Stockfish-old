@@ -186,7 +186,7 @@ namespace {
 
   // Assorted bonuses and penalties used by evaluation
   const Score MinorBehindPawn     = S(16,  0);
-  const Score BlockedCenterPawn   = S(18,  0);
+  const Score BlockedCenterPawn   = S(10,  4);
   const Score BishopPawns         = S( 8, 12);
   const Score RookOnPawn          = S( 8, 24);
   const Score TrappedRook         = S(92,  0);
@@ -301,7 +301,15 @@ namespace {
             // Bonus for outpost squares
             bb = OutpostRanks & ~ei.pi->pawn_attacks_span(Them);
             if (bb & s)
+            {
                 score += Outpost[Pt == BISHOP][!!(ei.attackedBy[Us][PAWN] & s)];
+
+                // Additional bonus if we block a central pawn
+                if (   (s == relative_square(Us, SQ_D6) || s == relative_square(Us, SQ_E6))
+                    && pos.pieces(Them, PAWN) & (s + pawn_push(Us)))
+                    score += BlockedCenterPawn;
+
+            }
             else
             {
                 bb &= b & ~pos.pieces(Us);
