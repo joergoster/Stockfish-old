@@ -322,11 +322,6 @@ namespace {
                 && (pos.pieces(PAWN) & (s + pawn_push(Us))))
                 score += MinorBehindPawn;
 
-            // Bonus if we block their central pawn
-            if (   (s == relative_square(Us, SQ_D6) || s == relative_square(Us, SQ_E6))
-                && pos.pieces(Them, PAWN) & (s + pawn_push(Us)))
-                score += BlockedCenterPawn;
-
             // Penalty for pawns on the same color square as the bishop
             if (Pt == BISHOP)
                 score -= BishopPawns * ei.pi->pawns_on_same_color_squares(Us, s);
