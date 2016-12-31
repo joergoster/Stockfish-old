@@ -996,9 +996,9 @@ Key Position::key_after(Move m) const {
 }
 
 
-/// Position::see_ge (Static Exchange Evaluation Greater or Equal) tests if the
-/// SEE value of move is greater or equal to the given value. We'll use an
-/// algorithm similar to alpha-beta pruning with a null window.
+/// Position::see_ge() tests if the SEE value of move is greater or equal to
+/// the given value (Static Exchange Evaluation Greater or Equal). We're using
+/// an algorithm similar to alpha-beta pruning with a null window.
 
 bool Position::see_ge(Move m, Value v) const {
 
@@ -1079,28 +1079,30 @@ bool Position::see_ge(Move m, Value v) const {
 /// Position::is_draw() tests whether the position is drawn by 50-move rule
 /// or by repetition. It does not detect stalemates.
 
-bool Position::is_draw() const {
-
-  if (st->rule50 < 4) // Return immediately
-      return false;
+bool Position::is_draw(int ply) const {
 
   if (st->rule50 > 99 && (!checkers() || MoveList<LEGAL>(*this).size()))
       return true;
 
-  int e = std::min(st->rule50, st->pliesFromNull);
+  int end = std::min(st->rule50, st->pliesFromNull);
 
-  if (e < 4)
+  if (end < 4) // Return immediately
     return false;
 
   StateInfo* stp = st->previous->previous;
+  int cnt = 0;
 
-  do {
+  for (int i = 4; i <= end; i += 2)
+  {
       stp = stp->previous->previous;
 
-      if (stp->key == st->key)
-          return true; // Draw at first repetition
-
-  } while ((e -= 2) >= 4);
+      // For Root ply is 1, so return a draw score if the position
+      // repeats once earlier but strictly after the root, or repeats
+      // twice before or at the root.
+      if (   stp->key == st->key
+          && ++cnt + (ply - i > 1) == 2)
+          return true;
+  }
 
   return false;
 }

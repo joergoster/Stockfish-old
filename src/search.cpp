@@ -635,7 +635,7 @@ namespace {
              return ss->ply >= MAX_PLY && !inCheck ? evaluate(pos) : beta;
 
         // Step 2b. Check for immediate draw
-        if (pos.is_draw())
+        if (pos.is_draw(ss->ply))
             return DrawValue[pos.side_to_move()];
 
         // Step 3. Mate distance pruning. Even if we mate at the next move our score
@@ -1264,7 +1264,7 @@ moves_loop: // When in check search starts from here
     assert(0 <= ss->ply && ss->ply < MAX_PLY);
 
     // Check for immediate draw
-    if (pos.is_draw())
+    if (pos.is_draw(ss->ply))
         return DrawValue[pos.side_to_move()];
 
     // Decide whether or not to include checks: this fixes also the type of
