@@ -210,9 +210,9 @@ int off_A1H8(Square sq) { return int(rank_of(sq)) - file_of(sq); }
 
 const Value WDL_to_value[] = {
    -VALUE_MATE + MAX_PLY + 1,
-    VALUE_DRAW - 2,
+    VALUE_DRAW - 5,
     VALUE_DRAW,
-    VALUE_DRAW + 2,
+    VALUE_DRAW + 5,
     VALUE_MATE - MAX_PLY - 1
 };
 

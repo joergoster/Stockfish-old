@@ -714,7 +714,7 @@ namespace {
 
                 value =  v < -drawScore ? -VALUE_MATE + MAX_PLY + ss->ply
                        : v >  drawScore ?  VALUE_MATE - MAX_PLY - ss->ply
-                                        :  VALUE_DRAW + 2 * v * drawScore;
+                                        :  VALUE_DRAW + 5 * v * drawScore;
 
                 tte->save(posKey, value_to_tt(value, ss->ply), BOUND_EXACT,
                           std::min(DEPTH_MAX - ONE_PLY, depth + 6 * ONE_PLY),
