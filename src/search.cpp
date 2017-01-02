@@ -322,7 +322,7 @@ void MainThread::search() {
       }
   }
 
-  previousScore = bestThread->rootMoves[0].score + 50;
+  previousScore = bestThread->rootMoves[0].score + 5;
 
   // Send new PV when needed
   if (bestThread != this)
