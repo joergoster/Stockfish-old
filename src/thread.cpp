@@ -37,8 +37,6 @@ Thread::Thread() {
   resetCalls = exit = false;
   maxPly = callsCnt = 0;
   tbHits = 0;
-  history.clear();
-  counterMoves.clear();
   idx = Threads.size(); // Start from 0
 
   std::unique_lock<Mutex> lk(mutex);
@@ -95,6 +93,8 @@ void Thread::start_searching(bool resume) {
 /// Thread::idle_loop() is where the thread is parked when it has no work to do
 
 void Thread::idle_loop() {
+
+  WinProcGroup::bindThisThread(idx);
 
   while (!exit)
   {
