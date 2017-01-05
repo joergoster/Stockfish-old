@@ -565,7 +565,7 @@ namespace {
     Depth extension, newDepth;
     Value bestValue, value, ttValue, eval, nullValue;
     bool ttHit, inCheck, givesCheck, singularExtensionNode, improving;
-    bool captureOrPromotion, doFullDepthSearch, moveCountPruning;
+    bool captureOrPromotion, doFullDepthSearch, moveCountPruning, shallowPruning;
     Piece moved_piece;
     int moveCount, quietCount;
 
@@ -877,6 +877,9 @@ moves_loop: // When in check search starts from here
       moveCountPruning =   depth < 16 * ONE_PLY
                         && moveCount >= FutilityMoveCounts[improving][depth / ONE_PLY];
 
+      shallowPruning =   pos.non_pawn_material(pos.side_to_move())
+                      || type_of(pos.piece_on(from_sq(move))) != KING;
+
       // Step 12. Extend checks
       if (    givesCheck
           && !moveCountPruning
@@ -908,7 +911,7 @@ moves_loop: // When in check search starts from here
 
       // Step 13. Pruning at shallow depth
       if (  !rootNode
-          && type_of(pos.piece_on(from_sq(move))) != KING
+          && shallowPruning
           && bestValue > VALUE_MATED_IN_MAX_PLY)
       {
           if (   !captureOrPromotion
