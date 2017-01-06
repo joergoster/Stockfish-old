@@ -874,7 +874,7 @@ moves_loop: // When in check search starts from here
                   ? pos.check_squares(type_of(pos.piece_on(from_sq(move)))) & to_sq(move)
                   : pos.gives_check(move);
 
-      moveCountPruning =   depth < 16 * ONE_PLY
+      moveCountPruning =   depth < std::min(16 * ONE_PLY, (thisThread->rootDepth - ONE_PLY) / 2)
                         && moveCount >= FutilityMoveCounts[improving][depth / ONE_PLY];
 
       // Step 12. Extend checks
