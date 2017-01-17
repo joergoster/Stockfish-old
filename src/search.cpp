@@ -1130,7 +1130,7 @@ moves_loop: // When in check search starts from here
              && is_ok((ss-1)->currentMove))
         update_cm_stats(ss-1, pos.piece_on(prevSq), prevSq, bonus(depth));
 
-    if (   pos.non_pawn_material(pos.side_to_move()) > QueenValueMg
+    if (   pos.game_phase() > PHASE_ENDGAME
         || bestValue != DrawValue[pos.side_to_move()])
         tte->save(posKey, value_to_tt(bestValue, ss->ply),
                   bestValue >= beta ? BOUND_LOWER :
@@ -1340,7 +1340,7 @@ moves_loop: // When in check search starts from here
     if (InCheck && bestValue == -VALUE_INFINITE)
         return mated_in(ss->ply); // Plies to mate from the root
 
-    if (   pos.non_pawn_material(pos.side_to_move()) > QueenValueMg
+    if (   pos.game_phase() > PHASE_ENDGAME
         || bestValue != DrawValue[pos.side_to_move()])
         tte->save(posKey, value_to_tt(bestValue, ss->ply),
                   PvNode && bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER,
