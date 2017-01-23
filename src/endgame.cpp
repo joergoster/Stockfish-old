@@ -147,8 +147,7 @@ Value Endgame<KXK>::operator()(const Position& pos) const {
 
   // Draw detection with 2 or more bishops of the same color (and no pawns!)
   if (    pos.count<BISHOP>(strongSide) > 1
-      && !(   pos.pieces(strongSide, BISHOP) &  DarkSquares
-           && pos.pieces(strongSide, BISHOP) & ~DarkSquares)
+      && !pos.bishop_pair(strongSide)
       && !pos.count<PAWN  >(strongSide)  // to
       && !pos.count<KNIGHT>(strongSide)  // avoid
       && !pos.count<ROOK  >(strongSide)  // false
