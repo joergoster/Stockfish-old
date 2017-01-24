@@ -936,7 +936,17 @@ moves_loop: // When in check search starts from here
       moveCountPruning =   depth < 16 * ONE_PLY
                         && moveCount >= FutilityMoveCounts[improving][depth / ONE_PLY];
 
-      // Step 12. Extensions
+      // Step 12a. Extend checks
+      if (    givesCheck
+          && !moveCountPruning
+          &&  pos.see_ge(move, VALUE_ZERO))
+          extension = ONE_PLY;
+
+      // Step 12b. Extend pawn captures in late endgame
+      else if (   pos.non_pawn_material(pos.side_to_move()) <= BishopValueMg
+               && type_of(pos.captured_piece()) == PAWN)
+          extension = ONE_PLY;
+
       // Singular extension search. If all moves but one fail low on a search of
       // (alpha-s, beta-s), and just one fails high on (alpha, beta), then that move
       // is singular and should be extended. To verify this we do a reduced search
@@ -944,6 +954,7 @@ moves_loop: // When in check search starts from here
       // ttValue minus a margin then we extend the ttMove.
       if (    singularExtensionNode
           &&  move == ttMove
+          && !extension
           &&  pos.legal(move))
       {
           Value rBeta = std::max(ttValue - 2 * depth / ONE_PLY, -VALUE_MATE);
@@ -955,19 +966,6 @@ moves_loop: // When in check search starts from here
           if (value < rBeta)
               extension = ONE_PLY;
       }
-
-      // Step 12a. Extend checks
-      if (   !extension
-          &&  givesCheck
-          && !moveCountPruning
-          &&  pos.see_ge(move, VALUE_ZERO))
-          extension = ONE_PLY;
-
-      // Step 12b. Extend pawn captures in late endgame
-      else if (  !extension
-               && pos.non_pawn_material(pos.side_to_move()) <= BishopValueMg
-               && type_of(pos.captured_piece()) == PAWN)
-          extension = ONE_PLY;
 
       // Calculate new depth for this move
       newDepth = depth - ONE_PLY + extension;
