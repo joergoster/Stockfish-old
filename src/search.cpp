@@ -768,6 +768,10 @@ namespace {
             if (depth < 12 * ONE_PLY && abs(beta) < VALUE_KNOWN_WIN)
                 return nullValue;
 
+            // Limit reduction for verification search for every second thread
+            if (thisThread->idx & 1)
+                R = std::min(R, 5 * ONE_PLY);
+
             // Do verification search at high depths
             Value v = depth-R < ONE_PLY ? qsearch<NonPV, false>(pos, ss, beta-1, beta)
                                         :  search<NonPV>(pos, ss, beta-1, beta, depth-R, false, true);
