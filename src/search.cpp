@@ -757,6 +757,7 @@ namespace {
     if (   !PvNode
         &&  eval >= beta
         && (ss->staticEval >= beta - 35 * (depth / ONE_PLY - 6) || depth >= 13 * ONE_PLY)
+        &&  ss->ply > int(thisThread->idx % 4) + thisThread->rootDepth / (10 * ONE_PLY)
         &&  pos.non_pawn_material(pos.side_to_move()))
     {
         ss->currentMove = MOVE_NULL;
@@ -780,10 +781,6 @@ namespace {
 
             if (depth < 12 * ONE_PLY && abs(beta) < VALUE_KNOWN_WIN)
                 return nullValue;
-
-            // Limit reduction for verification search for every second thread
-            if (thisThread->idx & 1)
-                R = std::min(R, 5 * ONE_PLY);
 
             // Do verification search at high depths
             Value v = depth-R < ONE_PLY ? qsearch<NonPV, false>(pos, ss, beta-1, beta)
@@ -982,7 +979,8 @@ moves_loop: // When in check search starts from here
       // re-searched at full depth.
       if (    depth >= 3 * ONE_PLY
           &&  moveCount > 1
-          && (!captureOrPromotion || moveCountPruning))
+          && (!captureOrPromotion || moveCountPruning)
+          &&  ss->ply > int(thisThread->idx % 4) + (Threads.size() > 1 ? thisThread->rootDepth / (10 * ONE_PLY) : 0))
       {
           Depth r = reduction<PvNode>(improving, depth, moveCount);
 
