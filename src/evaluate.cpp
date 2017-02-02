@@ -22,6 +22,7 @@
 #include <cassert>
 #include <cstring>   // For std::memset
 #include <iomanip>
+// #include <iostream>
 #include <sstream>
 
 #include "bitboard.h"
@@ -179,6 +180,12 @@ namespace {
   const Score PassedFile[FILE_NB] = {
     S(  9, 10), S( 2, 10), S( 1, -8), S(-20,-12),
     S(-20,-12), S( 1, -8), S( 2, 10), S(  9, 10)
+  };
+
+  // UndevelopedMinors[] contains a penalty according to the number
+  // of undeveloped minors during the opening phase.
+  const Score UndevelopedMinors[5] = {
+    S( 0, 0), S( 3, 0), S( 7, 0), S(12, 0), S(20, 0)
   };
 
   // Assorted bonuses and penalties used by evaluation
@@ -705,6 +712,7 @@ namespace {
     const Bitboard SpaceMask =
       Us == WHITE ? CenterFiles & (Rank2BB | Rank3BB | Rank4BB)
                   : CenterFiles & (Rank7BB | Rank6BB | Rank5BB);
+    Score score = SCORE_ZERO;
 
     // Find the safe squares for our pieces inside the area defined by
     // SpaceMask. A square is unsafe if it is attacked by an enemy
@@ -727,7 +735,26 @@ namespace {
     bonus = std::min(16, bonus);
     int weight = pos.count<ALL_PIECES>(Us) - 2 * ei.pe->open_files();
 
-    return make_score(bonus * weight * weight / 18, 0);
+    score =  make_score(bonus * weight * weight / 18, 0);
+
+    // Evaluate piece development
+    if (ei.me->game_phase() == PHASE_MIDGAME)
+    {
+        Bitboard b, n, u;
+
+        n = pos.pieces(Us, KNIGHT) & (  SquareBB[relative_square(Us, SQ_B1)]
+                                      | SquareBB[relative_square(Us, SQ_G1)]);
+
+        b = pos.pieces(Us, BISHOP) & (  SquareBB[relative_square(Us, SQ_C1)]
+                                      | SquareBB[relative_square(Us, SQ_F1)]);
+
+        u = PseudoAttacks[ROOK][relative_square(Us, SQ_E1)] & (n | b);
+//  std::cout << Bitboards::pretty(u) << std::endl;
+        if (u)
+            score -= UndevelopedMinors[popcount(u)];
+    }
+
+    return score;
   }
 
 
