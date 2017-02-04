@@ -196,6 +196,7 @@ namespace {
   const Score Hanging             = S(48, 27);
   const Score ThreatByPawnPush    = S(38, 22);
   const Score HinderPassedPawn    = S( 7,  0);
+  const Score EntryPoints         = S( 6,  2); 
 
   // Penalty for a bishop on a1/h1 (a8/h8 for black) which is trapped by
   // a friendly pawn on b2/g2 (b7/g7 for black). This can obviously only
@@ -510,12 +511,14 @@ namespace {
   template<Color Us, bool DoTrace>
   Score evaluate_threats(const Position& pos, const EvalInfo& ei) {
 
-    const Color Them        = (Us == WHITE ? BLACK      : WHITE);
-    const Square Up         = (Us == WHITE ? NORTH      : SOUTH);
-    const Square Left       = (Us == WHITE ? NORTH_WEST : SOUTH_EAST);
-    const Square Right      = (Us == WHITE ? NORTH_EAST : SOUTH_WEST);
-    const Bitboard TRank2BB = (Us == WHITE ? Rank2BB    : Rank7BB);
-    const Bitboard TRank7BB = (Us == WHITE ? Rank7BB    : Rank2BB);
+    const Color Them            = (Us == WHITE ? BLACK      : WHITE);
+    const Square Up             = (Us == WHITE ? NORTH      : SOUTH);
+    const Square Left           = (Us == WHITE ? NORTH_WEST : SOUTH_EAST);
+    const Square Right          = (Us == WHITE ? NORTH_EAST : SOUTH_WEST);
+    const Bitboard TRank2BB     = (Us == WHITE ? Rank2BB    : Rank7BB);
+    const Bitboard TRank7BB     = (Us == WHITE ? Rank7BB    : Rank2BB);
+    const Bitboard OpponentCamp = (Us == WHITE ? Rank6BB | Rank7BB
+                                               : Rank3BB | Rank2BB);
 
     Bitboard b, weak, defended, safeThreats;
     Score score = SCORE_ZERO;
@@ -591,6 +594,14 @@ namespace {
        & ~ei.attackedBy[Us][PAWN];
 
     score += ThreatByPawnPush * popcount(b);
+
+    // Entry points in the opponent's camp
+    b =   OpponentCamp
+       & ~pos.pieces()
+       & (  (ei.attackedBy[Us][ALL_PIECES] & ~ei.attackedBy[Them][ALL_PIECES])
+          | (ei.attackedBy2[Us] & ~ei.attackedBy2[Them]));
+
+    score += EntryPoints * popcount(b);
 
     if (DoTrace)
         Trace::add(THREAT, Us, score);
