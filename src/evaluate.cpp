@@ -727,7 +727,7 @@ namespace {
     bonus = std::min(16, bonus);
     int weight = pos.count<ALL_PIECES>(Us) - 2 * ei.pe->open_files();
 
-    return make_score(bonus * weight * weight / 18, 0);
+    return make_score(bonus * weight * weight / 18, bonus * 16);
   }
 
 
@@ -845,10 +845,9 @@ Value Eval::evaluate(const Position& pos) {
   score +=  evaluate_passer_pawns<WHITE, DoTrace>(pos, ei)
           - evaluate_passer_pawns<BLACK, DoTrace>(pos, ei);
 
-  // Evaluate space for both sides, only during opening
-  if (pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) >= 12222)
-      score +=  evaluate_space<WHITE>(pos, ei)
-              - evaluate_space<BLACK>(pos, ei);
+  // Evaluate space for both sides
+  score +=  evaluate_space<WHITE>(pos, ei)
+          - evaluate_space<BLACK>(pos, ei);
 
   // Evaluate position potential for the winning side
   score += evaluate_initiative(pos, ei.pe->pawn_asymmetry(), eg_value(score));
@@ -869,9 +868,8 @@ Value Eval::evaluate(const Position& pos) {
       Trace::add(IMBALANCE, ei.me->imbalance());
       Trace::add(PAWN, ei.pe->pawns_score());
       Trace::add(MOBILITY, mobility[WHITE], mobility[BLACK]);
-      if (pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) >= 12222)
-          Trace::add(SPACE, evaluate_space<WHITE>(pos, ei)
-                          , evaluate_space<BLACK>(pos, ei));
+      Trace::add(SPACE, evaluate_space<WHITE>(pos, ei)
+                      , evaluate_space<BLACK>(pos, ei));
       Trace::add(TOTAL, score);
   }
 
