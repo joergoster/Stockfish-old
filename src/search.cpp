@@ -361,6 +361,7 @@ void Thread::search() {
 
   Stack stack[MAX_PLY+7], *ss = stack+4; // To allow referencing (ss-4) and (ss+2)
   Value bestValue, alpha, beta, delta;
+  int isMateInX;
   Move easyMove = MOVE_NONE;
   MainThread* mainThread = (this == Threads.main() ? Threads.main() : nullptr);
 
@@ -373,6 +374,7 @@ void Thread::search() {
 
   if (mainThread)
   {
+      isMateInX = 0;
       easyMove = EasyMove.get(rootPos.key());
       EasyMove.clear();
       mainThread->easyMovePlayed = mainThread->failedLow = false;
@@ -519,7 +521,8 @@ void Thread::search() {
       // Have we found a "mate in x"?
       if (   Limits.mate
           && bestValue >= VALUE_MATE_IN_MAX_PLY
-          && VALUE_MATE - bestValue <= 2 * Limits.mate)
+          && VALUE_MATE - bestValue <= 2 * Limits.mate
+          && ++isMateInX == 3)
           Signals.stop = true;
 
       // Do we have time for the next iteration? Can we stop searching now?
