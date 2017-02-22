@@ -604,7 +604,7 @@ namespace {
     {
         // Step 2. Check for aborted search and immediate draw
         if (Signals.stop.load(std::memory_order_relaxed) || pos.is_draw(ss->ply) || ss->ply >= MAX_PLY)
-            return ss->ply >= MAX_PLY && !inCheck ? evaluate(pos)
+            return ss->ply >= MAX_PLY && !inCheck ? evaluate(pos, true)
                                                   : DrawValue[pos.side_to_move()];
 
         // Step 3. Mate distance pruning. Even if we mate at the next move our score
@@ -667,38 +667,6 @@ namespace {
         return ttValue;
     }
 
-    // Step 4a. Tablebase probe
-    if (!rootNode && TB::Cardinality)
-    {
-        int piecesCount = pos.count<ALL_PIECES>(WHITE) + pos.count<ALL_PIECES>(BLACK);
-
-        if (    piecesCount <= TB::Cardinality
-            && (piecesCount <  TB::Cardinality || depth >= TB::ProbeDepth)
-            &&  pos.rule50_count() == 0
-            && !pos.can_castle(ANY_CASTLING))
-        {
-            TB::ProbeState err;
-            TB::WDLScore v = Tablebases::probe_wdl(pos, &err);
-
-            if (err != TB::ProbeState::FAIL)
-            {
-                thisThread->tbHits++;
-
-                int drawScore = TB::UseRule50 ? 1 : 0;
-
-                value =  v < -drawScore ? -VALUE_MATE + MAX_PLY + ss->ply
-                       : v >  drawScore ?  VALUE_MATE - MAX_PLY - ss->ply
-                                        :  VALUE_DRAW + 2 * v * drawScore;
-
-                tte->save(posKey, value_to_tt(value, ss->ply), BOUND_EXACT,
-                          std::min(DEPTH_MAX - ONE_PLY, depth + 6 * ONE_PLY),
-                          MOVE_NONE, VALUE_NONE, TT.generation());
-
-                return value;
-            }
-        }
-    }
-
     // Step 5. Evaluate the position statically
     if (inCheck)
     {
@@ -710,7 +678,7 @@ namespace {
     {
         // Never assume anything on values stored in TT
         if ((ss->staticEval = eval = tte->eval()) == VALUE_NONE)
-            eval = ss->staticEval = evaluate(pos);
+            eval = ss->staticEval = evaluate(pos, true);
 
         // Can ttValue be used as a better position evaluation?
         if (ttValue != VALUE_NONE)
@@ -720,7 +688,7 @@ namespace {
     else
     {
         eval = ss->staticEval =
-        (ss-1)->currentMove != MOVE_NULL ? evaluate(pos)
+        (ss-1)->currentMove != MOVE_NULL ? evaluate(pos, true)
                                          : -(ss-1)->staticEval + 2 * Eval::Tempo;
 
         tte->save(posKey, VALUE_NONE, BOUND_NONE, DEPTH_NONE, MOVE_NONE,
@@ -1190,7 +1158,7 @@ moves_loop: // When in check search starts from here
 
     // Check for an instant draw or if the maximum ply has been reached
     if (pos.is_draw(ss->ply) || ss->ply >= MAX_PLY)
-        return ss->ply >= MAX_PLY && !InCheck ? evaluate(pos)
+        return ss->ply >= MAX_PLY && !InCheck ? evaluate(pos, true)
                                               : DrawValue[pos.side_to_move()];
 
     assert(0 <= ss->ply && ss->ply < MAX_PLY);
@@ -1227,7 +1195,7 @@ moves_loop: // When in check search starts from here
         {
             // Never assume anything on values stored in TT
             if ((ss->staticEval = bestValue = tte->eval()) == VALUE_NONE)
-                ss->staticEval = bestValue = evaluate(pos);
+                ss->staticEval = bestValue = evaluate(pos, false);
 
             // Can ttValue be used as a better position evaluation?
             if (ttValue != VALUE_NONE)
@@ -1236,7 +1204,7 @@ moves_loop: // When in check search starts from here
         }
         else
             ss->staticEval = bestValue =
-            (ss-1)->currentMove != MOVE_NULL ? evaluate(pos)
+            (ss-1)->currentMove != MOVE_NULL ? evaluate(pos, false)
                                              : -(ss-1)->staticEval + 2 * Eval::Tempo;
 
         // Stand pat. Return immediately if static value is at least beta

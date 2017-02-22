@@ -28,6 +28,8 @@
 #include "evaluate.h"
 #include "material.h"
 #include "pawns.h"
+#include "thread.h"
+#include "syzygy/tbprobe.h"
 
 namespace {
 
@@ -779,13 +781,40 @@ namespace {
 /// of the position from the point of view of the side to move.
 
 template<bool DoTrace>
-Value Eval::evaluate(const Position& pos) {
+Value Eval::evaluate(const Position& pos, bool doProbe) {
 
   assert(!pos.checkers());
 
   Score mobility[COLOR_NB] = { SCORE_ZERO, SCORE_ZERO };
   Value v;
   EvalInfo ei;
+
+  // Tablebase probe
+  if (    doProbe
+      &&  Tablebases::MaxCardinality >= popcount(pos.pieces())
+      &&  pos.rule50_count() == 0
+      && !pos.can_castle(ANY_CASTLING))
+  {
+      StateInfo st;
+      Position p;
+      p.set(pos.fen(), pos.is_chess960(), &st, pos.this_thread());
+//      bool UseRule50 = Options["Syzygy50MoveRule"];
+
+      Tablebases::ProbeState err;
+      Tablebases::WDLScore wdl = Tablebases::probe_wdl(p, &err);
+
+      if (err != Tablebases::ProbeState::FAIL)
+      {
+          pos.this_thread()->tbHits++;
+
+          int drawScore = 1; // FIXME! Allow ignoring 50-move rule
+
+          v =  wdl < -drawScore ? -VALUE_MATE + MAX_PLY
+             : wdl >  drawScore ?  VALUE_MATE - MAX_PLY
+                                :  VALUE_DRAW + 2 * wdl;
+          return v;
+      }
+  }
 
   // Probe the material hash table
   ei.me = Material::probe(pos);
@@ -864,8 +893,8 @@ Value Eval::evaluate(const Position& pos) {
 }
 
 // Explicit template instantiations
-template Value Eval::evaluate<true >(const Position&);
-template Value Eval::evaluate<false>(const Position&);
+template Value Eval::evaluate<true >(const Position&, bool);
+template Value Eval::evaluate<false>(const Position&, bool);
 
 
 /// trace() is like evaluate(), but instead of returning a value, it returns
@@ -876,7 +905,7 @@ std::string Eval::trace(const Position& pos) {
 
   std::memset(scores, 0, sizeof(scores));
 
-  Value v = evaluate<true>(pos);
+  Value v = evaluate<true>(pos, true);
   v = pos.side_to_move() == WHITE ? v : -v; // White's point of view
 
   std::stringstream ss;
