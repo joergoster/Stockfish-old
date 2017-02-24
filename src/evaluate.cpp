@@ -223,6 +223,19 @@ namespace {
   const int BishopCheck       = 588;
   const int KnightCheck       = 924;
 
+  // Table used to drive the king towards the edge of the board
+  // during the endgame, used in evaluate_initiative().
+  const int PushToEdges[SQUARE_NB] = {
+    10, 9, 8, 7, 7, 8, 9,10,
+     9, 7, 6, 5, 5, 6, 7, 9,
+     8, 6, 4, 3, 3, 4, 6, 8,
+     7, 5, 3, 2, 2, 3, 5, 7,
+     7, 5, 3, 2, 2, 3, 5, 7,
+     8, 6, 4, 3, 3, 4, 6, 8,
+     9, 7, 6, 5, 5, 6, 7, 9,
+    10, 9, 8, 7, 7, 8, 9,10
+  };
+
   // Threshold for lazy evaluation
   const Value LazyThreshold = Value(1500);
 
@@ -735,13 +748,13 @@ namespace {
   // status of the players.
   Score evaluate_initiative(const Position& pos, int asymmetry, Value eg) {
 
-    int kingDistance =  distance<File>(pos.square<KING>(WHITE), pos.square<KING>(BLACK))
-                      - distance<Rank>(pos.square<KING>(WHITE), pos.square<KING>(BLACK));
+    int kingPlacement =  PushToEdges[pos.square<KING>(BLACK)]
+                       - PushToEdges[pos.square<KING>(WHITE)];
     int pawns = pos.count<PAWN>(WHITE) + pos.count<PAWN>(BLACK);
     bool bothFlanks = (pos.pieces(PAWN) & QueenSide) && (pos.pieces(PAWN) & KingSide);
 
     // Compute the initiative bonus for the attacking side
-    int initiative = 8 * (asymmetry + kingDistance - 17) + 12 * pawns + 16 * bothFlanks;
+    int initiative = 8 * (asymmetry + kingPlacement - 17) + 12 * pawns + 16 * bothFlanks;
 
     // Now apply the bonus: note that we find the attacking side by extracting
     // the sign of the endgame value, and that we carefully cap the bonus so
