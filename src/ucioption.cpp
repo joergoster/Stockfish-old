@@ -80,6 +80,7 @@ void init(OptionsMap& o) {
   o["Threats(MG)"]           << Option(100, 0, 300, on_eval);
   o["Threats(EG)"]           << Option(100, 0, 300, on_eval);
   o["Space"]                 << Option(100, 0, 300, on_eval);
+  o["ExtendChecks"]          << Option(false);
   o["Razoring"]              << Option(true);
   o["Futility"]              << Option(true);
   o["NullMove"]              << Option(true);
