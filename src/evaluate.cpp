@@ -191,7 +191,7 @@ namespace {
     S(  9, 10), S( 2, 10), S( 1, -8), S(-20,-12),
     S(-20,-12), S( 1, -8), S( 2, 10), S(  9, 10)
   };
-  
+
   // Protector[PieceType-2][distance] contains a protecting bonus for our king,
   // indexed by piece type and distance between the piece and the king.
   const Score Protector[4][8] = {
@@ -319,7 +319,7 @@ namespace {
         int mob = popcount(b & ei.mobilityArea[Us]);
 
         mobility[Us] += MobilityBonus[Pt-2][mob];
-        
+
         // Bonus for this piece as a king protector
         score += Protector[Pt-2][distance(s, pos.square<KING>(Us))];
 
@@ -759,7 +759,7 @@ namespace {
 
     int kingDistance =  distance<File>(pos.square<KING>(WHITE), pos.square<KING>(BLACK))
                       - distance<Rank>(pos.square<KING>(WHITE), pos.square<KING>(BLACK));
-    int pawns = pos.count<PAWN>(WHITE) + pos.count<PAWN>(BLACK);
+    int pawns = pos.count<PAWN>();
     bool bothFlanks = (pos.pieces(PAWN) & QueenSide) && (pos.pieces(PAWN) & KingSide);
 
     // Compute the initiative bonus for the attacking side
@@ -867,7 +867,7 @@ Value Eval::evaluate(const Position& pos) {
           - evaluate_passer_pawns<BLACK, DoTrace>(pos, ei);
 
   // Evaluate space for both sides, only during opening
-  if (pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) >= 12317)
+  if (pos.non_pawn_material() >= 12222)
       score += apply_weight(  evaluate_space<WHITE>(pos, ei)
                             - evaluate_space<BLACK>(pos, ei), Weights[Space]);
 
@@ -891,7 +891,7 @@ Value Eval::evaluate(const Position& pos) {
       Trace::add(PAWN, apply_weight(ei.pe->pawns_score(), Weights[PawnStructure]));
       Trace::add(MOBILITY, apply_weight(mobility[WHITE], Weights[Mobility]),
                            apply_weight(mobility[BLACK], Weights[Mobility]));
-      if (pos.non_pawn_material(WHITE) + pos.non_pawn_material(BLACK) >= 12317)
+      if (pos.non_pawn_material() >= 12222)
           Trace::add(SPACE, apply_weight(evaluate_space<WHITE>(pos, ei), Weights[Space])
                           , apply_weight(evaluate_space<BLACK>(pos, ei), Weights[Space]));
       Trace::add(TOTAL, score);
