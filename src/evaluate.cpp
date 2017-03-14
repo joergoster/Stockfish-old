@@ -138,13 +138,13 @@ namespace {
   // supported by a pawn. If the minor piece occupies an outpost square
   // then score is doubled.
   const Score Outpost[][2] = {
-    { S(21, 1), S(34, 6) }, // Knight
-    { S( 7, 0), S( 8, 2) }  // Bishop
+    { S(18, 4), S(42, 8) }, // Knight
+    { S( 6, 0), S(11, 9) }  // Bishop
   };
 
   // RookOnFile[semiopen/open] contains bonuses for each rook when there is no
   // friendly pawn on the rook file.
-  const Score RookOnFile[2] = { S(30, 5), S(48, 21) };
+  const Score RookOnFile[2] = { S(20, 7), S(45, 20) };
 
   // ThreatBySafePawn[PieceType] contains bonuses according to which piece
   // type is attacked by a pawn which is protected or is not attacked.
