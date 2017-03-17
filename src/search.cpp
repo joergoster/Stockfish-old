@@ -899,8 +899,8 @@ moves_loop: // When in check search starts from here
 
       // Step 13. Pruning at shallow depth
       if (  !rootNode
-          && alpha > VALUE_MATED_IN_MAX_PLY
-          && beta < VALUE_MATE_IN_MAX_PLY)
+          && bestValue > VALUE_MATED_IN_MAX_PLY
+          && alpha > VALUE_MATED_IN_MAX_PLY)
       {
           if (   !captureOrPromotion
               && !givesCheck
