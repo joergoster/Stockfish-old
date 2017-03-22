@@ -893,6 +893,18 @@ moves_loop: // When in check and at SpNode search starts from here
               continue;
           }
 
+          // History Score Pruning
+          if (   depth <= 3 * ONE_PLY
+              && History[pos.moved_piece(move)][to_sq(move)] < VALUE_ZERO
+              && CounterMovesHistory[pos.piece_on(prevMoveSq)][prevMoveSq]
+                                    [pos.moved_piece(move)][to_sq(move)] < VALUE_ZERO)
+          {
+              if (SpNode)
+                  splitPoint->spinlock.acquire();
+
+              continue;
+          }
+
           predictedDepth = newDepth - reduction<PvNode>(improving, depth, moveCount);
 
           // Futility pruning: parent node
