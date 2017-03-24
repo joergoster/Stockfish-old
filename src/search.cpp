@@ -974,7 +974,9 @@ moves_loop: // When in check and at SpNode search starts from here
                                     [pos.piece_on(to_sq(move))][to_sq(move)] > VALUE_ZERO)
               ss->reduction = std::max(DEPTH_ZERO, ss->reduction - ONE_PLY);
 
-          // Decrease reduction for moves that escape a capture
+          // Decrease reduction for moves that escape a capture. Filter out castling
+          // moves because are coded as "king captures rook" and break make_move().
+          // Also use see() instead of see_sign() because destination square is empty.
           if (   ss->reduction
               && type_of(move) == NORMAL
               && type_of(pos.piece_on(to_sq(move))) != PAWN
