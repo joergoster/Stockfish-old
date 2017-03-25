@@ -934,6 +934,7 @@ moves_loop: // When in check search starts from here
       moveCountPruning =   depth < 16 * ONE_PLY
                         && moveCount >= FutilityMoveCounts[improving][depth / ONE_PLY];
 
+      // Step 12. Check, Pawn Capture (Late Endgame) and Singular Extensions
       // Step 12a. Extend checks
       if (givesCheck)
       {
@@ -952,6 +953,7 @@ moves_loop: // When in check search starts from here
           && type_of(pos.captured_piece()) == PAWN)
           extension = ONE_PLY;
 
+      // Step 12c. Singular Extension
       // Singular extension search. If all moves but one fail low on a search of
       // (alpha-s, beta-s), and just one fails high on (alpha, beta), then that move
       // is singular and should be extended. To verify this we do a reduced search
