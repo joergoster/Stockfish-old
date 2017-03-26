@@ -92,15 +92,16 @@ struct SplitPoint {
 
 struct ThreadBase : public std::thread {
 
+  ThreadBase() { exit = false; }
   virtual ~ThreadBase() = default;
   virtual void idle_loop() = 0;
   void notify_one();
-  void wait_for(volatile const bool& b);
+  void wait_for(std::atomic<bool>& b);
 
   Mutex mutex;
   Spinlock spinlock;
   ConditionVariable sleepCondition;
-  volatile bool exit = false;
+  std::atomic<bool> exit;
 };
 
 
@@ -128,7 +129,7 @@ struct Thread : public ThreadBase {
   int maxPly;
   SplitPoint* volatile activeSplitPoint;
   volatile size_t splitPointsSize;
-  volatile bool searching;
+  std::atomic<bool> searching;
 };
 
 
@@ -136,9 +137,10 @@ struct Thread : public ThreadBase {
 /// special threads: the main one and the recurring timer.
 
 struct MainThread : public Thread {
+  MainThread() { thinking = true; } // Avoid a race with start_thinking()
   virtual void idle_loop();
   void join();
-  volatile bool thinking = true; // Avoid a race with start_thinking()
+  std::atomic<bool> thinking;
 };
 
 struct TimerThread : public ThreadBase {
