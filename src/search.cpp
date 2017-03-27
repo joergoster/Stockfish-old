@@ -1121,7 +1121,7 @@ moves_loop: // When in check and at SpNode search starts from here
           thisThread->split(pos, ss, alpha, beta, &bestValue, &bestMove,
                             depth, moveCount, &mp, NT, cutNode);
 
-          if (Signals.stop || thisThread->cutoff_occurred())
+          if (Signals.stop.load(std::memory_order_relaxed) || thisThread->cutoff_occurred())
               return VALUE_ZERO;
 
           if (bestValue >= beta)
