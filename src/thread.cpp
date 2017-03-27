@@ -30,8 +30,6 @@ using namespace Search;
 
 ThreadPool Threads; // Global object
 
-extern void check_time();
-
 namespace {
 
  // Helpers to launch a thread after creation and joining before delete. Outside the
@@ -76,7 +74,7 @@ void ThreadBase::wait_for(std::atomic<bool>& condition) {
 }
 
 
-// Thread constructor makes some init but does not launch any execution thread
+// Thread constructor makes some init but does not launch any execution thread,
 // which will be started only when the constructor returns.
 
 Thread::Thread() { /* : splitPoints() */ // Initialization of non POD broken in MSVC

@@ -35,7 +35,6 @@
 #include "search.h"
 #include "thread_win32.h"
 
-struct Thread;
 
 const size_t MAX_THREADS = 128;
 const size_t MAX_SPLITPOINTS_PER_THREAD = 8;
@@ -148,6 +147,7 @@ struct TimerThread : public ThreadBase {
   static const int Resolution = 5; // Millisec between two check_time() calls
 
   virtual void idle_loop();
+  void check_time();
 
   bool run = false;
 };

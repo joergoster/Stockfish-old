@@ -181,9 +181,9 @@ void Search::init() {
 }
 
 
-/// Search::reset() clears all search memory, to obtain reproducible search results
+/// Search::clear() resets search state to zero, to obtain reproducible search results
 
-void Search::reset () {
+void Search::clear () {
 
   TT.clear();
   history.clear();
@@ -219,7 +219,7 @@ uint64_t Search::perft(Position& pos, Depth depth) {
   return nodes;
 }
 
-template uint64_t Search::perft<true>(Position& pos, Depth depth);
+template uint64_t Search::perft<true>(Position&, Depth);
 
 
 /// Search::think() is the external interface to Stockfish's search, and is
@@ -1423,8 +1423,8 @@ moves_loop: // When in check and at SpNode search starts from here
   }
 
 
-  // update_stats() updates killers, history, countermove history and
-  // countermoves stats for a quiet best move.
+  // update_stats() updates killers, history, countermove and
+  // countermove history when a new quiet best move is found.
 
   void update_stats(const Position& pos, Stack* ss, Move move,
                     Depth depth, Move* quiets, int quietsCnt) {
@@ -1457,7 +1457,7 @@ moves_loop: // When in check and at SpNode search starts from here
             cmh.update(pos.moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
     }
 
-    // Extra penalty for TT move in previous ply when it gets refuted
+    // Extra penalty for a quiet TT move in previous ply when it gets refuted
     if (   (ss-1)->moveCount == 1
         && !pos.captured_piece_type()
         &&  is_ok((ss-2)->currentMove))
@@ -1474,22 +1474,22 @@ moves_loop: // When in check and at SpNode search starts from here
 
   Move Skill::pick_best(size_t multiPV) {
 
-    // PRNG sequence should be non-deterministic, so we seed it with the time at init
-    static PRNG rng(now());
+    static PRNG rng(now()); // PRNG sequence should be non-deterministic
 
     // RootMoves are already sorted by score in descending order
-    int variance = std::min(RootMoves[0].score - RootMoves[multiPV - 1].score, PawnValueMg);
+    Value topScore = RootMoves[0].score;
+    int delta = std::min(topScore - RootMoves[multiPV - 1].score, PawnValueMg);
     int weakness = 120 - 2 * level;
     int maxScore = -VALUE_INFINITE;
 
-    // Choose best move. For each move score we add two terms both dependent on
+    // Choose best move. For each move score we add two terms, both dependent on
     // weakness. One deterministic and bigger for weaker levels, and one random,
     // then we choose the move with the resulting highest score.
     for (size_t i = 0; i < multiPV; ++i)
     {
         // This is our magic formula
-        int push = (  weakness * int(RootMoves[0].score - RootMoves[i].score)
-                    + variance * (rng.rand<unsigned>() % weakness)) / 128;
+        int push = (  weakness * int(topScore - RootMoves[i].score)
+                    + delta * (rng.rand<unsigned>() % weakness)) / 128;
 
         if (RootMoves[i].score + push > maxScore)
         {
@@ -1497,6 +1497,7 @@ moves_loop: // When in check and at SpNode search starts from here
             best = RootMoves[i].pv[0];
         }
     }
+
     return best;
   }
 
@@ -1576,7 +1577,8 @@ void RootMove::insert_pv_in_tt(Position& pos) {
       TTEntry* tte = TT.probe(pos.key(), ttHit);
 
       if (!ttHit || tte->move() != m) // Don't overwrite correct entries
-          tte->save(pos.key(), VALUE_NONE, BOUND_NONE, DEPTH_NONE, m, VALUE_NONE, TT.generation());
+          tte->save(pos.key(), VALUE_NONE, BOUND_NONE, DEPTH_NONE,
+                    m, VALUE_NONE, TT.generation());
 
       pos.do_move(m, *st++, pos.gives_check(m, CheckInfo(pos)));
   }
@@ -1586,10 +1588,10 @@ void RootMove::insert_pv_in_tt(Position& pos) {
 }
 
 
-/// RootMove::extract_ponder_from_tt() is called in case we have no ponder move before
-/// exiting the search, for instance in case we stop the search during a fail high at
-/// root. We try hard to have a ponder move to return to the GUI, otherwise in case of
-/// 'ponder on' we have nothing to think on.
+/// RootMove::extract_ponder_from_tt() is called in case we have no ponder move
+/// before exiting the search, for instance in case we stop the search during a
+/// fail high at root. We try hard to have a ponder move to return to the GUI,
+/// otherwise in case of 'ponder on' we have nothing to think on.
 
 bool RootMove::extract_ponder_from_tt(Position& pos)
 {
@@ -1652,9 +1654,6 @@ void Thread::idle_loop() {
 
           else if (sp->nodeType == PV)
               search<PV, true>(pos, ss, sp->alpha, sp->beta, sp->depth, sp->cutNode);
-
-//          else if (sp->nodeType == Root)
-//              search<Root, true>(pos, ss, sp->alpha, sp->beta, sp->depth, sp->cutNode);
 
           else
               assert(false);
@@ -1751,11 +1750,11 @@ void Thread::idle_loop() {
 }
 
 
-/// check_time() is called by the timer thread when the timer triggers. It is
-/// used to print debug info and, more importantly, to detect when we are out of
+/// TimerThread::check_time() is called when the timer triggers. It is used
+/// to print debug info and, more importantly, to detect when we are out of
 /// available time and thus stop the search.
 
-void check_time() {
+void TimerThread::check_time() {
 
   static TimePoint lastInfoTime = now();
   int elapsed = Time.elapsed();
