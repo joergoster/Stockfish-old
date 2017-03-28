@@ -67,7 +67,7 @@ void ThreadBase::notify_one() {
 
 // ThreadBase::wait_for() set the thread to sleep until 'condition' turns true
 
-void ThreadBase::wait_for(std::atomic<bool>& condition) {
+void ThreadBase::wait_for(std::atomic_bool& condition) {
 
   std::unique_lock<Mutex> lk(mutex);
   sleepCondition.wait(lk, [&]{ return bool(condition); });
@@ -79,8 +79,8 @@ void ThreadBase::wait_for(std::atomic<bool>& condition) {
 
 Thread::Thread() { /* : splitPoints() */ // Initialization of non POD broken in MSVC
 
-  searching = false;
-  maxPly = 0;
+  searching = resetCallsCnt = false;
+  maxPly = callsCnt = 0;
   splitPointsSize = 0;
   activeSplitPoint = nullptr;
   activePosition = nullptr;
@@ -218,26 +218,6 @@ void Thread::split(Position& pos, Stack* ss, Value alpha, Value beta, Value* bes
 }
 
 
-// TimerThread::idle_loop() is where the timer thread waits Resolution milliseconds
-// and then calls check_time(). When not searching, thread sleeps until it's woken up.
-
-void TimerThread::idle_loop() {
-
-  while (!exit)
-  {
-      std::unique_lock<Mutex> lk(mutex);
-
-      if (!exit)
-          sleepCondition.wait_for(lk, std::chrono::milliseconds(run ? Resolution : INT_MAX));
-
-      lk.unlock();
-
-      if (run)
-          check_time();
-  }
-}
-
-
 // MainThread::idle_loop() is where the main thread is parked waiting to be started
 // when there is a new search. The main thread will launch all the slave threads.
 
@@ -287,7 +267,6 @@ void MainThread::join() {
 
 void ThreadPool::init() {
 
-  timer = new_thread<TimerThread>();
   push_back(new_thread<MainThread>());
   read_uci_options();
 }
@@ -297,9 +276,6 @@ void ThreadPool::init() {
 // done in destructor because threads must be terminated before freeing us.
 
 void ThreadPool::exit() {
-
-  delete_thread(timer); // As first because check_time() accesses threads data
-  timer = nullptr;
 
   for (Thread* th : *this)
       delete_thread(th);

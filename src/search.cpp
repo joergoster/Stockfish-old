@@ -148,6 +148,7 @@ namespace {
   Value value_from_tt(Value v, int ply);
   void update_pv(Move* pv, Move move, Move* childPv);
   void update_stats(const Position& pos, Stack* ss, Move move, Depth depth, Move* quiets, int quietsCnt);
+  void check_time();
 
 } // namespace
 
@@ -229,7 +230,7 @@ template uint64_t Search::perft<true>(Position&, Depth);
 void Search::think() {
 
   Color us = RootPos.side_to_move();
-  Time.init(Limits, us, RootPos.game_ply(), now());
+  Time.init(Limits, us, RootPos.game_ply());
 
   int contempt = Options["Contempt"] * PawnValueEg / 100; // From centipawns
   DrawValue[ us] = VALUE_DRAW - Value(contempt);
@@ -294,12 +295,8 @@ void Search::think() {
           th->notify_one(); // Wake up all the threads
       }
 
-      Threads.timer->run = true;
-      Threads.timer->notify_one(); // Start the recurring timer
-
       id_loop(RootPos); // Let's start searching !
 
-      Threads.timer->run = false;
   }
 
   // When playing in 'nodes as time' mode, subtract the searched nodes from
@@ -557,6 +554,20 @@ namespace {
     moveCount = quietCount =  ss->moveCount = 0;
     bestValue = -VALUE_INFINITE;
     ss->ply = (ss-1)->ply + 1;
+
+    // Check for available remaining time
+    if (thisThread->resetCallsCnt.load(std::memory_order_relaxed))
+    {
+        thisThread->resetCallsCnt = false;
+        thisThread->callsCnt = 0;
+    }
+    if (++thisThread->callsCnt > 4096)
+    {
+        for (Thread* th : Threads)
+            th->resetCallsCnt = true;
+
+        check_time();
+    }
 
     // Used to send selDepth info to GUI
     if (PvNode && thisThread->maxPly < ss->ply)
@@ -1501,6 +1512,43 @@ moves_loop: // When in check and at SpNode search starts from here
     return best;
   }
 
+
+  // check_time() is used to print debug info and, more importantly, to detect
+  // when we are out of available time and thus stop the search.
+
+  void check_time() {
+
+    static TimePoint lastInfoTime = now();
+
+    int elapsed = Time.elapsed();
+    TimePoint tick = Limits.startTime + elapsed;
+
+    if (tick - lastInfoTime >= 1000)
+    {
+        lastInfoTime = tick;
+        dbg_print();
+    }
+
+    // An engine may not stop pondering until told so by the GUI
+    if (Limits.ponder)
+        return;
+
+    if (Limits.use_time_management())
+    {
+        bool stillAtFirstMove =    Signals.firstRootMove.load(std::memory_order_relaxed)
+                               && !Signals.failedLowAtRoot.load(std::memory_order_relaxed)
+                               &&  elapsed > Time.available() * 3 / 4;
+
+        if (stillAtFirstMove || elapsed > Time.maximum() - 10)
+            Signals.stop = true;
+    }
+    else if (Limits.movetime && elapsed >= Limits.movetime)
+        Signals.stop = true;
+
+    else if (Limits.nodes && RootPos.nodes_searched() >= Limits.nodes)
+            Signals.stop = true;
+  }
+
 } // namespace
 
 
@@ -1746,66 +1794,5 @@ void Thread::idle_loop() {
       }
       else
           std::this_thread::yield(); // Wait for a new job or for our slaves to finish
-  }
-}
-
-
-/// TimerThread::check_time() is called when the timer triggers. It is used
-/// to print debug info and, more importantly, to detect when we are out of
-/// available time and thus stop the search.
-
-void TimerThread::check_time() {
-
-  static TimePoint lastInfoTime = now();
-  int elapsed = Time.elapsed();
-
-  if (now() - lastInfoTime >= 1000)
-  {
-      lastInfoTime = now();
-      dbg_print();
-  }
-
-  // An engine may not stop pondering until told so by the GUI
-  if (Limits.ponder)
-      return;
-
-  if (Limits.use_time_management())
-  {
-      bool stillAtFirstMove =    Signals.firstRootMove
-                             && !Signals.failedLowAtRoot
-                             &&  elapsed > Time.available() * 3 / 4;
-
-      if (   stillAtFirstMove
-          || elapsed > Time.maximum() - 2 * TimerThread::Resolution)
-          Signals.stop = true;
-  }
-  else if (Limits.movetime && elapsed >= Limits.movetime)
-      Signals.stop = true;
-
-  else if (Limits.nodes)
-  {
-      int64_t nodes = RootPos.nodes_searched();
-
-      // Loop across all split points and sum accumulated SplitPoint nodes plus
-      // all the currently active positions nodes.
-      // FIXME: Racy...
-      for (Thread* th : Threads)
-          for (size_t i = 0; i < th->splitPointsSize; ++i)
-          {
-              SplitPoint& sp = th->splitPoints[i];
-
-              sp.spinlock.acquire();
-
-              nodes += sp.nodes;
-
-              for (size_t idx = 0; idx < Threads.size(); ++idx)
-                  if (sp.slavesMask.test(idx) && Threads[idx]->activePosition)
-                      nodes += Threads[idx]->activePosition->nodes_searched();
-
-              sp.spinlock.release();
-          }
-
-      if (nodes >= Limits.nodes)
-          Signals.stop = true;
   }
 }

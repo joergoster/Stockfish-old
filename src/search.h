@@ -89,14 +89,15 @@ struct LimitsType {
 
   std::vector<Move> searchmoves;
   int time[COLOR_NB], inc[COLOR_NB], npmsec, movestogo, depth, movetime, mate, infinite, ponder;
-  int64_t nodes;
+  uint64_t nodes;
+  TimePoint startTime;
 };
 
 /// The SignalsType struct stores atomic flags updated during the search
 /// typically in an async fashion e.g. to stop the search by the GUI.
 
 struct SignalsType {
-  std::atomic<bool> stop, stopOnPonderhit, firstRootMove, failedLowAtRoot;
+  std::atomic_bool stop, stopOnPonderhit, firstRootMove, failedLowAtRoot;
 };
 
 typedef std::unique_ptr<std::stack<StateInfo>> StateStackPtr;
