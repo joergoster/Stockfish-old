@@ -827,7 +827,7 @@ void Position::do_move(Move m, StateInfo& newSt, bool givesCheck) {
 
       // Update pawn hash key and prefetch access to pawnsTable
       st->pawnKey ^= Zobrist::psq[pc][from] ^ Zobrist::psq[pc][to];
-      prefetch(thisThread->pawnsTable[st->pawnKey]);
+      prefetch2(thisThread->pawnsTable[st->pawnKey]);
 
       // Reset rule 50 draw counter
       st->rule50 = 0;
@@ -1192,6 +1192,7 @@ bool Position::pos_is_ok(int* failedStep) const {
       }
 
       if (step == Lists)
+      {
           for (Piece pc : Pieces)
           {
               if (pieceCount[pc] != popcount(pieces(color_of(pc), type_of(pc))))
@@ -1201,6 +1202,9 @@ bool Position::pos_is_ok(int* failedStep) const {
                   if (board[pieceList[pc][i]] != pc || index[pieceList[pc][i]] != i)
                       return false;
           }
+          if (pieceCount[PAWN] > FILE_NB)
+              return false;
+      }
 
       if (step == Castling)
           for (Color c = WHITE; c <= BLACK; ++c)
