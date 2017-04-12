@@ -144,22 +144,22 @@ namespace {
 
   // RookOnFile[semiopen/open] contains bonuses for each rook when there is no
   // friendly pawn on the rook file.
-  const Score RookOnFile[2] = { S(20, 7), S(45, 20) };
+  const Score RookOnFile[2] = { S(20, 8), S(48, 19) };
 
   // ThreatByMinor/ByRook[attacked PieceType] contains bonuses according to
   // which piece type attacks which one. Attacks on lesser pieces which are
   // pawn-defended are not considered.
   const Score ThreatByMinor[PIECE_TYPE_NB] = {
-    S(0, 0), S(0, 33), S(45, 43), S(46, 47), S(72, 107), S(48, 118)
+    S(0, 0), S(3, 33), S(45, 45), S(49, 44), S(69, 101), S(49, 115)
   };
 
   const Score ThreatByRook[PIECE_TYPE_NB] = {
-    S(0, 0), S(0, 25), S(40, 62), S(40, 59), S( 0, 34), S(35, 48)
+    S(0, 0), S(4, 26), S(39, 62), S(39, 59), S( 2, 32), S(37, 51)
   };
 
   // ThreatByKing[on one/on many] contains bonuses for king attacks on
   // pawns or pieces which are not pawn-defended.
-  const Score ThreatByKing[2] = { S(3, 62), S(9, 138) };
+  const Score ThreatByKing[2] = { S(4, 63), S(13, 138) };
 
   // Passed[mg/eg][Rank] contains midgame and endgame bonuses for passed pawns.
   // We don't use a Score because we process the two components independently.
@@ -194,7 +194,7 @@ namespace {
   const Score PawnlessFlank       = S( 20, 80);
   const Score ThreatByHangingPawn = S( 71, 61);
   const Score ThreatBySafePawn    = S(182,175);
-  const Score ThreatByRank        = S( 16,  3);
+  const Score ThreatByRank        = S( 15,  4);
   const Score Hanging             = S( 48, 27);
   const Score ThreatByPawnPush    = S( 38, 22);
   const Score HinderPassedPawn    = S(  7,  0);
