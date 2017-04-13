@@ -104,6 +104,7 @@ extern LimitsType Limits;
 void init();
 void clear();
 template<bool Root = true> uint64_t perft(Position& pos, Depth depth);
+void split_root_moves(size_t idx, RootMoves& rootMoves);
 
 } // namespace Search
 

@@ -228,6 +228,22 @@ uint64_t Search::perft(Position& pos, Depth depth) {
 template uint64_t Search::perft<true>(Position&, Depth);
 
 
+/// Search::split_root_moves() splits the available root moves in two parts,
+/// assigning each part to one over the other thread. This is only done
+/// when there are more than 5 threads available, there are more than 4 moves
+/// to search, and RootInTB is not set to true.
+void Search::split_root_moves(size_t idx, RootMoves& rootMoves) {
+
+    if (idx < 5 || rootMoves.size() <= 4 || TB::RootInTB)
+        return;
+
+    bool isOdd = idx & 1;
+
+    for (size_t i = 0 + isOdd; i < rootMoves.size(); ++i)
+        rootMoves.erase (rootMoves.begin() + i);
+}
+
+
 /// MainThread::search() is called by the main thread when the program receives
 /// the UCI 'go' command. It searches from the root position and outputs the "bestmove".
 
@@ -251,7 +267,10 @@ void MainThread::search() {
   {
       for (Thread* th : Threads)
           if (th != this)
+          {
+              Search::split_root_moves(th->idx, th->rootMoves);
               th->start_searching();
+          }
 
       Thread::search(); // Let's start searching!
   }
@@ -290,6 +309,9 @@ void MainThread::search() {
   {
       for (Thread* th : Threads)
       {
+          if (th->idx == 5)
+              break;
+
           Depth depthDiff = th->completedDepth - bestThread->completedDepth;
           Value scoreDiff = th->rootMoves[0].score - bestThread->rootMoves[0].score;
 
