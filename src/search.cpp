@@ -251,7 +251,10 @@ void MainThread::search() {
   {
       for (Thread* th : Threads)
           if (th != this)
+          {
+              std::random_shuffle(th->rootMoves.begin(), th->rootMoves.end());
               th->start_searching();
+          }
 
       Thread::search(); // Let's start searching!
   }
