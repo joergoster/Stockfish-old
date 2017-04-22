@@ -857,7 +857,7 @@ moves_loop: // When in check search starts from here
                           thisThread->rootMoves.end(), move))
               continue;
 
-          if (thisThread->firstIteration)
+          if (thisThread->idx && thisThread->firstIteration)
               move = thisThread->rootMoves[thisThread->PVIdx + moveCount].pv[0];
       }
 
