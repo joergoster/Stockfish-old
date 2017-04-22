@@ -68,6 +68,7 @@ public:
   Search::RootMoves rootMoves;
   Depth rootDepth;
   Depth completedDepth;
+  bool firstIteration;
   std::atomic_bool resetCalls;
   MoveStats counterMoves;
   HistoryStats history;

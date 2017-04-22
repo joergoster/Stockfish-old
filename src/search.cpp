@@ -150,7 +150,6 @@ namespace {
 
   Value value_to_tt(Value v, int ply);
   Value value_from_tt(Value v, int ply);
-  Move next_root_move(Thread* th, int i);
   void update_pv(Move* pv, Move move, Move* childPv);
   void update_cm_stats(Stack* ss, Piece pc, Square s, Value bonus);
   void update_stats(const Position& pos, Stack* ss, Move move, Move* quiets, int quietsCnt, Value bonus);
@@ -339,6 +338,7 @@ void Thread::search() {
   bestValue = delta = alpha = -VALUE_INFINITE;
   beta = VALUE_INFINITE;
   completedDepth = DEPTH_ZERO;
+  firstIteration = true;
 
   if (mainThread)
   {
@@ -458,7 +458,10 @@ void Thread::search() {
       }
 
       if (!Signals.stop)
+      {
           completedDepth = rootDepth;
+          firstIteration = false;
+      }
 
       if (!mainThread)
           continue;
@@ -838,8 +841,7 @@ moves_loop: // When in check search starts from here
 
     // Step 11. Loop through moves
     // Loop through all pseudo-legal moves until no moves remain or a beta cutoff occurs
-    while (rootNode ? (move = next_root_move(thisThread, thisThread->PVIdx + moveCount)) != MOVE_NONE
-                    : (move = mp.next_move(skipQuiets)) != MOVE_NONE)
+    while ((move = mp.next_move(skipQuiets)) != MOVE_NONE)
     {
       assert(is_ok(move));
 
@@ -849,9 +851,15 @@ moves_loop: // When in check search starts from here
       // At root obey the "searchmoves" option and skip moves not listed in Root
       // Move List. As a consequence any illegal move is also skipped. In MultiPV
       // mode we also skip PV moves which have been already searched.
-      if (rootNode && !std::count(thisThread->rootMoves.begin() + thisThread->PVIdx,
-                                  thisThread->rootMoves.end(), move))
-          continue;
+      if (rootNode)
+      {
+          if (!std::count(thisThread->rootMoves.begin() + thisThread->PVIdx,
+                          thisThread->rootMoves.end(), move))
+              continue;
+
+          if (thisThread->firstIteration)
+              move = thisThread->rootMoves[thisThread->PVIdx + moveCount].pv[0];
+      }
 
       ss->moveCount = ++moveCount;
 
@@ -1372,17 +1380,6 @@ moves_loop: // When in check search starts from here
     return  v == VALUE_NONE             ? VALUE_NONE
           : v >= VALUE_MATE_IN_MAX_PLY  ? v - ply
           : v <= VALUE_MATED_IN_MAX_PLY ? v + ply : v;
-  }
-
-
-  // next_root_move() returns the next root move for the given thread
-
-  Move next_root_move(Thread* th, int i) {
-
-    if (size_t(i) < th->rootMoves.size())
-        return th->rootMoves[i].pv[0];
-
-    return MOVE_NONE;
   }
 
 
