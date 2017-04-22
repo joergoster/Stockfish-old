@@ -75,6 +75,9 @@ namespace {
   int FutilityMoveCounts[2][16]; // [improving][depth]
   int Reductions[2][2][64][64];  // [pv][improving][depth][moveNumber]
 
+  // Threshold used for countermoves based pruning.
+  const int CounterMovePruneThreshold = VALUE_ZERO;
+
   template <bool PvNode> Depth reduction(bool i, Depth d, int mn) {
     return Reductions[PvNode][i][std::min(d / ONE_PLY, 63)][std::min(mn, 63)] * ONE_PLY;
   }
@@ -175,8 +178,8 @@ void Search::init() {
 
   for (int d = 0; d < 16; ++d)
   {
-      FutilityMoveCounts[0][d] = int(2.4 + 0.773 * pow(d + 0.00, 1.8));
-      FutilityMoveCounts[1][d] = int(2.9 + 1.045 * pow(d + 0.49, 1.8));
+      FutilityMoveCounts[0][d] = int(2.4 + 0.74 * pow(d, 1.78));
+      FutilityMoveCounts[1][d] = int(5.0 + 1.00 * pow(d, 2.00));
   }
 }
 
@@ -192,6 +195,7 @@ void Search::clear() {
       th->counterMoves.clear();
       th->history.clear();
       th->counterMoveHistory.clear();
+      th->counterMoveHistory[NO_PIECE][0].fill(Value(CounterMovePruneThreshold-1));
       th->resetCalls = true;
   }
 
@@ -815,9 +819,6 @@ moves_loop: // When in check search starts from here
     const CounterMoveStats& cmh = *(ss-1)->counterMoves;
     const CounterMoveStats& fmh = *(ss-2)->counterMoves;
     const CounterMoveStats& fm2 = *(ss-4)->counterMoves;
-    const bool cm_ok = is_ok((ss-1)->currentMove);
-    const bool fm_ok = is_ok((ss-2)->currentMove);
-    const bool f2_ok = is_ok((ss-4)->currentMove);
 
     MovePicker mp(pos, ttMove, depth, ss);
     value = bestValue; // Workaround a bogus 'uninitialized' warning under gcc
@@ -919,9 +920,8 @@ moves_loop: // When in check search starts from here
 
               // Countermoves based pruning
               if (   lmrDepth < 3
-                  && ((cmh[moved_piece][to_sq(move)] < VALUE_ZERO) || !cm_ok)
-                  && ((fmh[moved_piece][to_sq(move)] < VALUE_ZERO) || !fm_ok)
-                  && ((fm2[moved_piece][to_sq(move)] < VALUE_ZERO) || !f2_ok || (cm_ok && fm_ok)))
+                  && (cmh[moved_piece][to_sq(move)] < CounterMovePruneThreshold)
+                  && (fmh[moved_piece][to_sq(move)] < CounterMovePruneThreshold))
                   continue;
 
               // Futility pruning: parent node
@@ -1126,7 +1126,7 @@ moves_loop: // When in check search starts from here
     // Bonus for prior countermove that caused the fail low
     else if (    depth >= 3 * ONE_PLY
              && !pos.captured_piece()
-             && cm_ok)
+             && is_ok((ss-1)->currentMove))
         update_cm_stats(ss-1, pos.piece_on(prevSq), prevSq, stat_bonus(depth));
 
     if(!excludedMove)
