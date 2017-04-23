@@ -366,6 +366,10 @@ void Thread::search() {
           int i = (idx - 1) % 20;
           if (((rootDepth / ONE_PLY + rootPos.game_ply() + skipPhase[i]) / skipSize[i]) % 2)
               continue;
+
+          // No need to waste time on depths lower than main thread already finished searching
+          if (rootDepth > 10 * ONE_PLY && rootDepth <= Threads.main()->completedDepth)
+              continue;
       }
 
       // Age out PV variability metric
