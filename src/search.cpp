@@ -378,7 +378,10 @@ void Thread::search() {
       // Save the last iteration's scores before first PV line is searched and
       // all the move scores except the (new) PV are set to -VALUE_INFINITE.
       for (RootMove& rm : rootMoves)
+      {
           rm.previousScore = rm.score;
+          rm.score = -VALUE_INFINITE; // not really needed
+      }
 
       // MultiPV loop. We perform a full root search for each PV line
       for (PVIdx = 0; PVIdx < multiPV && !Signals.stop; ++PVIdx)
@@ -454,6 +457,15 @@ void Thread::search() {
 
           if (Signals.stop || PVIdx + 1 == multiPV || Time.elapsed() > 3000)
               sync_cout << UCI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
+
+          // Reset all scores except the already searched PV lines
+          for (size_t i = 0; i < rootMoves.size(); ++i)
+          {
+              if (i <= PVIdx)
+                  continue;
+
+              rootMoves[i].score = -VALUE_INFINITE;
+          }
       }
 
       if (!Signals.stop)
@@ -1064,11 +1076,6 @@ moves_loop: // When in check search starts from here
               if (moveCount > 1 && thisThread == Threads.main())
                   ++static_cast<MainThread*>(thisThread)->bestMoveChanges;
           }
-          else
-              // All other moves but the PV are set to the lowest value: this is
-              // not a problem when sorting because the sort is stable and the
-              // move position in the list is preserved - just the PV is pushed up.
-              rm.score = -VALUE_INFINITE;
       }
 
       if (value > bestValue)
@@ -1504,7 +1511,7 @@ string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
 
   for (size_t i = 0; i < multiPV; ++i)
   {
-      bool updated = (i <= PVIdx);
+      bool updated = (i <= PVIdx && rootMoves[i].score != -VALUE_INFINITE);
 
       if (depth == ONE_PLY && !updated)
           continue;
