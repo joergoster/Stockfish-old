@@ -67,6 +67,10 @@ namespace {
   const int skipSize[]  = { 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4 };
   const int skipPhase[] = { 0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7 };
 
+  // Needed for a second sort in multipv search
+  bool firstLowest(const RootMove& rm) { return rm.score == -VALUE_INFINITE; }
+  bool sortPrevScore (const RootMove& rm1, const RootMove& rm2) { return rm2.previousScore < rm1.previousScore; }
+
   // Razoring and futility margin based on depth
   // razor_margin[0] is unused as long as depth >= ONE_PLY in search
   const int razor_margin[] = { 0, 570, 603, 554 };
@@ -446,18 +450,20 @@ void Thread::search() {
               assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE);
           }
 
-          // Sort the PV lines searched so far and update the GUI
+          // Sort the PV lines searched so far
           std::stable_sort(rootMoves.begin(), rootMoves.begin() + PVIdx + 1);
+
+          // In case of a multiPV search we have to do a second sort to make sure,
+          // we do not end with a move with no valid score available.
+          if (multiPV > 1)
+              std::stable_sort(std::find_if(rootMoves.begin() + PVIdx, rootMoves.end(), firstLowest), rootMoves.end(), sortPrevScore);
 
           if (!mainThread)
               continue;
 
+          // Update the GUI
           if (Signals.stop || PVIdx + 1 == multiPV || Time.elapsed() > 3000)
               sync_cout << UCI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
-
-          // Reset all scores except the already searched PV lines
-          for (size_t i = PVIdx + 1; i < rootMoves.size(); ++i)
-              rootMoves[i].score = -VALUE_INFINITE;
       }
 
       if (!Signals.stop)
