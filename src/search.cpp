@@ -453,13 +453,13 @@ void Thread::search() {
           // Sort the PV lines searched so far
           std::stable_sort(rootMoves.begin(), rootMoves.begin() + PVIdx + 1);
 
+          if (!mainThread)
+              continue;
+
           // In case of a multiPV search we have to do a second sort to make sure,
           // we do not end with a move with no valid score available.
           if (multiPV > 1)
               std::stable_sort(std::find_if(rootMoves.begin() + PVIdx, rootMoves.end(), firstLowest), rootMoves.end(), sortPrevScore);
-
-          if (!mainThread)
-              continue;
 
           // Update the GUI
           if (Signals.stop || PVIdx + 1 == multiPV || Time.elapsed() > 3000)
