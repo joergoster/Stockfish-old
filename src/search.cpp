@@ -366,12 +366,12 @@ void Thread::search() {
       // Distribute search depths across the threads
       if (idx)
       {
-          int i = (idx - 1) % 20;
-          if (((rootDepth / ONE_PLY + rootPos.game_ply() + skipPhase[i]) / skipSize[i]) % 2)
+          // No need to waste time on depths 2 plies lower than main thread already finished searching
+          if (rootDepth + 2 * ONE_PLY <= Threads.main()->completedDepth)
               continue;
 
-          // No need to waste time on depths lower than main thread already finished searching
-          if (rootDepth > 10 * ONE_PLY && rootDepth <= Threads.main()->completedDepth)
+          int i = (idx - 1) % 20;
+          if (((rootDepth / ONE_PLY + rootPos.game_ply() + skipPhase[i]) / skipSize[i]) % 2)
               continue;
       }
 
