@@ -67,7 +67,7 @@ namespace {
   const int skipSize[]  = { 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4 };
   const int skipPhase[] = { 0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7 };
 
-  // Needed for a second sort in multipv search
+  // Needed for a second sort in case of a multipv search
   bool firstLowest(const RootMove& rm) { return rm.score == -VALUE_INFINITE; }
   bool sortPrevScore (const RootMove& rm1, const RootMove& rm2) { return rm2.previousScore < rm1.previousScore; }
 
@@ -456,10 +456,12 @@ void Thread::search() {
           if (!mainThread)
               continue;
 
-          // In case of a multiPV search we have to do a second sort to make sure,
-          // we do not end with a move with no valid score available.
+          // In case of a multiPV search we have to do a second sort on the moves
+          // with no valid score. We now use their previous scores to sort them,
+          // because we don't want to output a move with no valid score available.
           if (multiPV > 1)
-              std::stable_sort(std::find_if(rootMoves.begin() + PVIdx, rootMoves.end(), firstLowest), rootMoves.end(), sortPrevScore);
+              std::stable_sort(std::find_if(rootMoves.begin() + PVIdx, rootMoves.end(), firstLowest),
+                                            rootMoves.end(), sortPrevScore);
 
           // Update the GUI
           if (Signals.stop || PVIdx + 1 == multiPV || Time.elapsed() > 3000)
