@@ -142,6 +142,7 @@ namespace {
 
   EasyMoveManager EasyMove;
   Value DrawValue[COLOR_NB];
+  std::atomic<int> workingAt[DEPTH_MAX];
 
   template <NodeType NT>
   Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth, bool cutNode, bool skipEarlyPruning);
@@ -246,6 +247,9 @@ void MainThread::search() {
   int contempt = Options["Contempt"] * PawnValueEg / 100; // From centipawns
   DrawValue[ us] = VALUE_DRAW - Value(contempt);
   DrawValue[~us] = VALUE_DRAW + Value(contempt);
+
+  for (Depth d = DEPTH_ZERO; d < DEPTH_MAX; d += ONE_PLY)
+      workingAt[d] = 0;
 
   if (rootMoves.empty())
   {
@@ -366,14 +370,22 @@ void Thread::search() {
       // Distribute search depths across the threads
       if (idx)
       {
-          // No need to waste time on depths 2 plies lower than main thread already finished searching
+          // Don't search 2 depths below the one already finished by the main thread
           if (rootDepth + 2 * ONE_PLY <= Threads.main()->completedDepth)
               continue;
 
+          // Our standard skipping scheme
           int i = (idx - 1) % 20;
           if (((rootDepth / ONE_PLY + rootPos.game_ply() + skipPhase[i]) / skipSize[i]) % 2)
               continue;
+
+          // Let at most only half of the available threads search this iteration
+          if (workingAt[rootDepth].load(std::memory_order_acquire) * 2 >= int(Threads.size()))
+              continue;
       }
+
+      // Increase the number of threads searching this iteration
+      workingAt[rootDepth]++;
 
       // Age out PV variability metric
       if (mainThread)
