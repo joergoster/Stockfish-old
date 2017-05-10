@@ -371,7 +371,7 @@ void Thread::search() {
       if (idx)
       {
           // Don't search 2 depths below the one already finished by the main thread
-          if (rootDepth + 2 * ONE_PLY <= Threads.main()->completedDepth)
+          if (rootDepth + 2 * ONE_PLY < Threads.main()->completedDepth)
               continue;
 
           // Our standard skipping scheme
@@ -384,7 +384,7 @@ void Thread::search() {
               continue;
       }
 
-      // Increase the number of threads searching this iteration
+      // Increment the number of threads searching this iteration
       workingAt[rootDepth]++;
 
       // Age out PV variability metric
