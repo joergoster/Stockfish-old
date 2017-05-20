@@ -79,6 +79,11 @@ namespace {
   // Threshold used for countermoves based pruning
   const int CounterMovePruneThreshold = 0;
 
+  // LMR move count threshold
+  int MoveCountThreshold(Depth d) {
+    return d < 7 * ONE_PLY ? 5 : d < 13 * ONE_PLY ? 3 : 1;
+  }
+
   template <bool PvNode> Depth reduction(bool i, Depth d, int mn) {
     return Reductions[PvNode][i][std::min(d / ONE_PLY, 63)][std::min(mn, 63)] * ONE_PLY;
   }
@@ -964,7 +969,7 @@ moves_loop: // When in check search starts from here
       // Step 15. Reduced depth search (LMR). If the move fails high it will be
       // re-searched at full depth.
       if (    depth >= 3 * ONE_PLY
-          &&  moveCount > 1
+          &&  moveCount > MoveCountThreshold(thisThread->rootDepth)
           && (!captureOrPromotion || moveCountPruning))
       {
           Depth r = reduction<PvNode>(improving, depth, moveCount);
