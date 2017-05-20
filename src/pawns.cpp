@@ -32,19 +32,19 @@ namespace {
   #define S(mg, eg) make_score(mg, eg)
 
   // Isolated pawn penalty by opposed flag
-  const Score Isolated[] = { S(44, 37), S(31, 29) };
+  const Score Isolated[] = { S(45, 40), S(30, 27) };
 
   // Backward pawn penalty by opposed flag
-  const Score Backward[] = { S(56, 34), S(37, 19) };
+  const Score Backward[] = { S(56, 33), S(41, 19) };
 
   // Unsupported pawn penalty for pawns which are neither isolated or backward
-  const Score Unsupported = S(13, 10);
+  const Score Unsupported = S(17, 8);
 
   // Connected pawn bonus by opposed, phalanx, twice supported and rank
   Score Connected[2][2][2][RANK_NB];
 
   // Doubled pawn penalty
-  const Score Doubled = S(19, 39);
+  const Score Doubled = S(18, 38);
 
   // Lever bonus by rank
   const Score Lever[RANK_NB] = {
@@ -205,7 +205,7 @@ namespace Pawns {
 
 void init() {
 
-  static const int Seed[RANK_NB] = { 0, 10, 16, 13, 71, 90, 168, 330 };
+  static const int Seed[RANK_NB] = { 0, 8, 19, 13, 71, 94, 169, 324 };
 
   for (int opposed = 0; opposed <= 1; ++opposed)
       for (int phalanx = 0; phalanx <= 1; ++phalanx)
