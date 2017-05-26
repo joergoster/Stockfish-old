@@ -22,7 +22,6 @@
 #define THREAD_H_INCLUDED
 
 #include <atomic>
-#include <bitset>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
@@ -69,9 +68,9 @@ public:
   Depth rootDepth;
   Depth completedDepth;
   std::atomic_bool resetCalls;
-  MoveStats counterMoves;
-  HistoryStats history;
-  CounterMoveHistoryStats counterMoveHistory;
+  CounterMoveStat counterMoves;
+  ButterflyHistory history;
+  CounterMoveHistoryStat counterMoveHistory;
 };
 
 
