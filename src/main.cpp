@@ -39,7 +39,6 @@ int main(int argc, char* argv[]) {
   PSQT::init();
   Bitboards::init();
   Position::init();
-  Bitbases::init();
   Search::init();
   Pawns::init();
   Threads.init();
