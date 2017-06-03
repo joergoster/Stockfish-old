@@ -788,7 +788,7 @@ namespace {
         && (ss->staticEval >= beta - 35 * (depth / ONE_PLY - 6) || depth >= 13 * ONE_PLY)
         &&  ss->ply > std::max(thisThread->rootDepth / (5 * ONE_PLY), 2)
         && !(depth > 12 * ONE_PLY && MoveList<LEGAL>(pos).size() < 4)
-        &&  pos.non_pawn_material(pos.side_to_move()))
+        &&  pos.non_pawn_material(pos.side_to_move()) > (depth > 12 * ONE_PLY) * BishopValueMg)
     {
 
         assert(eval - beta >= 0);
