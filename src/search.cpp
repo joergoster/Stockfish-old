@@ -621,8 +621,8 @@ namespace {
     }
 
     // Used to send selDepth info to GUI
-    if (PvNode && thisThread->maxPly < ss->ply)
-        thisThread->maxPly = ss->ply;
+    if (PvNode)
+        thisThread->maxPly = std::max(ss->ply, thisThread->maxPly);
 
     if (!rootNode)
     {
@@ -1266,8 +1266,8 @@ moves_loop: // When in check search starts from here
     moveCount = 0;
 
     // Update selDepth if needed
-    if (PvNode && pos.this_thread()->maxPly < ss->ply)
-        pos.this_thread()->maxPly = ss->ply;
+    if (PvNode)
+        pos.this_thread()->maxPly = std::max(ss->ply, pos.this_thread()->maxPly);
 
     // Maximum search depth reached?
     if (ss->ply >= MAX_PLY)
