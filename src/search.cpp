@@ -639,7 +639,7 @@ namespace {
                     update_stats(pos, ss, ttMove, nullptr, 0, stat_bonus(depth));
 
                 // Extra penalty for a quiet TT move in previous ply when it gets refuted
-                if ((ss-1)->moveCount == 1 && !pos.capture_or_promotion((ss-1)->currentMove))
+                if ((ss-1)->moveCount == 1 && !pos.captured_piece() && type_of((ss-1)->currentMove) != PROMOTION)
                     update_cm_stats(ss-1, pos.piece_on(prevSq), prevSq, -stat_bonus(depth + ONE_PLY));
             }
             // Penalty for a quiet ttMove that fails low
@@ -1122,7 +1122,7 @@ moves_loop: // When in check search starts from here
             update_stats(pos, ss, bestMove, quietsSearched, quietCount, stat_bonus(depth));
 
         // Extra penalty for a quiet TT move in previous ply when it gets refuted
-        if ((ss-1)->moveCount == 1 && !pos.captured_piece())
+        if ((ss-1)->moveCount == 1 && !pos.captured_piece() && type_of((ss-1)->currentMove) != PROMOTION)
             update_cm_stats(ss-1, pos.piece_on(prevSq), prevSq, -stat_bonus(depth + ONE_PLY));
     }
     // Bonus for prior countermove that caused the fail low
