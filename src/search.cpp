@@ -958,6 +958,11 @@ moves_loop: // When in check search starts from here
       ss->currentMove = move;
       ss->history = &thisThread->counterMoveHistory[moved_piece][to_sq(move)];
 
+      // Reset stat scores for TT move and captures. Can be wrongly set to non-zero
+      // by the last quiet move in IID or singular extension search. 
+      if (moveCount == 1 || captureOrPromotion)
+          ss->statScore = 0;
+
       // Step 14. Make the move
       pos.do_move(move, st, givesCheck);
 
@@ -994,7 +999,7 @@ moves_loop: // When in check search starts from here
               if (ss->statScore > 0 && (ss-1)->statScore < 0)
                   r -= ONE_PLY;
 
-              else if (ss->statScore < 0 && (ss-1)->statScore > 0)
+              else if (ss->statScore < 0 && (ss-1)->statScore >= 0)
                   r += ONE_PLY;
 
               // Decrease/increase reduction for moves with a good/bad history
