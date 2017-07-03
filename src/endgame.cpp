@@ -272,7 +272,7 @@ Value Endgame<KPKB>::operator()(const Position& pos) const {
   Square loserKSq = pos.square<KING>(weakSide);
   Square pawnSq = pos.square<PAWN>(strongSide);
   Square bishopSq = pos.square<BISHOP>(weakSide);
-  Bitboard queeningPath = forward_bb(strongSide, pawnSq);
+  Bitboard queeningPath = forward_file_bb(strongSide, pawnSq);
 
   // If the pawn is not far advanced, it's a draw
   if (relative_rank(strongSide, pawnSq) <= RANK_4)
