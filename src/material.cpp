@@ -34,34 +34,34 @@ namespace {
   const int QuadraticOurs[][PIECE_TYPE_NB] = {
     //            OUR PIECES
     // pair pawn knight bishop rook queen
-    {1667                               }, // Bishop pair
-    {  40,    0                         }, // Pawn
-    {  32,  255,  -3                    }, // Knight      OUR PIECES
-    {   0,  104,   4,    0              }, // Bishop
-    { -26,   -2,  47,   105,  -149      }, // Rook
-    {-185,   24, 122,   137,  -134,   0 }  // Queen
+    { 417                               }, // Bishop pair
+    {  10,    0                         }, // Pawn
+    {   8,   64,  -1                    }, // Knight      OUR PIECES
+    {   0,   26,   1,    0              }, // Bishop
+    {  -7,   -1,  12,    26,   -37      }, // Rook
+    { -46,    6,  31,    34,   -34,   0 }  // Queen
   };
 
   const int QuadraticTheirs[][PIECE_TYPE_NB] = {
     //           THEIR PIECES
     // pair pawn knight bishop rook queen
     {   0                               }, // Bishop pair
-    {  36,    0                         }, // Pawn
-    {   9,   63,   0                    }, // Knight      OUR PIECES
-    {  59,   65,  42,     0             }, // Bishop
-    {  46,   39,  24,   -24,    0       }, // Rook
-    { 101,  100, -37,   141,  268,    0 }  // Queen
+    {   9,    0                         }, // Pawn
+    {   2,   16,   0                    }, // Knight      OUR PIECES
+    {  15,   16,  11,     0             }, // Bishop
+    {  12,   10,   6,    -6,    0       }, // Rook
+    {  25,   25,  -9,    35,   67,    0 }  // Queen
   };
 
   // PawnSet[pawn count] contains a bonus/malus indexed by number of pawns
   const int PawnSet[] = {
-    24, -32, 107, -51, 117, -9, -126, -21, 31
+    6, -8, 27, -13, 29, -2, -32, -5, 8
   };
 
   // QueenMinorsImbalance[opp_minor_count] is applied when only one side has a queen.
   // It contains a bonus/malus for the side with the queen.
   const int QueenMinorsImbalance[16] = { 
-    31, -8, -15, -25, -5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    8, -2, -4, -6, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
   };
 
   // Endgame evaluation and scaling functions are accessed directly and not through
@@ -233,7 +233,7 @@ Entry* probe(const Position& pos) {
   { pos.count<BISHOP>(BLACK) > 1, pos.count<PAWN>(BLACK), pos.count<KNIGHT>(BLACK),
     pos.count<BISHOP>(BLACK)    , pos.count<ROOK>(BLACK), pos.count<QUEEN >(BLACK) } };
 
-  e->value = int16_t((imbalance<WHITE>(PieceCount) - imbalance<BLACK>(PieceCount)) / 16);
+  e->value = int16_t((imbalance<WHITE>(PieceCount) - imbalance<BLACK>(PieceCount)) / 4);
   return e;
 }
 
