@@ -607,8 +607,7 @@ namespace {
         static_cast<MainThread*>(thisThread)->check_time();
 
     // Used to send selDepth info to GUI
-    if (PvNode)
-        thisThread->selDepth = std::max(ss->ply, thisThread->selDepth);
+    thisThread->selDepth = std::max(ss->ply, thisThread->selDepth);
 
     if (!rootNode)
     {
@@ -1260,8 +1259,7 @@ moves_loop: // When in check search starts from here
     moveCount = 0;
 
     // Update selDepth if needed
-    if (PvNode)
-        pos.this_thread()->selDepth = std::max(ss->ply, pos.this_thread()->selDepth);
+    pos.this_thread()->selDepth = std::max(ss->ply, pos.this_thread()->selDepth);
 
     // Maximum search depth reached?
     if (ss->ply >= MAX_PLY)
