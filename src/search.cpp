@@ -467,10 +467,8 @@ void Thread::search() {
                   }
               }
               else if (bestValue >= beta)
-              {
-                  alpha += delta / 2;
                   beta = std::min(bestValue + delta, VALUE_INFINITE);
-              }
+
               else
                   break;
 
