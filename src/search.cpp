@@ -39,7 +39,6 @@
 
 namespace Search {
 
-  SignalsType Signals;
   LimitsType Limits;
 }
 
@@ -287,18 +286,18 @@ void MainThread::search() {
       Time.availableNodes += Limits.inc[us] - Threads.nodes_searched();
 
   // When we reach the maximum depth, we can arrive here without a raise of
-  // Signals.stop. However, if we are pondering or in an infinite search,
+  // Threads.stop. However, if we are pondering or in an infinite search,
   // the UCI protocol states that we shouldn't print the best move before the
   // GUI sends a "stop" or "ponderhit" command. We therefore simply wait here
-  // until the GUI sends one of those commands (which also raises Signals.stop).
-  if (!Signals.stop && (Limits.ponder || Limits.infinite))
+  // until the GUI sends one of those commands (which also raises Threads.stop).
+  if (!Threads.stop && (Limits.ponder || Limits.infinite))
   {
-      Signals.stopOnPonderhit = true;
-      wait(Signals.stop);
+      Threads.stopOnPonderhit = true;
+      wait(Threads.stop);
   }
 
   // Stop the threads if not already stopped
-  Signals.stop = true;
+  Threads.stop = true;
 
   // Wait until all threads have finished
   for (Thread* th : Threads)
@@ -382,7 +381,7 @@ void Thread::search() {
 
   // Iterative deepening loop until requested to stop or the target depth is reached
   while (   (rootDepth += ONE_PLY) < DEPTH_MAX
-         && !Signals.stop
+         && !Threads.stop
          && !(Limits.depth && mainThread && rootDepth / ONE_PLY > Limits.depth))
   {
       // Distribute search depths across the threads
@@ -406,10 +405,13 @@ void Thread::search() {
           rm.previousScore = rm.score;
 
       // MultiPV loop. We perform a full root search for each PV line
-      for (PVIdx = 0; PVIdx < multiPV && !Signals.stop; ++PVIdx)
+      for (PVIdx = 0; PVIdx < multiPV && !Threads.stop; ++PVIdx)
       {
           if (mainThread)
               mainThread->newPVIdx = true;
+
+          // Reset UCI info selDepth for each depth and each PV line
+          selDepth = 0;
 
           // Reset aspiration window starting size
           if (rootDepth >= 5 * ONE_PLY)
@@ -437,7 +439,7 @@ void Thread::search() {
               // If search has been stopped, we break immediately. Sorting and
               // writing PV back to TT is safe because RootMoves is still
               // valid, although it refers to the previous iteration.
-              if (Signals.stop)
+              if (Threads.stop)
                   break;
 
               // When failing high/low give some update (without cluttering
@@ -461,7 +463,7 @@ void Thread::search() {
                   if (mainThread)
                   {
                       mainThread->failedLow = true;
-                      Signals.stopOnPonderhit = false;
+                      Threads.stopOnPonderhit = false;
                   }
               }
               else if (bestValue >= beta)
@@ -487,14 +489,14 @@ void Thread::search() {
               continue;
 
           // ... and let the main thread update the GUI
-          if (Signals.stop || PVIdx + 1 == multiPV || Time.elapsed() - lastInfoPv >= 5000)
+          if (Threads.stop || PVIdx + 1 == multiPV || Time.elapsed() - lastInfoPv >= 5000)
           {
               sync_cout << UCI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
               lastInfoPv = Time.elapsed();
           }
       }
 
-      if (!Signals.stop)
+      if (!Threads.stop)
           completedDepth = rootDepth;
 
       // Let the helper threads continue with the next iteration
@@ -510,12 +512,12 @@ void Thread::search() {
           && bestValue >= VALUE_MATE_IN_MAX_PLY
           && VALUE_MATE - bestValue <= 2 * Limits.mate
           && ++isMateInX == 3)
-          Signals.stop = true;
+          Threads.stop = true;
 
       // Do we have time for the next iteration? Can we stop searching now?
       if (Limits.use_time_management())
       {
-          if (!Signals.stop && !Signals.stopOnPonderhit)
+          if (!Threads.stop && !Threads.stopOnPonderhit)
           {
               // Stop the search if only one legal move is available, or if all
               // of the available time has been used, or if we matched an easyMove
@@ -538,9 +540,9 @@ void Thread::search() {
                   // If we are allowed to ponder do not stop the search now but
                   // keep pondering until the GUI sends "ponderhit" or "stop".
                   if (Limits.ponder)
-                      Signals.stopOnPonderhit = true;
+                      Threads.stopOnPonderhit = true;
                   else
-                      Signals.stop = true;
+                      Threads.stop = true;
               }
           }
 
@@ -608,12 +610,12 @@ namespace {
 
     // Used to send selDepth info to GUI
     if (PvNode)
-        thisThread->maxPly = std::max(ss->ply, thisThread->maxPly);
+        thisThread->selDepth = std::max(ss->ply, thisThread->selDepth);
 
     if (!rootNode)
     {
         // Step 2a. Check for aborted search or reaching maximum search depth
-        if (Signals.stop.load(std::memory_order_relaxed) || ss->ply >= MAX_PLY)
+        if (Threads.stop.load(std::memory_order_relaxed) || ss->ply >= MAX_PLY)
              return ss->ply >= MAX_PLY && !inCheck ? evaluate(pos) : beta;
 
         // Step 2b. Check for immediate draw
@@ -1120,7 +1122,7 @@ moves_loop: // When in check search starts from here
       // Finished searching the move. If a stop occurred, the return value of
       // the search cannot be trusted, and we return immediately without
       // updating best move, PV and TT.
-      if (Signals.stop.load(std::memory_order_relaxed))
+      if (Threads.stop.load(std::memory_order_relaxed))
           return VALUE_ZERO;
 
       if (rootNode)
@@ -1132,6 +1134,7 @@ moves_loop: // When in check search starts from here
           if (moveCount == 1 || value > alpha)
           {
               rm.score = value;
+              rm.selDepth = thisThread->selDepth;
               rm.pv.resize(1);
 
               assert((ss+1)->pv);
@@ -1181,7 +1184,7 @@ moves_loop: // When in check search starts from here
     // completed. But in this case bestValue is valid because we have fully
     // searched our subtree, and we can anyhow save the result in TT.
     /*
-       if (Signals.stop)
+       if (Threads.stop)
         return VALUE_DRAW;
     */
 
@@ -1260,7 +1263,7 @@ moves_loop: // When in check search starts from here
 
     // Update selDepth if needed
     if (PvNode)
-        pos.this_thread()->maxPly = std::max(ss->ply, pos.this_thread()->maxPly);
+        pos.this_thread()->selDepth = std::max(ss->ply, pos.this_thread()->selDepth);
 
     // Maximum search depth reached?
     if (ss->ply >= MAX_PLY)
@@ -1590,7 +1593,7 @@ moves_loop: // When in check search starts from here
     if (   (Limits.use_time_management() && elapsed > Time.maximum() - 10)
         || (Limits.movetime && elapsed >= Limits.movetime)
         || (Limits.nodes && Threads.nodes_searched() >= (uint64_t)Limits.nodes))
-            Signals.stop = true;
+            Threads.stop = true;
   }
 
 
@@ -1625,7 +1628,7 @@ string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
 
       ss << "info"
          << " depth "    << d / ONE_PLY
-         << " seldepth " << pos.this_thread()->maxPly
+         << " seldepth " << rootMoves[i].selDepth
          << " multipv "  << i + 1
          << " score "    << UCI::value(v);
 
