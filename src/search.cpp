@@ -410,11 +410,12 @@ void Thread::search() {
           if (mainThread)
               mainThread->newPVIdx = true;
 
-          // Reset UCI info selDepth for each depth and each PV line
-          selDepth = 0;
+          // Always reset bounds (don't rely on the implicit way)
+          alpha = -VALUE_INFINITE;
+          beta  =  VALUE_INFINITE;
 
           // Reset aspiration window starting size
-          if (rootDepth >= 5 * ONE_PLY)
+          if (rootDepth >= 5 * ONE_PLY && abs(rootMoves[PVIdx].previousScore) < VALUE_KNOWN_WIN)
           {
               delta = Value(18);
               alpha = std::max(rootMoves[PVIdx].previousScore - delta,-VALUE_INFINITE);
@@ -426,6 +427,9 @@ void Thread::search() {
           // high/low anymore.
           while (true)
           {
+              // Reset UCI info selDepth for every research
+              selDepth = 0;
+
               bestValue = ::search<PV>(rootPos, ss, alpha, beta, rootDepth, false, false);
 
               // Bring the best move to the front. It is critical that sorting
@@ -439,7 +443,7 @@ void Thread::search() {
               // If search has been stopped, we break immediately. Sorting and
               // writing PV back to TT is safe because RootMoves is still
               // valid, although it refers to the previous iteration.
-              if (Threads.stop)
+              if (Threads.stop || (bestValue > alpha && bestValue < beta))
                   break;
 
               // When failing high/low give some update (without cluttering
@@ -453,9 +457,14 @@ void Thread::search() {
                   lastInfoFail = Time.elapsed();
               }
 
-              // In case of failing low/high increase aspiration window and
-              // re-search, otherwise exit the loop.
-              if (bestValue <= alpha)
+              // Update delta
+              delta += delta / 4 + 5;
+
+              assert(delta >= VALUE_ZERO);
+
+              // In case of failing low/high, increase aspiration window
+              // and re-search.
+              if (bestValue <= alpha) // fail-low
               {
                   alpha = std::max(bestValue - delta, -VALUE_INFINITE);
                   beta -= delta / 2;
@@ -466,15 +475,9 @@ void Thread::search() {
                       Threads.stopOnPonderhit = false;
                   }
               }
-              else if (bestValue >= beta)
+              else // must be fail-high
                   beta = std::min(bestValue + delta, VALUE_INFINITE);
 
-              else
-                  break;
-
-              delta += delta / 4 + 5;
-
-              assert(delta >= VALUE_ZERO);
               assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE);
           }
 
