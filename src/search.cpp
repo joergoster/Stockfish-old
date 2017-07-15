@@ -775,6 +775,7 @@ namespace {
         &&  eval >= beta
         && (ss->staticEval >= beta - 35 * (depth / ONE_PLY - 6) || depth >= 13 * ONE_PLY)
         &&  ss->ply > std::max(thisThread->rootDepth / (5 * ONE_PLY), 2)
+        &&  thisThread->selDepth + 5 > thisThread->rootDepth / ONE_PLY
         && !(depth > 12 * ONE_PLY && MoveList<LEGAL>(pos).size() < 4)
         &&  pos.non_pawn_material(pos.side_to_move()) > (depth > 12 * ONE_PLY) * BishopValueMg)
     {
@@ -1439,11 +1440,9 @@ moves_loop: // When in check search starts from here
     if (InCheck && bestValue == -VALUE_INFINITE)
         return mated_in(ss->ply); // Plies to mate from the root
 
-    if (   pos.game_phase() > PHASE_ENDGAME
-        || bestValue != DrawValue[pos.side_to_move()])
-        tte->save(posKey, value_to_tt(bestValue, ss->ply),
-                  PvNode && bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER,
-                  ttDepth, bestMove, ss->staticEval, TT.generation());
+    tte->save(posKey, value_to_tt(bestValue, ss->ply),
+              PvNode && bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER,
+              ttDepth, bestMove, ss->staticEval, TT.generation());
 
     assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
 
