@@ -418,8 +418,8 @@ void Thread::search() {
           if (rootDepth >= 5 * ONE_PLY && abs(rootMoves[PVIdx].previousScore) < VALUE_KNOWN_WIN)
           {
               delta = Value(18);
-              alpha = std::max(rootMoves[PVIdx].previousScore - delta,-VALUE_INFINITE);
-              beta  = std::min(rootMoves[PVIdx].previousScore + delta, VALUE_INFINITE);
+              alpha = rootMoves[PVIdx].previousScore - delta;
+              beta  = rootMoves[PVIdx].previousScore + delta;
           }
 
           // Start with a small aspiration window and, in the case of a fail
@@ -440,13 +440,14 @@ void Thread::search() {
               // search the already searched PV lines are preserved.
               std::stable_sort(rootMoves.begin() + PVIdx, rootMoves.end());
 
-              // If search has been stopped, we break immediately. Sorting and
-              // writing PV back to TT is safe because RootMoves is still
-              // valid, although it refers to the previous iteration.
+              // If search has been stopped, we break immediately. Sorting
+              // is safe because RootMoves is still valid, although it refers
+              // to the previous iteration.
+              // We also break when not failing low/high, of course.
               if (Threads.stop || (bestValue > alpha && bestValue < beta))
                   break;
 
-              // When failing high/low give some update (without cluttering
+              // When failing low/high give some update (without cluttering
               // the UI) before a re-search.
               if (   mainThread
                   && multiPV == 1
