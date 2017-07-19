@@ -34,7 +34,7 @@ namespace {
   const int QuadraticOurs[][PIECE_TYPE_NB] = {
     //            OUR PIECES
     // pair pawn knight bishop rook queen
-    { 417                               }, // Bishop pair
+    {   0                               }, // Bishop pair
     {  10,    0                         }, // Pawn
     {   8,   64,  -1                    }, // Knight      OUR PIECES
     {   0,   26,   1,    0              }, // Bishop
@@ -51,6 +51,11 @@ namespace {
     {  15,   16,  11,     0             }, // Bishop
     {  12,   10,   6,    -6,    0       }, // Rook
     {  25,   25,  -9,    35,   67,    0 }  // Queen
+  };
+
+  // BishopPair[pawn count/2] contains a bonus for the bishop pair
+  const int BishopPair[9] = {
+    883, 506, 1004, 604, 507, 320, 320, 320, 320
   };
 
   // PawnSet[pawn count] contains a bonus/malus indexed by number of pawns
@@ -101,6 +106,9 @@ namespace {
     const Color Them = (Us == WHITE ? BLACK : WHITE);
 
     int bonus = PawnSet[pieceCount[Us][PAWN]];
+
+    if (pieceCount[Us][NO_PIECE_TYPE])
+        bonus += BishopPair[(pieceCount[Us][PAWN] + pieceCount[Them][PAWN]) / 2];
 
     // Second-degree polynomial material imbalance by Tord Romstad
     for (int pt1 = NO_PIECE_TYPE; pt1 <= QUEEN; ++pt1)
