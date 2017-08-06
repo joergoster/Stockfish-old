@@ -290,7 +290,7 @@ void MainThread::search() {
   // the UCI protocol states that we shouldn't print the best move before the
   // GUI sends a "stop" or "ponderhit" command. We therefore simply wait here
   // until the GUI sends one of those commands (which also raises Threads.stop).
-  if (!Threads.stop && (Limits.ponder || Limits.infinite))
+  if (!Threads.stop && Limits.ponder)
   {
       Threads.stopOnPonderhit = true;
       wait(Threads.stop);
