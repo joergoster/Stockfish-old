@@ -620,7 +620,7 @@ namespace {
              return ss->ply >= MAX_PLY && !inCheck ? evaluate(pos) : beta;
 
         // Step 2b. Check for immediate draw
-        if (pos.is_draw(ss->ply))
+        if (pos.is_draw(ss->ply) && pos.rule50_count() < 101)
             return DrawValue[pos.side_to_move()];
 
         // Step 3. Mate distance pruning. Even if we mate at the next move our score
