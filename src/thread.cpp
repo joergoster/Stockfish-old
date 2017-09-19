@@ -2,6 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
+  Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -23,238 +24,171 @@
 #include "movegen.h"
 #include "search.h"
 #include "thread.h"
-#include "uci.h"
-
-using namespace Search;
+#include "syzygy/tbprobe.h"
 
 ThreadPool Threads; // Global object
 
-extern void check_time();
 
-namespace {
+/// Thread constructor launches the thread and waits until it goes to sleep
+/// in idle_loop(). Note that 'searching' and 'exit' should be alredy set.
 
- // Helpers to launch a thread after creation and joining before delete. Outside the
- // Thread constructor and destructor because the object must be fully initialized
- // when start_routine (and hence virtual idle_loop) is called and when joining.
+Thread::Thread(size_t n) : idx(n), stdThread(&Thread::idle_loop, this) {
 
- template<typename T> T* new_thread() {
-   std::thread* th = new T;
-   *th = std::thread(&T::idle_loop, (T*)th); // Will go to sleep
-   return (T*)th;
- }
-
- void delete_thread(ThreadBase* th) {
-
-   th->mutex.lock();
-   th->exit = true; // Search must be already finished
-   th->mutex.unlock();
-
-   th->notify_one();
-   th->join(); // Wait for thread termination
-   delete th;
- }
-
+  wait_for_search_finished();
+  clear(); // Zero-init histories (based on std::array)
 }
 
 
-// ThreadBase::notify_one() wakes up the thread when there is some work to do
+/// Thread destructor wakes up the thread in idle_loop() and waits
+/// for its termination. Thread should be already waiting.
 
-void ThreadBase::notify_one() {
+Thread::~Thread() {
+
+  assert(!searching);
+
+  exit = true;
+  start_searching();
+  stdThread.join();
+}
+
+
+/// Thread::clear() reset histories, usually before a new game
+
+void Thread::clear() {
+
+  counterMoves.fill(MOVE_NONE);
+  mainHistory.fill(0);
+
+  for (auto& to : contHistory)
+      for (auto& h : to)
+          h.fill(0);
+
+  contHistory[NO_PIECE][0].fill(Search::CounterMovePruneThreshold - 1);
+}
+
+/// Thread::start_searching() wakes up the thread that will start the search
+
+void Thread::start_searching() {
+
+  std::lock_guard<Mutex> lk(mutex);
+  searching = true;
+  cv.notify_one(); // Wake up the thread in idle_loop()
+}
+
+
+/// Thread::wait_for_search_finished() blocks on the condition variable
+/// until the thread has finished searching.
+
+void Thread::wait_for_search_finished() {
 
   std::unique_lock<Mutex> lk(mutex);
-  sleepCondition.notify_one();
+  cv.wait(lk, [&]{ return !searching; });
 }
 
 
-// ThreadBase::wait() set the thread to sleep until 'condition' turns true
-
-void ThreadBase::wait(std::atomic<bool>& condition) {
-
-  std::unique_lock<Mutex> lk(mutex);
-  sleepCondition.wait(lk, [&]{ return bool(condition); });
-}
-
-
-// ThreadBase::wait_while() set the thread to sleep until 'condition' turns false
-void ThreadBase::wait_while(std::atomic<bool>& condition) {
-
-  std::unique_lock<Mutex> lk(mutex);
-  sleepCondition.wait(lk, [&]{ return !condition; });
-}
-
-
-// Thread constructor makes some init but does not launch any execution thread, 
-// which will be started only when the constructor returns.
-
-Thread::Thread() {
-
-  searching = false;
-  maxPly = 0;
-  history.clear();
-  counterMoves.clear();
-  idx = Threads.size(); // Starts from 0
-}
-
-
-// TimerThread::idle_loop() is where the timer thread waits Resolution milliseconds
-// and then calls check_time(). When not searching, thread sleeps until it's woken up.
-
-void TimerThread::idle_loop() {
-
-  while (!exit)
-  {
-      std::unique_lock<Mutex> lk(mutex);
-
-      if (!exit)
-          sleepCondition.wait_for(lk, std::chrono::milliseconds(run ? Resolution : INT_MAX));
-
-      lk.unlock();
-
-      if (!exit && run)
-          check_time();
-  }
-}
-
-
-// Thread::idle_loop() is where the thread is parked when it has no work to do
+/// Thread::idle_loop() is where the thread is parked, blocked on the
+/// condition variable, when it has no work to do.
 
 void Thread::idle_loop() {
 
-  while (!exit)
+  WinProcGroup::bindThisThread(idx);
+
+  while (true)
   {
       std::unique_lock<Mutex> lk(mutex);
+      searching = false;
+      cv.notify_one(); // Wake up anyone waiting for search finished
+      cv.wait(lk, [&]{ return searching; });
 
-      while (!searching && !exit)
-          sleepCondition.wait(lk);
+      if (exit)
+          return;
 
       lk.unlock();
 
-      if (!exit && searching)
-          search();
+      search();
   }
 }
 
 
-// MainThread::idle_loop() is where the main thread is parked waiting to be started
-// when there is a new search. The main thread will launch all the slave threads.
+/// ThreadPool::init() creates and launches the threads that will go
+/// immediately to sleep in idle_loop. We cannot use the constructor because
+/// Threads is a static object and we need a fully initialized engine at
+/// this point due to allocation of Endgames in the Thread constructor.
 
-void MainThread::idle_loop() {
+void ThreadPool::init(size_t requested) {
 
-  while (!exit)
-  {
-      std::unique_lock<Mutex> lk(mutex);
-
-      thinking = false;
-
-      while (!thinking && !exit)
-      {
-          sleepCondition.notify_one(); // Wake up the UI thread if needed
-          sleepCondition.wait(lk);
-      }
-
-      lk.unlock();
-
-      if (!exit)
-          think();
-  }
+  push_back(new MainThread(0));
+  set(requested);
 }
 
 
-// MainThread::join() waits for main thread to finish thinking
-
-void MainThread::join() {
-
-  std::unique_lock<Mutex> lk(mutex);
-  sleepCondition.wait(lk, [&]{ return !thinking; });
-}
-
-
-// ThreadPool::init() is called at startup to create and launch requested threads,
-// that will go immediately to sleep. We cannot use a constructor because Threads 
-// is a static object and we need a fully initialized engine at this point due to
-// allocation of Endgames in the Thread constructor.
-
-void ThreadPool::init() {
-
-  timer = new_thread<TimerThread>();
-  push_back(new_thread<MainThread>());
-  read_uci_options();
-}
-
-
-// ThreadPool::exit() terminates the threads before the program exits. Cannot be
-// done in destructor because threads must be terminated before freeing us.
+/// ThreadPool::exit() terminates threads before the program exits. Cannot be
+/// done in the destructor because threads must be terminated before deleting
+/// any static object, so before main() returns.
 
 void ThreadPool::exit() {
 
-  delete_thread(timer); // As first because check_time() accesses threads data
-  timer = nullptr;
-
-  for (Thread* th : *this)
-      delete_thread(th);
-
-  clear(); // Get rid of stale pointers
+  main()->wait_for_search_finished();
+  set(0);
 }
 
 
-// ThreadPool::read_uci_options() updates internal threads parameters from the
-// corresponding UCI options and creates/destroys threads to match the requested
-// number. Thread objects are dynamically allocated to avoid creating all possible
-// threads in advance (which include pawns and material tables), even if only a
-// few are to be used.
+/// ThreadPool::set() creates/destroys threads to match the requested number
 
-void ThreadPool::read_uci_options() {
-
-  size_t requested  = Options["Threads"];
-
-  assert(requested > 0);
+void ThreadPool::set(size_t requested) {
 
   while (size() < requested)
-      push_back(new_thread<Thread>());
+      push_back(new Thread(size()));
 
   while (size() > requested)
-  {
-      delete_thread(back());
-      pop_back();
-  }
+      delete back(), pop_back();
 }
 
 
-// ThreadPool::nodes_searched() returns the number of nodes searched
+/// ThreadPool::start_thinking() wakes up main thread waiting in idle_loop() and
+/// returns immediately. Main thread will wake up other threads and start the search.
 
-int64_t ThreadPool::nodes_searched() {
+void ThreadPool::start_thinking(Position& pos, StateListPtr& states,
+                                const Search::LimitsType& limits, bool ponderMode) {
 
-  int64_t nodes = 0;
-  for (Thread *th : *this)
-      nodes += th->rootPos.nodes_searched();
-  return nodes;
-}
+  main()->wait_for_search_finished();
 
-
-// ThreadPool::start_thinking() wakes up the main thread sleeping in
-// MainThread::idle_loop() and starts a new search, then returns immediately.
-
-void ThreadPool::start_thinking(const Position& pos, const LimitsType& limits,
-                                StateStackPtr& states) {
-  main()->join();
-
-  Signals.stopOnPonderhit = Signals.firstRootMove = false;
-  Signals.stop = Signals.failedLowAtRoot = false;
-
-  main()->rootMoves.clear();
-  main()->rootPos = pos;
-  Limits = limits;
-  if (states.get()) // If we don't set a new position, preserve current state
-  {
-      SetupStates = std::move(states); // Ownership transfer here
-      assert(!states.get());
-  }
+  stopOnPonderhit = stop = false;
+  ponder = ponderMode;
+  Search::Limits = limits;
+  Search::RootMoves rootMoves;
 
   for (const auto& m : MoveList<LEGAL>(pos))
       if (   limits.searchmoves.empty()
           || std::count(limits.searchmoves.begin(), limits.searchmoves.end(), m))
-          main()->rootMoves.push_back(RootMove(m));
+          rootMoves.emplace_back(m);
 
-  main()->thinking = true;
-  main()->notify_one(); // Wake up main thread: 'thinking' must be already set
+  if (!rootMoves.empty())
+      Tablebases::filter_root_moves(pos, rootMoves);
+
+  // After ownership transfer 'states' becomes empty, so if we stop the search
+  // and call 'go' again without setting a new position states.get() == NULL.
+  assert(states.get() || setupStates.get());
+
+  if (states.get())
+      setupStates = std::move(states); // Ownership transfer, states is now empty
+
+  // We use Position::set() to set root position across threads. But there are
+  // some StateInfo fields (previous, pliesFromNull, capturedPiece) that cannot
+  // be deduced from a fen string, so set() clears them and to not lose the info
+  // we need to backup and later restore setupStates->back(). Note that setupStates
+  // is shared by threads but is accessed in read-only mode.
+  StateInfo tmp = setupStates->back();
+
+  for (Thread* th : Threads)
+  {
+      th->nodes = th->tbHits = 0;
+      th->rootDepth = th->completedDepth = DEPTH_ZERO;
+      th->rootMoves = rootMoves;
+      th->rootPos.set(pos.fen(), pos.is_chess960(), &setupStates->back(), th);
+  }
+
+  setupStates->back() = tmp;
+
+  main()->start_searching();
 }

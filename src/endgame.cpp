@@ -2,6 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
+  Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -21,7 +22,6 @@
 #include <cassert>
 
 #include "bitboard.h"
-#include "bitcount.h"
 #include "endgame.h"
 #include "movegen.h"
 
@@ -39,7 +39,7 @@ namespace {
      70, 50, 30, 20, 20, 30, 50,  70,
      80, 60, 40, 30, 30, 40, 60,  80,
      90, 70, 60, 50, 50, 60, 70,  90,
-    100, 90, 80, 70, 70, 80, 90, 100,
+    100, 90, 80, 70, 70, 80, 90, 100
   };
 
   // Table used to drive the king towards a corner square of the
@@ -60,7 +60,7 @@ namespace {
   const int PushAway [8] = { 0, 5, 20, 40, 60, 80, 90, 100 };
 
   // Pawn Rank based scaling factors used in KRPPKRP endgame
-  const int KRPPKRPScaleFactors[RANK_NB] = {0, 9, 10, 14, 21, 44, 0, 0};
+  const int KRPPKRPScaleFactors[RANK_NB] = { 0, 9, 10, 14, 21, 44, 0, 0 };
 
 #ifndef NDEBUG
   bool verify_material(const Position& pos, Color c, Value npm, int pawnsCnt) {
@@ -81,25 +81,6 @@ namespace {
         sq = ~sq;
 
     return sq;
-  }
-
-  // Get the material key of Position out of the given endgame key code
-  // like "KBPKN". The trick here is to first forge an ad-hoc FEN string
-  // and then let a Position object do the work for us.
-  Key key(const string& code, Color c) {
-
-    assert(code.length() > 0 && code.length() < 8);
-    assert(code[0] == 'K');
-
-    string sides[] = { code.substr(code.find('K', 1)),      // Weak
-                       code.substr(0, code.find('K', 1)) }; // Strong
-
-    std::transform(sides[c].begin(), sides[c].end(), sides[c].begin(), tolower);
-
-    string fen =  sides[0] + char(8 - sides[0].length() + '0') + "/8/8/8/8/8/8/"
-                + sides[1] + char(8 - sides[1].length() + '0') + " w - - 0 10";
-
-    return Position(fen, false, nullptr).material_key();
   }
 
 } // namespace
@@ -129,13 +110,6 @@ Endgames::Endgames() {
 }
 
 
-template<EndgameType E, typename T>
-void Endgames::add(const string& code) {
-  map<T>()[key(code, WHITE)] = std::unique_ptr<EndgameBase<T>>(new Endgame<E>(WHITE));
-  map<T>()[key(code, BLACK)] = std::unique_ptr<EndgameBase<T>>(new Endgame<E>(BLACK));
-}
-
-
 /// Mate with KX vs K. This function is used to evaluate positions with
 /// king and plenty of material vs a lone king. It simply gives the
 /// attacking side a bonus for driving the defending king towards the edge
@@ -161,9 +135,9 @@ Value Endgame<KXK>::operator()(const Position& pos) const {
   if (   pos.count<QUEEN>(strongSide)
       || pos.count<ROOK>(strongSide)
       ||(pos.count<BISHOP>(strongSide) && pos.count<KNIGHT>(strongSide))
-      ||(pos.count<BISHOP>(strongSide) > 1 && opposite_colors(pos.squares<BISHOP>(strongSide)[0],
-                                                              pos.squares<BISHOP>(strongSide)[1])))
-      result += VALUE_KNOWN_WIN;
+      || (   (pos.pieces(strongSide, BISHOP) & ~DarkSquares)
+          && (pos.pieces(strongSide, BISHOP) &  DarkSquares)))
+      result = std::min(result + VALUE_KNOWN_WIN, VALUE_MATE_IN_MAX_PLY - 1);
 
   return strongSide == pos.side_to_move() ? result : -result;
 }
@@ -258,8 +232,8 @@ Value Endgame<KRKP>::operator()(const Position& pos) const {
       result = Value(80) - 8 * distance(wksq, psq);
 
   else
-      result =  Value(200) - 8 * (  distance(wksq, psq + DELTA_S)
-                                  - distance(bksq, psq + DELTA_S)
+      result =  Value(200) - 8 * (  distance(wksq, psq + SOUTH)
+                                  - distance(bksq, psq + SOUTH)
                                   - distance(psq, queeningSq));
 
   return strongSide == pos.side_to_move() ? result : -result;
@@ -495,7 +469,7 @@ ScaleFactor Endgame<KRPKR>::operator()(const Position& pos) const {
   // If the defending king blocks the pawn and the attacking king is too far
   // away, it's a draw.
   if (   r <= RANK_5
-      && bksq == wpsq + DELTA_N
+      && bksq == wpsq + NORTH
       && distance(wksq, wpsq) - tempo >= 2
       && distance(wksq, brsq) - tempo >= 2)
       return SCALE_FACTOR_DRAW;
@@ -516,10 +490,10 @@ ScaleFactor Endgame<KRPKR>::operator()(const Position& pos) const {
       && file_of(wrsq) == f
       && wrsq < wpsq
       && (distance(wksq, queeningSq) < distance(bksq, queeningSq) - 2 + tempo)
-      && (distance(wksq, wpsq + DELTA_N) < distance(bksq, wpsq + DELTA_N) - 2 + tempo)
+      && (distance(wksq, wpsq + NORTH) < distance(bksq, wpsq + NORTH) - 2 + tempo)
       && (  distance(bksq, wrsq) + tempo >= 3
           || (    distance(wksq, queeningSq) < distance(bksq, wrsq) + tempo
-              && (distance(wksq, wpsq + DELTA_N) < distance(bksq, wrsq) + tempo))))
+              && (distance(wksq, wpsq + NORTH) < distance(bksq, wrsq) + tempo))))
       return ScaleFactor(  SCALE_FACTOR_MAX
                          - 8 * distance(wpsq, queeningSq)
                          - 2 * distance(wksq, queeningSq));
@@ -624,7 +598,7 @@ ScaleFactor Endgame<KPsK>::operator()(const Position& pos) const {
 
   // If all pawns are ahead of the king, on a single rook file and
   // the king is within one file of the pawns, it's a draw.
-  if (   !(pawns & ~in_front_bb(weakSide, rank_of(ksq)))
+  if (   !(pawns & ~forward_ranks_bb(weakSide, ksq))
       && !((pawns & ~FileABB) && (pawns & ~FileHBB))
       &&  distance<File>(ksq, lsb(pawns)) <= 1)
       return SCALE_FACTOR_DRAW;
@@ -670,17 +644,15 @@ ScaleFactor Endgame<KBPKB>::operator()(const Position& pos) const {
 
       if (relative_rank(strongSide, pawnSq) <= RANK_5)
           return SCALE_FACTOR_DRAW;
-      else
-      {
-          Bitboard path = forward_bb(strongSide, pawnSq);
 
-          if (path & pos.pieces(weakSide, KING))
-              return SCALE_FACTOR_DRAW;
+      Bitboard path = forward_file_bb(strongSide, pawnSq);
 
-          if (  (pos.attacks_from<BISHOP>(weakBishopSq) & path)
-              && distance(weakBishopSq, pawnSq) >= 3)
-              return SCALE_FACTOR_DRAW;
-      }
+      if (path & pos.pieces(weakSide, KING))
+          return SCALE_FACTOR_DRAW;
+
+      if (  (pos.attacks_from<BISHOP>(weakBishopSq) & path)
+          && distance(weakBishopSq, pawnSq) >= 3)
+          return SCALE_FACTOR_DRAW;
   }
   return SCALE_FACTOR_NONE;
 }
@@ -808,7 +780,7 @@ ScaleFactor Endgame<KNPKB>::operator()(const Position& pos) const {
 
   // King needs to get close to promoting pawn to prevent knight from blocking.
   // Rules for this are very tricky, so just approximate.
-  if (forward_bb(strongSide, pawnSq) & pos.attacks_from<BISHOP>(bishopSq))
+  if (forward_file_bb(strongSide, pawnSq) & pos.attacks_from<BISHOP>(bishopSq))
       return ScaleFactor(distance(weakKingSq, pawnSq));
 
   return SCALE_FACTOR_NONE;
