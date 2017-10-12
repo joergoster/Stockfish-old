@@ -852,6 +852,9 @@ moves_loop: // When in check search starts from here
       moveCountPruning =   depth < 16 * ONE_PLY
                         && moveCount >= FutilityMoveCounts[improving][depth / ONE_PLY];
 
+      avoidRepetition =   thisThread->rootMoves[thisThread->PVIdx].previousScore
+                       == DrawValue[thisThread->rootPos.side_to_move()];
+
       // Step 12. Singular and Gives Check Extensions
 
       // Singular extension search. If all moves but one fail low on a search of
@@ -939,15 +942,13 @@ moves_loop: // When in check search starts from here
       ss->currentMove = move;
       ss->contHistory = &thisThread->contHistory[movedPiece][to_sq(move)];
 
-      avoidRepetition = thisThread->rootMoves[thisThread->PVIdx].previousScore == DrawValue[thisThread->rootPos.side_to_move()];
-
       // Step 14. Make the move
       pos.do_move(move, st, givesCheck);
 
       // Step 15. Reduced depth search (LMR). If the move fails high it will be
       // re-searched at full depth.
       if (    depth >= 3 * ONE_PLY
-          &&  moveCount > 1 + avoidRepetition
+          &&  moveCount > 1
           && (!captureOrPromotion || moveCountPruning))
       {
           Depth r = reduction<PvNode>(improving, depth, moveCount);
@@ -994,6 +995,10 @@ moves_loop: // When in check search starts from here
 
               // Decrease/increase reduction for moves with a good/bad history
               r = std::max(DEPTH_ZERO, (r / ONE_PLY - ss->statScore / 20000) * ONE_PLY);
+
+              // Finally, decrease reduction if the previous best score is a draw score
+              if (avoidRepetition)
+                  r -= ONE_PLY;
           }
 
           Depth d = std::max(newDepth - r, ONE_PLY);
