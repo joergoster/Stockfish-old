@@ -564,12 +564,12 @@ namespace {
     if (!rootNode)
     {
         // Step 2a. Check for aborted search or reaching maximum search depth
-        if (Signals.stop.load(std::memory_order_relaxed) || ss->ply >= MAX_PLY)
+        if (Threads.stop.load(std::memory_order_relaxed) || ss->ply >= MAX_PLY)
             return ss->ply >= MAX_PLY && !inCheck ? evaluate(pos)
-                                                  : DrawValue[pos.side_to_move()];
+                                                  : VALUE_DRAW;
         // Step 2b. Check for immediate draw
         if (pos.is_draw(ss->ply))
-            return DrawValue[pos.side_to_move()];
+            return ss->ply < 10 ? DrawValue[pos.side_to_move()] : VALUE_DRAW;
 
         // Step 3. Mate distance pruning. Even if we mate at the next move our score
         // would be at best mate_in(ss->ply+1), but if alpha is already bigger because
@@ -1176,13 +1176,13 @@ moves_loop: // When in check search starts from here
 
     // Check if the maximum ply has been reached
     if (ss->ply >= MAX_PLY)
-        return !InCheck ? evaluate(pos) : DrawValue[pos.side_to_move()];
+        return !InCheck ? evaluate(pos) : VALUE_DRAW;
 
     assert(0 <= ss->ply && ss->ply < MAX_PLY);
 
     // Check for an instant draw
     if (pos.is_draw(ss->ply))
-        return DrawValue[pos.side_to_move()];
+        return ss->ply < 10 ? DrawValue[pos.side_to_move()] : VALUE_DRAW;
 
     // Decide whether or not to include checks: this fixes also the type of
     // TT entry depth that we are going to use. Note that in qsearch we use
