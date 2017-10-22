@@ -87,10 +87,9 @@ namespace {
 
   // Skill structure is used to implement strength limit
   struct Skill {
-    Skill(int l) : level(l) {}
+    explicit Skill(int l) : level(l) {}
     bool enabled() const { return level < 20; }
     bool time_to_pick(Depth depth) const { return depth / ONE_PLY == 1 + level; }
-    Move best_move(size_t multiPV) { return best ? best : pick_best(multiPV); }
     Move pick_best(size_t multiPV);
 
     int level;
@@ -514,8 +513,8 @@ void Thread::search() {
 
   // If skill level is enabled, swap best PV line with the sub-optimal one
   if (skill.enabled())
-      std::swap(rootMoves[0], *std::find(rootMoves.begin(),
-                rootMoves.end(), skill.best_move(multiPV)));
+      std::swap(rootMoves[0], *std::find(rootMoves.begin(), rootMoves.end(),
+                skill.best ? skill.best : skill.pick_best(multiPV)));
 }
 
 
@@ -1458,7 +1457,7 @@ moves_loop: // When in check search starts from here
         int push = (  weakness * int(topScore - rootMoves[i].score)
                     + delta * (rng.rand<unsigned>() % weakness)) / 128;
 
-        if (rootMoves[i].score + push > maxScore)
+        if (rootMoves[i].score + push >= maxScore)
         {
             maxScore = rootMoves[i].score + push;
             best = rootMoves[i].pv[0];
@@ -1595,6 +1594,10 @@ void Tablebases::filter_root_moves(Position& pos, Search::RootMoves& rootMoves) 
     UseRule50 = Options["Syzygy50MoveRule"];
     ProbeDepth = Options["SyzygyProbeDepth"] * ONE_PLY;
     Cardinality = Options["SyzygyProbeLimit"];
+
+    // Don't filter any moves if the user requested analysis on multiple
+    if (Options["MultiPV"] != 1)
+        return;
 
     // Skip TB probing when no TB found: !TBLargest -> !TB::Cardinality
     if (Cardinality > MaxCardinality)
