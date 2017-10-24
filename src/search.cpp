@@ -883,9 +883,10 @@ moves_loop: // When in check search starts from here
       newDepth = depth - ONE_PLY + extension;
 
       // Step 13. Pruning at shallow depth
-      if (  !rootNode
-          && pos.non_pawn_material(pos.side_to_move())
-          && bestValue > VALUE_MATED_IN_MAX_PLY)
+      if (   !rootNode
+          && !avoidRepetition
+          &&  pos.non_pawn_material(pos.side_to_move())
+          &&  bestValue > VALUE_MATED_IN_MAX_PLY)
       {
           if (   !captureOrPromotion
               && !givesCheck
@@ -996,8 +997,8 @@ moves_loop: // When in check search starts from here
               r = std::max(DEPTH_ZERO, (r / ONE_PLY - ss->statScore / 20000) * ONE_PLY);
 
               // Finally, decrease reduction if the previous best score is a draw score
-              if (avoidRepetition && moveCount < 4)
-                  r -= ONE_PLY;
+//              if (avoidRepetition && moveCount < 4)
+//                  r -= ONE_PLY;
           }
 
           Depth d = std::max(newDepth - r, ONE_PLY);
