@@ -787,7 +787,9 @@ namespace {
   template<Tracing T>
   ScaleFactor Evaluation<T>::evaluate_scale_factor(Value eg) {
 
-    Color strongSide = eg > VALUE_DRAW ? WHITE : BLACK;
+    const Color strongSide = eg > VALUE_DRAW ? WHITE : BLACK;
+    const int scaleMinors[] = { 8, 4, 2, 1, 0 };
+
     ScaleFactor sf = me->scale_factor(pos, strongSide);
 
     // If we don't already have an unusual scale factor, check for certain
@@ -814,7 +816,8 @@ namespace {
             return ScaleFactor(37 + 7 * pos.count<PAWN>(strongSide));
     }
 
-    return sf;
+    int sf2 = std::max(int(sf) - scaleMinors[pos.count<KNIGHT>(strongSide) + pos.count<BISHOP>(strongSide)], 0);
+    return ScaleFactor(sf2);
   }
 
 
