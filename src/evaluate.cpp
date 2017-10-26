@@ -788,7 +788,7 @@ namespace {
   ScaleFactor Evaluation<T>::evaluate_scale_factor(Value eg) {
 
     const Color strongSide = eg > VALUE_DRAW ? WHITE : BLACK;
-    const int scaleMinors[] = { 8, 4, 2, 1, 0 };
+    const int scaleMinors[] = { 4, 2, 1, 0, 0 };
 
     ScaleFactor sf = me->scale_factor(pos, strongSide);
 
