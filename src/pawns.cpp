@@ -183,7 +183,13 @@ namespace {
             score -= Backward, e->weakUnopposed[Us] += !opposed;
 
         if (doubled && !supported)
-            score -= (f == FILE_B || f == FILE_G) ? Doubled / 2 : Doubled;
+        {
+            if (   (f == FILE_B && !(ourPawns & FileABB))  // assume we captured with a-pawn
+                || (f == FILE_G && !(ourPawns & FileHBB))) // assume we captured with h-pawn
+                score -= Doubled / 2;
+            else
+                score -= Doubled;
+        }
 
         if (lever)
             score += Lever[relative_rank(Us, s)];
