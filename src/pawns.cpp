@@ -183,7 +183,7 @@ namespace {
             score -= Backward, e->weakUnopposed[Us] += !opposed;
 
         if (doubled && !supported)
-            score -= Doubled;
+            score -= (f == FILE_B || f == FILE_G) ? Doubled / 2 : Doubled;
 
         if (lever)
             score += Lever[relative_rank(Us, s)];
