@@ -1132,10 +1132,15 @@ moves_loop: // When in check search starts from here
         update_continuation_histories(ss-1, pos.piece_on(prevSq), prevSq, stat_bonus(depth));
 
     if (!excludedMove)
+    {
+        Depth d = bestValue == DrawValue[pos.side_to_move()] ?
+                  std::min(depth, 4 * ONE_PLY) : depth;
+
         tte->save(posKey, value_to_tt(bestValue, ss->ply),
                   bestValue >= beta ? BOUND_LOWER :
                   PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
-                  depth, bestMove, ss->staticEval, TT.generation());
+                  d, bestMove, ss->staticEval, TT.generation());
+    }
 
     assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
 
