@@ -178,7 +178,7 @@ namespace {
   // RookOnOpenFile[File] contains bonuses for each rook
   // when there is no pawn on the rook file.
   Score RookOnOpenFile[FILE_NB] = {
-    S(45, 21), S(44, 20), S(48, 21), S(43, 20),
+    S(44, 21), S(44, 20), S(48, 21), S(43, 20),
     S(45, 21), S(49, 20), S(44, 19), S(44, 18)
   };
 
