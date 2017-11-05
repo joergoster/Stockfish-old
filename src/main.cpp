@@ -43,9 +43,10 @@ int main(int argc, char* argv[]) {
   Bitbases::init();
   Search::init();
   Pawns::init();
-  Threads.init();
   Tablebases::init(Options["SyzygyPath"]);
   TT.resize(Options["Hash"]);
+  Threads.init(Options["Threads"]);
+  Search::clear(); // After threads are up
 
   UCI::loop(argc, argv);
 

@@ -21,69 +21,97 @@
 #ifndef MOVEPICK_H_INCLUDED
 #define MOVEPICK_H_INCLUDED
 
-#include <algorithm> // For std::max
-#include <cstring>   // For std::memset
+#include <array>
+#include <limits>
 
 #include "movegen.h"
 #include "position.h"
 #include "types.h"
 
+/// StatBoards is a generic 2-dimensional array used to store various statistics
+template<int Size1, int Size2, typename T = int16_t>
+struct StatBoards : public std::array<std::array<T, Size2>, Size1> {
 
-/// HistoryStats records how often quiet moves have been successful or unsuccessful
-/// during the current search, and is used for reduction and move ordering decisions.
-struct HistoryStats {
-
-  static const Value Max = Value(1 << 28);
-
-  Value get(Color c, Move m) const { return table[c][from_sq(m)][to_sq(m)]; }
-  void clear() { std::memset(table, 0, sizeof(table)); }
-  void update(Color c, Move m, Value v) {
-
-    Square from = from_sq(m);
-    Square to = to_sq(m);
-
-    const int denom = 324;
-
-    assert(abs(int(v)) <= denom); // Needed for stability.
-
-    table[c][from][to] -= table[c][from][to] * abs(int(v)) / denom;
-    table[c][from][to] += int(v) * 32;
+  void fill(const T& v) {
+    T* p = &(*this)[0][0];
+    std::fill(p, p + sizeof(*this) / sizeof(*p), v);
   }
 
-private:
-  Value table[COLOR_NB][SQUARE_NB][SQUARE_NB];
+  void update(T& entry, int bonus, const int D) {
+
+    assert(abs(bonus) <= D); // Ensure range is [-32 * D, 32 * D]
+    assert(abs(32 * D) < (std::numeric_limits<T>::max)()); // Ensure we don't overflow
+
+    entry += bonus * 32 - entry * abs(bonus) / D;
+
+    assert(abs(entry) <= 32 * D);
+  }
 };
 
+/// StatCubes is a generic 3-dimensional array used to store various statistics
+template<int Size1, int Size2, int Size3, typename T = int16_t>
+struct StatCubes : public std::array<std::array<std::array<T, Size3>, Size2>, Size1> {
 
-/// A template struct, used to generate MoveStats and CounterMoveHistoryStats:
-/// MoveStats store the move that refute a previous one.
-/// CounterMoveHistoryStats is like HistoryStats, but with two consecutive moves.
-/// Entries are stored using only the moving piece and destination square, hence
-/// two moves with different origin but same destination and piece will be
-/// considered identical.
-template<typename T>
-struct Stats {
-  const T* operator[](Piece pc) const { return table[pc]; }
-  T* operator[](Piece pc) { return table[pc]; }
-  void clear() { std::memset(table, 0, sizeof(table)); }
-  void update(Piece pc, Square to, Move m) { table[pc][to] = m; }
-  void update(Piece pc, Square to, Value v) {
-
-    const int denom = 936;
-
-    assert(abs(int(v)) <= denom); // Needed for stability.
-
-    table[pc][to] -= table[pc][to] * abs(int(v)) / denom;
-    table[pc][to] += int(v) * 32;
+  void fill(const T& v) {
+    T* p = &(*this)[0][0][0];
+    std::fill(p, p + sizeof(*this) / sizeof(*p), v);
   }
 
-private:
-  T table[PIECE_NB][SQUARE_NB];
+  void update(T& entry, int bonus, const int D, const int W) {
+
+    assert(abs(bonus) <= D); // Ensure range is [-W * D, W * D]
+    assert(abs(W * D) < (std::numeric_limits<T>::max)()); // Ensure we don't overflow
+
+    entry += bonus * W - entry * abs(bonus) / D;
+
+    assert(abs(entry) <= W * D);
+  }
 };
 
-typedef Stats<Move> MoveStats;
-typedef Stats<Value> CounterMoveStats;
-typedef Stats<CounterMoveStats> CounterMoveHistoryStats;
+/// ButterflyBoards are 2 tables (one for each color) indexed by the move's from
+/// and to squares, see chessprogramming.wikispaces.com/Butterfly+Boards
+typedef StatBoards<COLOR_NB, int(SQUARE_NB) * int(SQUARE_NB)> ButterflyBoards;
+
+/// PieceToBoards are addressed by a move's [piece][to] information
+typedef StatBoards<PIECE_NB, SQUARE_NB> PieceToBoards;
+
+/// CapturePieceToBoards are addressed by a move's [piece][to][captured piece type] information
+typedef StatCubes<PIECE_NB, SQUARE_NB, PIECE_TYPE_NB> CapturePieceToBoards;
+
+/// ButterflyHistory records how often quiet moves have been successful or
+/// unsuccessful during the current search, and is used for reduction and move
+/// ordering decisions. It uses ButterflyBoards as backing store.
+struct ButterflyHistory : public ButterflyBoards {
+
+  void update(Color c, Move m, int bonus) {
+    StatBoards::update((*this)[c][from_to(m)], bonus, 324);
+  }
+};
+
+/// PieceToHistory is like ButterflyHistory, but is based on PieceToBoards
+struct PieceToHistory : public PieceToBoards {
+
+  void update(Piece pc, Square to, int bonus) {
+    StatBoards::update((*this)[pc][to], bonus, 936);
+  }
+};
+
+/// CapturePieceToHistory is like PieceToHistory, but is based on CapturePieceToBoards
+struct CapturePieceToHistory : public CapturePieceToBoards {
+
+  void update(Piece pc, Square to, PieceType captured, int bonus) {
+    StatCubes::update((*this)[pc][to][captured], bonus, 324, 2);
+  }
+};
+
+/// CounterMoveHistory stores counter moves indexed by [piece][to] of the previous
+/// move, see chessprogramming.wikispaces.com/Countermove+Heuristic
+typedef StatBoards<PIECE_NB, SQUARE_NB, Move> CounterMoveHistory;
+
+/// ContinuationHistory is the history of a given pair of moves, usually the
+/// current one given a previous one. History table is based on PieceToBoards
+/// instead of ButterflyBoards.
+typedef StatBoards<PIECE_NB, SQUARE_NB, PieceToHistory> ContinuationHistory;
 
 
 /// MovePicker class is used to pick one pseudo legal move at a time from the
@@ -92,17 +120,14 @@ typedef Stats<CounterMoveStats> CounterMoveHistoryStats;
 /// when MOVE_NONE is returned. In order to improve the efficiency of the alpha
 /// beta algorithm, MovePicker attempts to return the moves which are most likely
 /// to get a cut-off first.
-namespace Search { struct Stack; }
 
 class MovePicker {
 public:
   MovePicker(const MovePicker&) = delete;
   MovePicker& operator=(const MovePicker&) = delete;
-
-  MovePicker(const Position&, Move, Value);
-  MovePicker(const Position&, Move, Depth, Square);
-  MovePicker(const Position&, Move, Depth, Search::Stack*);
-
+  MovePicker(const Position&, Move, Value, const CapturePieceToHistory*);
+  MovePicker(const Position&, Move, Depth, const ButterflyHistory*,  const CapturePieceToHistory*, Square);
+  MovePicker(const Position&, Move, Depth, const ButterflyHistory*, const CapturePieceToHistory*, const PieceToHistory**, Move, Move*);
   Move next_move(bool skipQuiets = false);
 
 private:
@@ -111,14 +136,15 @@ private:
   ExtMove* end() { return endMoves; }
 
   const Position& pos;
-  const Search::Stack* ss;
-  Move countermove;
-  Depth depth;
-  Move ttMove;
+  const ButterflyHistory* mainHistory;
+  const CapturePieceToHistory* captureHistory;
+  const PieceToHistory** contHistory;
+  Move ttMove, countermove, killers[2];
+  ExtMove *cur, *endMoves, *endBadCaptures;
+  int stage;
   Square recaptureSquare;
   Value threshold;
-  int stage;
-  ExtMove *cur, *endMoves, *endBadCaptures;
+  Depth depth;
   ExtMove moves[MAX_MOVES];
 };
 
