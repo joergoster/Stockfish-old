@@ -661,7 +661,21 @@ namespace {
     if (skipEarlyPruning)
         goto moves_loop;
 
-    // Step 6. ProbCut (skipped when in check)
+    // Step 6. Razoring (skipped when in check)
+    if (   !PvNode
+        &&  depth < 4 * ONE_PLY
+        &&  eval + razor_margin[depth / ONE_PLY] <= alpha)
+    {
+        if (depth <= ONE_PLY)
+            return qsearch<NonPV, false>(pos, ss, alpha, alpha+1);
+
+        Value ralpha = alpha - razor_margin[depth / ONE_PLY];
+        Value v = qsearch<NonPV, false>(pos, ss, ralpha, ralpha+1);
+        if (v <= ralpha)
+            return v;
+    }
+
+    // Step 7. ProbCut (skipped when in check)
     // If we have a good enough capture and a reduced search returns a value
     // much above beta, we can (almost) safely prune the previous move.
     if (   !PvNode
@@ -689,29 +703,7 @@ namespace {
             }
     }
 
-    // Step 7. Futility pruning: child node (skipped when in check)
-    if (   !rootNode
-        &&  depth < 7 * ONE_PLY
-        &&  eval - futility_margin(depth) >= beta
-        &&  eval < VALUE_KNOWN_WIN  // Do not return unproven wins
-        &&  pos.non_pawn_material(pos.side_to_move()))
-        return eval;
-
-    // Step 8. Razoring (skipped when in check)
-    if (   !PvNode
-        &&  depth < 4 * ONE_PLY
-        &&  eval + razor_margin[depth / ONE_PLY] <= alpha)
-    {
-        if (depth <= ONE_PLY)
-            return qsearch<NonPV, false>(pos, ss, alpha, alpha+1);
-
-        Value ralpha = alpha - razor_margin[depth / ONE_PLY];
-        Value v = qsearch<NonPV, false>(pos, ss, ralpha, ralpha+1);
-        if (v <= ralpha)
-            return v;
-    }
-
-    // Step 9. Null move search with verification search (is omitted in PV nodes)
+    // Step 8. Null move search with verification search (is omitted in PV nodes)
     if (   !PvNode
         &&  eval >= beta
         &&  ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
@@ -748,6 +740,14 @@ namespace {
                 return nullValue;
         }
     }
+
+    // Step 9. Futility pruning: child node (skipped when in check)
+    if (   !rootNode
+        &&  depth < 7 * ONE_PLY
+        &&  eval - futility_margin(depth) >= beta
+        &&  eval < VALUE_KNOWN_WIN  // Do not return unproven wins
+        &&  pos.non_pawn_material(pos.side_to_move()))
+        return eval;
 
     // Step 10. Internal iterative deepening (skipped when in check)
     if (    depth >= 6 * ONE_PLY
