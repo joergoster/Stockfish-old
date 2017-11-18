@@ -53,11 +53,18 @@ namespace {
     { 101,  100, -37,   141,  268,    0 }  // Queen
   };
 
+  // PawnSet[pawn count] contains a bonus/malus indexed by number of pawns
+  int PawnSet[] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0
+  };
+
   // QueenMinorsImbalance[opp_minor_count] is applied when only one side has a queen.
   // It contains a bonus/malus for the side with the queen.
   const int QueenMinorsImbalance[13] = {
     31, -8, -15, -25, -5
   };
+
+  TUNE(SetRange(-1000, 1000), PawnSet);
 
   // Endgame evaluation and scaling functions are accessed directly and not through
   // the function maps because they correspond to more than one material hash key.
@@ -95,7 +102,7 @@ namespace {
 
     const Color Them = (Us == WHITE ? BLACK : WHITE);
 
-    int bonus = 0;
+ int bonus = PawnSet[pieceCount[Us][PAWN]];
 
     // Second-degree polynomial material imbalance, by Tord Romstad
     for (int pt1 = NO_PIECE_TYPE; pt1 <= QUEEN; ++pt1)
