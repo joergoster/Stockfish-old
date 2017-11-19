@@ -383,7 +383,7 @@ ScaleFactor Endgame<KBPsK>::operator()(const Position& pos) const {
       }
   }
 
-  return SCALE_FACTOR_NONE;
+  return SCALE_FACTOR_NORMAL;
 }
 
 
@@ -654,7 +654,7 @@ ScaleFactor Endgame<KBPKB>::operator()(const Position& pos) const {
           && distance(weakBishopSq, pawnSq) >= 3)
           return SCALE_FACTOR_DRAW;
   }
-  return SCALE_FACTOR_NONE;
+  return SCALE_FACTOR_NORMAL;
 }
 
 
@@ -669,7 +669,7 @@ ScaleFactor Endgame<KBPPKB>::operator()(const Position& pos) const {
   Square bbsq = pos.square<BISHOP>(weakSide);
 
   if (!opposite_colors(wbsq, bbsq))
-      return SCALE_FACTOR_NONE;
+      return SCALE_FACTOR_NORMAL;
 
   Square ksq = pos.square<KING>(weakSide);
   Square psq1 = pos.squares<PAWN>(strongSide)[0];
@@ -699,7 +699,7 @@ ScaleFactor Endgame<KBPPKB>::operator()(const Position& pos) const {
         && opposite_colors(ksq, wbsq))
         return SCALE_FACTOR_DRAW;
     else
-        return SCALE_FACTOR_NONE;
+        return SCALE_FACTOR_NORMAL;
 
   case 1:
     // Pawns on adjacent files. It's a draw if the defender firmly controls the
@@ -718,11 +718,11 @@ ScaleFactor Endgame<KBPPKB>::operator()(const Position& pos) const {
                  || (pos.attacks_from<BISHOP>(blockSq1) & pos.pieces(weakSide, BISHOP))))
         return SCALE_FACTOR_DRAW;
     else
-        return SCALE_FACTOR_NONE;
+        return SCALE_FACTOR_NORMAL;
 
   default:
     // The pawns are not on the same file or adjacent files. No scaling.
-    return SCALE_FACTOR_NONE;
+    return SCALE_FACTOR_NORMAL;
   }
 }
 
@@ -746,7 +746,7 @@ ScaleFactor Endgame<KBPKN>::operator()(const Position& pos) const {
           || relative_rank(strongSide, weakKingSq) <= RANK_6))
       return SCALE_FACTOR_DRAW;
 
-  return SCALE_FACTOR_NONE;
+  return SCALE_FACTOR_NORMAL;
 }
 
 
