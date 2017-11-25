@@ -518,7 +518,7 @@ namespace {
 
     assert(-VALUE_INFINITE <= alpha && alpha < beta && beta <= VALUE_INFINITE);
     assert(PvNode || (alpha == beta - 1));
-    assert(depth > DEPTH_ZERO);
+    assert(DEPTH_ZERO < depth && depth < DEPTH_MAX);
 
     Move pv[MAX_PLY+1], quietsSearched[64];
     StateInfo st;
