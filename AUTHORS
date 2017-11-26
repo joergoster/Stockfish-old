@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Generated with git shortlog -sn | cut -c8-', which sorts by commits (manually ordered the first four authors)
 
 Tord Romstad
@@ -27,41 +26,8 @@ Stefano80
 Tom Vijlbrief
 hxim
 snicolet
-=======
-# Generated with 'git shortlog -sn | cut -c8-', which sorts by commits, manually ordered the first four authors, merged duplicates
-
-Tord Romstad
-Marco Costalba (mcostalba)
-Joona Kiiski (zamar)
-Gary Linscott (glinscott)
-Lucas Braesch (lucasart)
-Bill Henry (VoyagerOne)
-mstembera
-Stéphane Nicolet (Stephane Nicolet, snicolet)
-Stefan Geschwentner
-Alain SAVARD (Rocky640)
-Jörg Oster (Joerg Oster, joergoster)
-Reuven Peleg
-Chris Caino (Chris Cain, ceebo)
-Jean-Francois Romang
-homoSapiensSapiens
-Leonid Pechenik
-Stefano Cardanobile (Stefano80)
-Arjun Temurnikar
-Uri Blass (uriblass)
-jundery
-Ajith (ajithcj)
-hxim
-Ralph Stößer (Ralph Stoesser)
-Guenther Demetz
-Jonathan Calovski (Mysseno)
-Tom Vijlbrief
-mbootsector
->>>>>>> always_imb
 Daylen Yang
-ElbertoOne
 Henri Wiechers
-<<<<<<< HEAD
 Jonathan Calovski
 mbootsector
 David Zar
@@ -69,21 +35,11 @@ Eelco de Groot
 Jerry Donald
 Joerg Oster
 Jörg Oster
-=======
-loco-loco
-Joost VandeVondele (Joost Vandevondele)
-Ronald de Man (syzygy)
-DU-jdto
-David Zar
-Eelco de Groot
-Jerry Donald
-NicklasPersson
->>>>>>> always_imb
 Ryan Schmitt
+mcostalba
 Alexander Kure
 Dan Schmidt
 H. Felix Wittmann
-<<<<<<< HEAD
 Joseph R. Prostko
 Justin Blanchard
 Linus Arver
@@ -102,30 +58,10 @@ Auguste Pop
 Balint Pfliegel
 Chris Cain
 DU-jdto
-=======
-Jacques
-Joseph R. Prostko
-Justin Blanchard
-Linus Arver
-Luca Brivio
-Lyudmil Antonov
-Rodrigo Exterckötter Tjäder
-Ron Britvich
-RyanTaker
-Vince Negri
-erbsenzaehler
-Joseph Hellis (jhellis3)
-shane31
-Andrew Grant
-Andy Duplain
-Auguste Pop
-Balint Pfliegel
->>>>>>> always_imb
 Dariusz Orzechowski
 DiscanX
 Ernesto Gatti
 Gregor Cramer
-<<<<<<< HEAD
 Guenther Demetz
 Hiraoka Takuya
 Hongzhi Cheng
@@ -134,57 +70,29 @@ Kelly Wilson
 Ken T Takusagawa
 Kojirion
 Luca Brivio
-=======
-Hiraoka Takuya (HiraokaTakuya)
-Hongzhi Cheng
-IIvec
-Kelly Wilson
-Ken T Takusagawa
-Kojirion
-Krgp
->>>>>>> always_imb
 Matt Sullivan
 Matthew Lai
 Matthew Sullivan
 Michel Van den Bergh
-<<<<<<< HEAD
 Mysseno
 Oskar Werkelin Ahlin
 Pablo Vazquez
 Pascal Romaret
 Ralph Stoesser
 Ralph St��er
-=======
-Niklas Fiekas
-Oskar Werkelin Ahlin
-Pablo Vazquez
-Pascal Romaret
->>>>>>> always_imb
 Raminder Singh
 Richard Lloyd
 Ryan Takker
 Stephane Nicolet
 Thanar2
 absimaldata
-<<<<<<< HEAD
 braich
-=======
-atumanian
-braich
-fanon
-gamander
->>>>>>> always_imb
 gguliash
 kinderchocolate
 loco-loco
 pellanda
-ppigazzini
 renouve
 sf-x
 thaspel
 unknown
-<<<<<<< HEAD
 uriblass
-=======
-
->>>>>>> always_imb

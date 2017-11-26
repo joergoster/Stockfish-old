@@ -2,11 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-<<<<<<< HEAD
   Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
-=======
-  Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
->>>>>>> always_imb
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -35,11 +31,12 @@
 #include "types.h"
 
 
-/// EndgameCode lists all supported endgame functions by corresponding codes
+/// EndgameType lists all supported endgames
 
-enum EndgameCode {
+enum EndgameType {
 
-  EVALUATION_FUNCTIONS,
+  // Evaluation functions
+
   KNNK,  // KNN vs K
   KXK,   // Generic "mate lone king" eval
   KBNK,  // KBN vs K
@@ -50,7 +47,10 @@ enum EndgameCode {
   KQKP,  // KQ vs KP
   KQKR,  // KQ vs KR
 
+
+  // Scaling functions
   SCALING_FUNCTIONS,
+
   KBPsK,   // KB and pawns vs K
   KQKRPs,  // KQ vs KR and pawns
   KRPKR,   // KRP vs KR
@@ -68,28 +68,30 @@ enum EndgameCode {
 
 /// Endgame functions can be of two types depending on whether they return a
 /// Value or a ScaleFactor.
-template<EndgameCode E> using
+template<EndgameType E> using
 eg_type = typename std::conditional<(E < SCALING_FUNCTIONS), Value, ScaleFactor>::type;
 
 
-/// Base and derived functors for endgame evaluation and scaling functions
+/// Base and derived templates for endgame evaluation and scaling functions
 
 template<typename T>
 struct EndgameBase {
 
-  explicit EndgameBase(Color c) : strongSide(c), weakSide(~c) {}
   virtual ~EndgameBase() = default;
+  virtual Color strong_side() const = 0;
   virtual T operator()(const Position&) const = 0;
-
-  const Color strongSide, weakSide;
 };
 
 
-template<EndgameCode E, typename T = eg_type<E>>
+template<EndgameType E, typename T = eg_type<E>>
 struct Endgame : public EndgameBase<T> {
 
-  explicit Endgame(Color c) : EndgameBase<T>(c) {}
-  T operator()(const Position&) const override;
+  explicit Endgame(Color c) : strongSide(c), weakSide(~c) {}
+  Color strong_side() const { return strongSide; }
+  T operator()(const Position&) const;
+
+private:
+  Color strongSide, weakSide;
 };
 
 
@@ -99,20 +101,14 @@ struct Endgame : public EndgameBase<T> {
 
 class Endgames {
 
-  template<typename T> using Ptr = std::unique_ptr<EndgameBase<T>>;
-  template<typename T> using Map = std::map<Key, Ptr<T>>;
+  template<typename T> using Map = std::map<Key, std::unique_ptr<EndgameBase<T>>>;
+
+  template<EndgameType E, typename T = eg_type<E>>
+  void add(const std::string& code);
 
   template<typename T>
   Map<T>& map() {
     return std::get<std::is_same<T, ScaleFactor>::value>(maps);
-  }
-
-  template<EndgameCode E, typename T = eg_type<E>, typename P = Ptr<T>>
-  void add(const std::string& code) {
-
-    StateInfo st;
-    map<T>()[Position().set(code, WHITE, &st).material_key()] = P(new Endgame<E>(WHITE));
-    map<T>()[Position().set(code, BLACK, &st).material_key()] = P(new Endgame<E>(BLACK));
   }
 
   std::pair<Map<Value>, Map<ScaleFactor>> maps;

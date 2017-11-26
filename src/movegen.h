@@ -2,11 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-<<<<<<< HEAD
   Copyright (C) 2015-2016 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
-=======
-  Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
->>>>>>> always_imb
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -25,8 +21,6 @@
 #ifndef MOVEGEN_H_INCLUDED
 #define MOVEGEN_H_INCLUDED
 
-#include <algorithm>
-
 #include "types.h"
 
 class Position;
@@ -42,14 +36,10 @@ enum GenType {
 
 struct ExtMove {
   Move move;
-  int value;
+  Value value;
 
   operator Move() const { return move; }
   void operator=(Move m) { move = m; }
-
-  // Inhibit unwanted implicit conversions to Move
-  // with an ambiguity that yields to a compile error.
-  operator float() const;
 };
 
 inline bool operator<(const ExtMove& f, const ExtMove& s) {
@@ -69,7 +59,8 @@ struct MoveList {
   const ExtMove* end() const { return last; }
   size_t size() const { return last - moveList; }
   bool contains(Move move) const {
-    return std::find(begin(), end(), move) != end();
+    for (const auto& m : *this) if (m == move) return true;
+    return false;
   }
 
 private:

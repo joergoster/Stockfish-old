@@ -1,10 +1,6 @@
 ### Overview
 
 [![Build Status](https://travis-ci.org/official-stockfish/Stockfish.svg?branch=master)](https://travis-ci.org/official-stockfish/Stockfish)
-<<<<<<< HEAD
-=======
-[![Build Status](https://ci.appveyor.com/api/projects/status/github/official-stockfish/Stockfish?svg=true)](https://ci.appveyor.com/project/mcostalba/stockfish)
->>>>>>> always_imb
 
 Stockfish is a free UCI chess engine derived from Glaurung 2.1. It is
 not a complete chess program and requires some UCI-compatible GUI
@@ -13,7 +9,7 @@ Partner or Fritz) in order to be used comfortably. Read the
 documentation for your GUI of choice for information about how to use
 Stockfish with it.
 
-This version of Stockfish supports up to 512 cores. The engine defaults
+This version of Stockfish supports up to 128 cores. The engine defaults
 to one search thread, so it is therefore recommended to inspect the value of
 the *Threads* UCI parameter, and to make sure it equals the number of CPU
 cores on your computer.
@@ -115,4 +111,4 @@ to where the source code can be found. If you make any changes to the
 source code, these changes must also be made available under the GPL.
 
 For full details, read the copy of the GPL found in the file named
-*Copying.txt*.
+*Copying.txt*
