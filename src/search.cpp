@@ -931,12 +931,9 @@ moves_loop: // When in check and at SpNode search starts from here
           if (   predictedDepth < 7 * ONE_PLY
               && ss->staticEval + futility_margin(predictedDepth) + 256 <= alpha)
           {
-                  if (SpNode)
-                  {
-                      splitPoint->spinlock.acquire();
-                      if (bestValue > splitPoint->bestValue)
-                          splitPoint->bestValue = bestValue;
-                  }
+              if (SpNode)
+                  splitPoint->spinlock.acquire();
+
               continue;
           }
 
