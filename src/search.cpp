@@ -1510,7 +1510,7 @@ string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
   int elapsed = Time.elapsed() + 1;
   const RootMoves& rootMoves = pos.this_thread()->rootMoves;
   size_t PVIdx = pos.this_thread()->PVIdx;
-  size_t multiPV = pos.this_thread()->multiPV;
+  size_t multiPV = std::min((size_t)Options["MultiPV"], rootMoves.size());
   uint64_t nodesSearched = Threads.nodes_searched();
   uint64_t tbHits = Threads.tb_hits() + (TB::RootInTB ? rootMoves.size() : 0);
 
