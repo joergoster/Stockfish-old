@@ -825,7 +825,7 @@ moves_loop: // When in check, search starts from here
                   : pos.gives_check(move);
 
       moveCountPruning =   depth < 16 * ONE_PLY
-                        && moveCount >= FutilityMoveCounts[improving][depth / ONE_PLY];
+                        && moveCount >= FutilityMoveCounts[improving][depth / ONE_PLY] + std::max(3 - (ss-1)->moveCount, 0);
 
       // Step 13. Extensions
 
