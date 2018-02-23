@@ -826,7 +826,7 @@ moves_loop: // When in check, search starts from here
 
       moveCountPruning =   depth < 16 * ONE_PLY
                         && moveCount >=  FutilityMoveCounts[improving][depth / ONE_PLY]
-                                       + std::max(10 - (ss-1)->moveCount, 0);
+                                       + ((ss-1)->moveCount == 1 ? 4 : (ss-1)->moveCount == 2 ? 2 : 0);
       // Step 13. Extensions
 
       // Singular extension search. If all moves but one fail low on a search
