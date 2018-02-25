@@ -200,9 +200,24 @@ void MainThread::search() {
   }
   else
   {
+      int n = 0; // th->idx not available
+
       for (Thread* th : Threads)
+      {
+          if (th->rootMoves.size() > 2 && th != this)
+          {
+              for (size_t i = 0 + (++n % 2); i < th->rootMoves.size(); ++i)
+                  th->rootMoves.erase(th->rootMoves.begin() + i);
+          }
+
+//          std::cerr << "Number of root moves: " << th->rootMoves.size() << std::endl;
+//          std::cerr << "n = " << n << std::endl;
+//          for (size_t i = 0; i < th->rootMoves.size(); ++i)
+//              std::cerr << UCI::move(th->rootMoves[i].pv[0], rootPos.is_chess960()) << std::endl;
+
           if (th != this)
               th->start_searching();
+      }
 
       Thread::search(); // Let's start searching!
   }
