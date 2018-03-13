@@ -286,6 +286,8 @@ void Thread::search() {
   Move  lastBestMove = MOVE_NONE;
   Depth lastBestMoveDepth = DEPTH_ZERO;
   MainThread* mainThread = (this == Threads.main() ? Threads.main() : nullptr);
+  int UCIct, ct;
+  double ps;
   double timeReduction = 1.0;
   Color us = rootPos.side_to_move();
 
@@ -309,9 +311,9 @@ void Thread::search() {
 
   multiPV = std::min(multiPV, rootMoves.size());
 
-  int ct = Options["Contempt"] * PawnValueEg / 100; // From centipawns
-  Eval::Contempt = (us == WHITE ?  make_score(ct, ct / 2)
-                                : -make_score(ct, ct / 2));
+  UCIct = Options["Contempt"] * PawnValueEg / 100; // From centipawns
+  Eval::Contempt = (us == WHITE ?  make_score(UCIct, UCIct / 2)
+                                : -make_score(UCIct, UCIct / 2));
 
   // Iterative deepening loop until requested to stop or the target depth is reached
   while (   (rootDepth += ONE_PLY) < DEPTH_MAX
@@ -335,6 +337,17 @@ void Thread::search() {
       for (RootMove& rm : rootMoves)
           rm.previousScore = rm.score;
 
+      // Calculate dynamic contempt based on the previous best score
+      if (rootDepth >= 5 * ONE_PLY)
+      {
+          ps = double(rootMoves[0].previousScore) / int(PawnValueEg);
+          ps = ps * ps;
+
+          ct = int((1 - (ps / (ps + 3))) * UCIct + 0.5);
+          Eval::Contempt = (us == WHITE ?  make_score(ct, ct / 2)
+                                        : -make_score(ct, ct / 2));
+      }
+
       // MultiPV loop. We perform a full root search for each PV line
       for (PVIdx = 0; PVIdx < multiPV && !Threads.stop; ++PVIdx)
       {
@@ -347,14 +360,6 @@ void Thread::search() {
               delta = Value(18);
               alpha = std::max(rootMoves[PVIdx].previousScore - delta,-VALUE_INFINITE);
               beta  = std::min(rootMoves[PVIdx].previousScore + delta, VALUE_INFINITE);
-
-              ct =  Options["Contempt"] * PawnValueEg / 100; // From centipawns
-
-              // Adjust contempt based on current bestValue (dynamic contempt)
-              ct += int(std::round(48 * atan(float(bestValue) / 128)));
-
-              Eval::Contempt = (us == WHITE ?  make_score(ct, ct / 2)
-                                            : -make_score(ct, ct / 2));
           }
 
           // Start with a small aspiration window and, in the case of a fail
