@@ -98,6 +98,8 @@ namespace {
     Move best = MOVE_NONE;
   };
 
+  Value DrawValue[COLOR_NB];
+
   template <NodeType NT>
   Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth, bool cutNode, bool skipEarlyPruning);
 
@@ -286,6 +288,8 @@ void Thread::search() {
   Move  lastBestMove = MOVE_NONE;
   Depth lastBestMoveDepth = DEPTH_ZERO;
   MainThread* mainThread = (this == Threads.main() ? Threads.main() : nullptr);
+  int UCIct, ct;
+  double ps;
   double timeReduction = 1.0;
   Color us = rootPos.side_to_move();
 
@@ -309,9 +313,11 @@ void Thread::search() {
 
   multiPV = std::min(multiPV, rootMoves.size());
 
-  int ct = Options["Contempt"] * PawnValueEg / 100; // From centipawns
-  Eval::Contempt = (us == WHITE ?  make_score(ct, ct / 2)
-                                : -make_score(ct, ct / 2));
+  UCIct = Options["Contempt"] * PawnValueEg / 100; // From centipawns
+  Eval::Contempt = (us == WHITE ?  make_score(UCIct, UCIct / 2)
+                                : -make_score(UCIct, UCIct / 2));
+  DrawValue[ us] = VALUE_DRAW - Value(UCIct / 2);
+  DrawValue[~us] = VALUE_DRAW + Value(UCIct / 2);
 
   // Iterative deepening loop until requested to stop or the target depth is reached
   while (   (rootDepth += ONE_PLY) < DEPTH_MAX
@@ -334,6 +340,21 @@ void Thread::search() {
       // all the move scores except the (new) PV are set to -VALUE_INFINITE.
       for (RootMove& rm : rootMoves)
           rm.previousScore = rm.score;
+
+      // Dynamic contempt based on the previous best score
+      if (rootDepth >= 5 * ONE_PLY)
+      {
+          ps = double(rootMoves[0].previousScore) / int(PawnValueEg);
+          ps = ps * ps;
+
+          ct = int((1 - (ps / (1.2 * ps + 4))) * UCIct + 0.5);
+
+          Eval::Contempt = (us == WHITE ?  make_score(ct, ct / 2)
+                                        : -make_score(ct, ct / 2));
+
+          DrawValue[ us] = VALUE_DRAW - Value(ct / 2);
+          DrawValue[~us] = VALUE_DRAW + Value(ct / 2);
+      }
 
       // MultiPV loop. We perform a full root search for each PV line
       for (PVIdx = 0; PVIdx < multiPV && !Threads.stop; ++PVIdx)
@@ -533,7 +554,8 @@ namespace {
         if (   Threads.stop.load(std::memory_order_relaxed)
             || pos.is_draw(ss->ply)
             || ss->ply >= MAX_PLY)
-            return (ss->ply >= MAX_PLY && !inCheck) ? evaluate(pos) : VALUE_DRAW;
+            return (ss->ply >= MAX_PLY && !inCheck) ? evaluate(pos)
+                                                    : DrawValue[pos.side_to_move()];
 
         // Step 3. Mate distance pruning. Even if we mate at the next move our score
         // would be at best mate_in(ss->ply+1), but if alpha is already bigger because
@@ -1114,7 +1136,7 @@ moves_loop: // When in check, search starts from here
 
     if (!moveCount)
         bestValue = excludedMove ? alpha
-                   :     inCheck ? mated_in(ss->ply) : VALUE_DRAW;
+                   :     inCheck ? mated_in(ss->ply) : DrawValue[pos.side_to_move()];
     else if (bestMove)
     {
         // Quiet best move: update move sorting heuristics
@@ -1185,7 +1207,8 @@ moves_loop: // When in check, search starts from here
     // Check for an immediate draw or maximum ply reached
     if (   pos.is_draw(ss->ply)
         || ss->ply >= MAX_PLY)
-        return (ss->ply >= MAX_PLY && !inCheck) ? evaluate(pos) : VALUE_DRAW;
+        return (ss->ply >= MAX_PLY && !inCheck) ? evaluate(pos)
+                                                : DrawValue[pos.side_to_move()];
 
     assert(0 <= ss->ply && ss->ply < MAX_PLY);
 
