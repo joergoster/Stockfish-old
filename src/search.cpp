@@ -343,7 +343,7 @@ void Thread::search() {
           ps = double(rootMoves[0].previousScore) / int(PawnValueEg);
           ps = ps * ps;
 
-          ct = int((1 - (ps / (ps + 3))) * UCIct + 0.5);
+          ct = int((1 - (ps / (1.2 * ps + 4))) * UCIct + 0.5);
           Eval::Contempt = (us == WHITE ?  make_score(ct, ct / 2)
                                         : -make_score(ct, ct / 2));
       }
