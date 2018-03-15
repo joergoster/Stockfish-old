@@ -98,6 +98,9 @@ namespace {
   const int BishopSafeCheck = 435;
   const int KnightSafeCheck = 790;
 
+  int cx_factor[6] = { 8, 8, 12, 16, 48, 136};
+  TUNE(SetRange(0, 2000), cx_factor);
+
 #define S(mg, eg) make_score(mg, eg)
 
   // MobilityBonus[PieceType-2][attacked] contains bonuses for middle and end game,
@@ -761,12 +764,12 @@ namespace {
                             && (pos.pieces(PAWN) & KingSide);
 
     // Compute the initiative bonus for the attacking side
-    int complexity =   8 * outflanking
-                    +  8 * pe->pawn_asymmetry()
-                    + 12 * pos.count<PAWN>()
-                    + 16 * pawnsOnBothFlanks
-                    + 48 * !pos.non_pawn_material()
-                    -136 ;
+    int complexity =  cx_factor[0] * outflanking
+                    + cx_factor[1] * pe->pawn_asymmetry()
+                    + cx_factor[2] * pos.count<PAWN>()
+                    + cx_factor[3] * pawnsOnBothFlanks
+                    + cx_factor[4] * !pos.non_pawn_material()
+                    - cx_factor[5] ;
 
     // Now apply the bonus: note that we find the attacking side by extracting
     // the sign of the endgame value, and that we carefully cap the bonus so
