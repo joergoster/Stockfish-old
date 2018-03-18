@@ -776,6 +776,7 @@ namespace {
             {
                 probCutCount++;
 
+                prefetch(TT.first_entry(pos.key_after(move)));
                 ss->currentMove = move;
                 ss->contHistory = thisThread->contHistory[pos.moved_piece(move)][to_sq(move)].get();
 
