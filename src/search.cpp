@@ -204,7 +204,13 @@ void MainThread::search() {
   {
       rootMoves.emplace_back(MOVE_NONE);
       sync_cout << "info depth 0 score "
-                << UCI::value(rootPos.checkers() ? -VALUE_MATE : VALUE_DRAW)
+                << UCI::value(rootPos.checkers() && (rootPos.rule50_count() <= 100 || !Options["Syzygy50MoveRule"]) ? -VALUE_MATE : VALUE_DRAW)
+                << sync_endl;
+  }
+  else if (TB::UseRule50 && rootPos.rule50_count() >= 100)
+  {
+      sync_cout << "info depth 0 score "
+                << UCI::value(VALUE_DRAW)
                 << sync_endl;
   }
   else

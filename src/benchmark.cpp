@@ -81,6 +81,17 @@ const vector<string> Defaults = {
   "8/8/8/8/8/6k1/6p1/6K1 w - -",
   "7k/7P/6K1/8/3B4/8/8/8 b - -",
 
+  // Mated just within 50-move rule
+  "1R3k2/8/5K2/8/8/8/8/8 b - - 100 168",
+
+  // Mated after 50-move rule (Draw!)
+  "1R3k2/8/5K2/8/8/8/8/8 b - - 101 169",
+
+  // Mated after 50-move rule, but with 50-move rule switched off (Mate!)
+  "setoption name Syzygy50MoveRule value false",
+  "1R3k2/8/5K2/8/8/8/8/8 b - - 101 169",
+  "setoption name Syzygy50MoveRule value true",
+
   // Chess 960
   "setoption name UCI_Chess960 value true",
   "bbqnnrkr/pppppppp/8/8/8/8/PPPPPPPP/BBQNNRKR w KQkq - 0 1 moves g2g3 d7d5 d2d4 c8h3 c1g5 e8d6 g5e7 f7f6",
