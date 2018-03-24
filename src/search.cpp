@@ -97,6 +97,8 @@ namespace {
     Move best = MOVE_NONE;
   };
 
+  bool doNull;
+
   template <NodeType NT>
   Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth, bool cutNode, bool skipEarlyPruning);
 
@@ -304,6 +306,7 @@ void Thread::search() {
   if (mainThread)
       mainThread->bestMoveChanges = 0, mainThread->failedLow = false;
 
+  doNull = Options["NullMove"];
   size_t multiPV = Options["MultiPV"];
   Skill skill(Options["Skill Level"]);
 
@@ -708,7 +711,8 @@ namespace {
         return eval;
 
     // Step 9. Null move search with verification search
-    if (   !PvNode
+    if (    doNull
+        && !PvNode
         &&  eval >= beta
         &&  ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
         && (ss->ply >= thisThread->nmp_ply || ss->ply % 2 != thisThread->nmp_odd))
