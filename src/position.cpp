@@ -939,6 +939,8 @@ void Position::do_null_move(StateInfo& newSt) {
   assert(!checkers());
   assert(&newSt != st);
 
+  thisThread->nodes.fetch_add(1, std::memory_order_relaxed);
+
   std::memcpy(&newSt, st, sizeof(StateInfo));
   newSt.previous = st;
   st = &newSt;
