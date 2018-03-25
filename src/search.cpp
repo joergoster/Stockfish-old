@@ -307,7 +307,7 @@ void Thread::search() {
       mainThread->bestMoveChanges = 0, mainThread->failedLow = false;
 
   doNull = Options["NullMove"];
-  size_t multiPV = Options["MultiPV"];
+  multiPV = Options["MultiPV"];
   Skill skill(Options["Skill Level"]);
 
   // When playing with strength handicap enable MultiPV search that we will
@@ -378,7 +378,8 @@ void Thread::search() {
               // and we want to keep the same order for all the moves except the
               // new PV that goes to the front. Note that in case of MultiPV
               // search the already searched PV lines are preserved.
-              std::stable_sort(rootMoves.begin() + PVIdx, rootMoves.end());
+              if (PVIdx + 1 == multiPV)
+                  std::stable_sort(rootMoves.begin() + PVIdx, rootMoves.end());
 
               // If search has been stopped, we break immediately. Sorting is
               // safe because RootMoves is still valid, although it refers to
@@ -835,12 +836,20 @@ moves_loop: // When in check, search starts from here
       if (move == excludedMove)
           continue;
 
-      // At root obey the "searchmoves" option and skip moves not listed in Root
-      // Move List. As a consequence any illegal move is also skipped. In MultiPV
-      // mode we also skip PV moves which have been already searched.
-      if (rootNode && !std::count(thisThread->rootMoves.begin() + thisThread->PVIdx,
-                                  thisThread->rootMoves.end(), move))
-          continue;
+      if (rootNode)
+      {
+          // At root obey the "searchmoves" option and skip moves not listed in
+          // Root Move List. As a consequence, any illegal move is also skipped.
+          if (!std::count(thisThread->rootMoves.begin() + thisThread->PVIdx,
+                          thisThread->rootMoves.end(), move))
+              continue;
+
+          // In MultiPV mode we not only skip PV moves which have already been
+          // searched, but also any other move except for the last PV line.
+          if (   thisThread->PVIdx + 1 < thisThread->multiPV
+              && move != ttMove)
+              continue;
+      }
 
       ss->moveCount = ++moveCount;
 
