@@ -22,7 +22,7 @@
 ### ==========================================================================
 
 ### Executable name
-EXE = stockfish
+EXE = zander
 
 ### Installation dir definitions
 PREFIX = /usr/local
@@ -357,7 +357,7 @@ endif
 
 help:
 	@echo ""
-	@echo "To compile stockfish, type: "
+	@echo "To compile zander, type: "
 	@echo ""
 	@echo "make target ARCH=arch [COMP=compiler] [COMPCXX=cxx]"
 	@echo ""
