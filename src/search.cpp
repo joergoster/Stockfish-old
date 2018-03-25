@@ -1181,24 +1181,28 @@ moves_loop: // When in check, search starts from here
     bool ttHit, inCheck, givesCheck, evasionPrunable;
     int moveCount;
 
+    inCheck = bool(pos.checkers());
+
+    // Check for an immediate draw
+    if (pos.is_draw(ss->ply))
+        return VALUE_DRAW;
+
+    // Check for maximum ply reached
+    if (ss->ply >= MAX_PLY)
+        return !inCheck ? evaluate(pos) : beta;
+
+    assert(0 <= ss->ply && ss->ply < MAX_PLY);
+
+    (ss+1)->ply = ss->ply + 1;
+    ss->currentMove = bestMove = MOVE_NONE;
+    moveCount = 0;
+
     if (PvNode)
     {
         oldAlpha = alpha; // To flag BOUND_EXACT when eval above alpha and no available moves
         (ss+1)->pv = pv;
         ss->pv[0] = MOVE_NONE;
     }
-
-    (ss+1)->ply = ss->ply + 1;
-    ss->currentMove = bestMove = MOVE_NONE;
-    inCheck = bool(pos.checkers());
-    moveCount = 0;
-
-    // Check for an immediate draw or maximum ply reached
-    if (   pos.is_draw(ss->ply)
-        || ss->ply >= MAX_PLY)
-        return (ss->ply >= MAX_PLY && !inCheck) ? evaluate(pos) : VALUE_DRAW;
-
-    assert(0 <= ss->ply && ss->ply < MAX_PLY);
 
     // Decide whether or not to include checks: this fixes also the type of
     // TT entry depth that we are going to use. Note that in qsearch we use
@@ -1234,7 +1238,8 @@ moves_loop: // When in check, search starts from here
                 ss->staticEval = bestValue = evaluate(pos);
 
             // Can ttValue be used as a better position evaluation?
-            if (   ttValue != VALUE_NONE
+            if (   !PvNode
+                &&  ttValue != VALUE_NONE
                 && (tte->bound() & (ttValue > bestValue ? BOUND_LOWER : BOUND_UPPER)))
                 bestValue = ttValue;
         }
