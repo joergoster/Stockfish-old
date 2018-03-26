@@ -34,23 +34,23 @@ namespace {
   constexpr int QuadraticOurs[][PIECE_TYPE_NB] = {
     //            OUR PIECES
     // pair pawn knight bishop rook queen
-    {1667                               }, // Bishop pair
-    {  40,    0                         }, // Pawn
-    {  32,  255,  -3                    }, // Knight      OUR PIECES
-    {   0,  104,   4,    0              }, // Bishop
-    { -26,   -2,  47,   105,  -149      }, // Rook
-    {-189,   24, 117,   133,  -134, -10 }  // Queen
+    { 834                               }, // Bishop pair
+    {  20,    0                         }, // Pawn
+    {  16,  128,  -2                    }, // Knight      OUR PIECES
+    {   0,   52,   2,    0              }, // Bishop
+    { -13,   -1,  24,    53,   -75      }, // Rook
+    { -93,   12,  59,    67,   -67,  -5 }  // Queen
   };
 
   constexpr int QuadraticTheirs[][PIECE_TYPE_NB] = {
     //           THEIR PIECES
     // pair pawn knight bishop rook queen
     {   0                               }, // Bishop pair
-    {  36,    0                         }, // Pawn
-    {   9,   63,   0                    }, // Knight      OUR PIECES
-    {  59,   65,  42,     0             }, // Bishop
-    {  46,   39,  24,   -24,    0       }, // Rook
-    {  97,  100, -42,   137,  268,    0 }  // Queen
+    {  18,    0                         }, // Pawn
+    {   5,   32,   0                    }, // Knight      OUR PIECES
+    {  30,   33,  21,     0             }, // Bishop
+    {  23,   20,  12,   -12,    0       }, // Rook
+    {  49,   50, -21,    69,  134,    0 }  // Queen
   };
 
   // Endgame evaluation and scaling functions are accessed directly and not through
@@ -77,7 +77,7 @@ namespace {
   bool is_KQKRPs(const Position& pos, Color us) {
     return  !pos.count<PAWN>(us)
           && pos.non_pawn_material(us) == QueenValueMg
-          && pos.count<QUEEN>(us)  == 1
+          && pos.count<QUEEN>(us) == 1
           && pos.count<ROOK>(~us) == 1
           && pos.count<PAWN>(~us) >= 1;
   }
@@ -155,14 +155,14 @@ Entry* probe(const Position& pos) {
   // for the bishop pair "extended piece", which allows us to be more flexible
   // in defining bishop pair bonuses.
   const int pieceCount[COLOR_NB][PIECE_TYPE_NB] = {
-  { pos.count<BISHOP>(WHITE) > 1, pos.count<PAWN>(WHITE), pos.count<KNIGHT>(WHITE),
-    pos.count<BISHOP>(WHITE)    , pos.count<ROOK>(WHITE), pos.count<QUEEN >(WHITE) },
-  { pos.count<BISHOP>(BLACK) > 1, pos.count<PAWN>(BLACK), pos.count<KNIGHT>(BLACK),
-    pos.count<BISHOP>(BLACK)    , pos.count<ROOK>(BLACK), pos.count<QUEEN >(BLACK) } };
+  { pos.bishop_pair(WHITE)  , pos.count<PAWN>(WHITE), pos.count<KNIGHT>(WHITE),
+    pos.count<BISHOP>(WHITE), pos.count<ROOK>(WHITE), pos.count<QUEEN >(WHITE) },
+  { pos.bishop_pair(BLACK)  , pos.count<PAWN>(BLACK), pos.count<KNIGHT>(BLACK),
+    pos.count<BISHOP>(BLACK), pos.count<ROOK>(BLACK), pos.count<QUEEN >(BLACK) } };
 
-  e->value = int16_t((imbalance<WHITE>(pieceCount) - imbalance<BLACK>(pieceCount)) / 16);
+  e->value = int16_t((imbalance<WHITE>(pieceCount) - imbalance<BLACK>(pieceCount)) / 8);
 
-  // We didn't find any special evaluation function for the current material
+  // OK, we didn't find any special evaluation function for the current material
   // configuration. Is there a suitable specialized scaling function?
   EndgameBase<ScaleFactor>* sf;
 
