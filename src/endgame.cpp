@@ -91,7 +91,6 @@ namespace {
 Endgames::Endgames() {
 
   add<KPK>("KPK");
-  add<KNNK>("KNNK");
   add<KBNK>("KBNK");
   add<KRKP>("KRKP");
   add<KRKB>("KRKB");
@@ -124,20 +123,24 @@ Value Endgame<KXK>::operator()(const Position& pos) const {
   if (pos.side_to_move() == weakSide && !MoveList<LEGAL>(pos).size())
       return VALUE_DRAW;
 
-  Square winnerKSq = pos.square<KING>(strongSide);
-  Square loserKSq = pos.square<KING>(weakSide);
+  // Draw detection with 2 knights or 2 and more bishops of the same color
+  if (   ((pos.count<KNIGHT>(strongSide) == 2 && !pos.count<BISHOP>(strongSide))
+      || (!pos.bishop_pair(strongSide) && !pos.count<KNIGHT>(strongSide)))
+      &&  !pos.count<PAWN  >(strongSide)
+      &&  !pos.count<ROOK  >(strongSide)
+      &&  !pos.count<QUEEN >(strongSide))
+      return VALUE_DRAW;
 
-  Value result =  pos.non_pawn_material(strongSide)
+  Square winnerKSq = pos.square<KING>(strongSide);
+  Square  loserKSq = pos.square<KING>(weakSide);
+
+  Value result =  VALUE_KNOWN_WIN
+                + pos.non_pawn_material(strongSide)
                 + pos.count<PAWN>(strongSide) * PawnValueEg
                 + PushToEdges[loserKSq]
                 + PushClose[distance(winnerKSq, loserKSq)];
 
-  if (   pos.count<QUEEN>(strongSide)
-      || pos.count<ROOK>(strongSide)
-      ||(pos.count<BISHOP>(strongSide) && pos.count<KNIGHT>(strongSide))
-      || (   (pos.pieces(strongSide, BISHOP) & ~DarkSquares)
-          && (pos.pieces(strongSide, BISHOP) &  DarkSquares)))
-      result = std::min(result + VALUE_KNOWN_WIN, VALUE_MATE_IN_MAX_PLY - 1);
+  result = std::min(result, VALUE_MATE_IN_MAX_PLY - 1);
 
   return strongSide == pos.side_to_move() ? result : -result;
 }
@@ -165,6 +168,7 @@ Value Endgame<KBNK>::operator()(const Position& pos) const {
   }
 
   Value result =  VALUE_KNOWN_WIN
+                + pos.non_pawn_material(strongSide)
                 + PushClose[distance(winnerKSq, loserKSq)]
                 + PushToCorners[loserKSq];
 
@@ -263,6 +267,7 @@ Value Endgame<KRKN>::operator()(const Position& pos) const {
 
   Square bksq = pos.square<KING>(weakSide);
   Square bnsq = pos.square<KNIGHT>(weakSide);
+
   Value result = Value(PushToEdges[bksq] + PushAway[distance(bksq, bnsq)]);
   return strongSide == pos.side_to_move() ? result : -result;
 }
@@ -315,9 +320,7 @@ Value Endgame<KQKR>::operator()(const Position& pos) const {
 }
 
 
-/// Some cases of trivial draws
-template<> Value Endgame<KNNK>::operator()(const Position&) const { return VALUE_DRAW; }
-
+/// Scaling functions ///
 
 /// KB and one or more pawns vs K. It checks for draws with rook pawns and
 /// a bishop of the wrong color. If such a draw is detected, SCALE_FACTOR_DRAW
