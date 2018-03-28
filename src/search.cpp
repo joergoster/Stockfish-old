@@ -300,7 +300,8 @@ void Thread::search() {
   for (int i = 4; i > 0; i--)
      (ss-i)->contHistory = this->contHistory[NO_PIECE][0].get(); // Use as sentinel
 
-  bestValue = delta = alpha = -VALUE_INFINITE;
+  bestValue = alpha = -VALUE_INFINITE;
+  delta = VALUE_ZERO;
   beta = VALUE_INFINITE;
 
   if (mainThread)
@@ -346,8 +347,9 @@ void Thread::search() {
       // MultiPV loop. We perform a full root search for each PV line
       for (PVIdx = 0; PVIdx < multiPV && !Threads.stop; ++PVIdx)
       {
-          // Reset UCI info selDepth for each depth and each PV line
+          // Reset UCI info selDepth and bestValue for each depth and each PV line
           selDepth = 1;
+          bestValue = -VALUE_INFINITE;
 
           // Reset aspiration window starting size
           if (rootDepth >= 5 * ONE_PLY)
@@ -413,6 +415,7 @@ void Thread::search() {
 
               delta += delta / 4 + 5;
 
+              assert(delta >= VALUE_ZERO);
               assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE);
           }
 
@@ -1643,7 +1646,7 @@ void Tablebases::filter_root_moves(Position& pos, Search::RootMoves& rootMoves) 
         ProbeDepth = DEPTH_ZERO;
     }
 
-    if (Cardinality < popcount(pos.pieces()) || pos.can_castle(ANY_CASTLING))
+    if (Cardinality < pos.count<ALL_PIECES>() || pos.can_castle(ANY_CASTLING))
         return;
 
     // Don't filter any moves if the user requested analysis on multiple
