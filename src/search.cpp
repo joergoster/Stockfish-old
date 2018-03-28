@@ -290,7 +290,7 @@ void Thread::search() {
 
   Stack stack[MAX_PLY+7], *ss = stack+4; // To reference from (ss-4) to (ss+2)
   Value bestValue, alpha, beta, delta;
-  Move  lastBestMove = MOVE_NONE;
+  Move lastBestMove = MOVE_NONE;
   Depth lastBestMoveDepth = DEPTH_ZERO;
   MainThread* mainThread = (this == Threads.main() ? Threads.main() : nullptr);
   double timeReduction = 1.0;
@@ -301,8 +301,8 @@ void Thread::search() {
      (ss-i)->contHistory = this->contHistory[NO_PIECE][0].get(); // Use as sentinel
 
   bestValue = alpha = -VALUE_INFINITE;
-  delta = VALUE_ZERO;
   beta = VALUE_INFINITE;
+  delta = VALUE_ZERO;
 
   if (mainThread)
       mainThread->bestMoveChanges = 0, mainThread->failedLow = false;
@@ -699,7 +699,9 @@ namespace {
     improving =   ss->staticEval >= (ss-2)->staticEval
                ||(ss-2)->staticEval == VALUE_NONE;
 
-    if (skipEarlyPruning || !pos.non_pawn_material(pos.side_to_move()))
+    if (    skipEarlyPruning
+        ||  thisThread->rootDepth < 7 * ONE_PLY
+        || !pos.non_pawn_material(pos.side_to_move()))
         goto moves_loop;
 
     // Step 7. Razoring (skipped when in check)
@@ -906,8 +908,10 @@ moves_loop: // When in check, search starts from here
 
       // Step 14. Pruning at shallow depth
       if (  !rootNode
+          && thisThread->rootDepth > 6 * ONE_PLY
           && pos.non_pawn_material(pos.side_to_move())
-          && bestValue > VALUE_MATED_IN_MAX_PLY)
+          && bestValue > VALUE_MATED_IN_MAX_PLY
+          && beta < VALUE_MATE_IN_MAX_PLY)
       {
           if (   !captureOrPromotion
               && !givesCheck
