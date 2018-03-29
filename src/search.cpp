@@ -1204,6 +1204,13 @@ moves_loop: // When in check, search starts from here
     bool ttHit, inCheck, givesCheck, evasionPrunable;
     int moveCount;
 
+    if (PvNode)
+    {
+        oldAlpha = alpha; // To flag BOUND_EXACT when eval above alpha and no available moves
+        (ss+1)->pv = pv;
+        ss->pv[0] = MOVE_NONE;
+    }
+
     inCheck = bool(pos.checkers());
 
     // Check for draw by repetition
@@ -1219,13 +1226,6 @@ moves_loop: // When in check, search starts from here
     (ss+1)->ply = ss->ply + 1;
     ss->currentMove = bestMove = MOVE_NONE;
     moveCount = 0;
-
-    if (PvNode)
-    {
-        oldAlpha = alpha; // To flag BOUND_EXACT when eval above alpha and no available moves
-        (ss+1)->pv = pv;
-        ss->pv[0] = MOVE_NONE;
-    }
 
     // Decide whether or not to include checks: this fixes also the type of
     // TT entry depth that we are going to use. Note that in qsearch we use
