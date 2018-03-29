@@ -544,15 +544,25 @@ namespace {
         if (Threads.stop.load(std::memory_order_relaxed))
             return VALUE_ZERO;
 
-        // Step 3b. Check for immediate draw
-        if (pos.is_draw(ss->ply))
+        // Step 3b. Check for draw by repetition
+        if (pos.is_repetition(ss->ply))
             return VALUE_DRAW;
 
-        // Step 3c. Check for maximum ply reached
+        // Step 3b. Check for draw by 50-move rule
+        if (TB::UseRule50)
+        {
+            if (pos.rule50_count() > 100)
+                return VALUE_DRAW;
+
+            if (pos.rule50_count() == 100 && (!inCheck || MoveList<LEGAL>(pos).size()))
+                return VALUE_DRAW;
+        }
+
+        // Step 3d. Check for maximum ply reached
         if (ss->ply >= MAX_PLY)
             return !inCheck ? evaluate(pos) : beta;
 
-        // Step 3d. Mate distance pruning. Even if we mate at the next move our score
+        // Step 3e. Mate distance pruning. Even if we mate at the next move our score
         // would be at best mate_in(ss->ply+1), but if alpha is already bigger because
         // a shorter mate was found upward in the tree then there is no need to search
         // because we will never beat the current alpha. Same logic but with reversed
@@ -1196,8 +1206,8 @@ moves_loop: // When in check, search starts from here
 
     inCheck = bool(pos.checkers());
 
-    // Check for an immediate draw
-    if (pos.is_draw(ss->ply))
+    // Check for draw by repetition
+    if (pos.is_repetition(ss->ply))
         return VALUE_DRAW;
 
     // Check for maximum ply reached
