@@ -26,6 +26,7 @@
 #include <sstream>
 
 #include "evaluate.h"
+#include "material.h"
 #include "misc.h"
 #include "movegen.h"
 #include "movepick.h"
@@ -96,6 +97,8 @@ namespace {
     int level;
     Move best = MOVE_NONE;
   };
+
+  Value DrawValue[COLOR_NB];
 
   template <NodeType NT>
   Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth, bool cutNode, bool skipEarlyPruning);
@@ -285,6 +288,7 @@ void Thread::search() {
   Move  lastBestMove = MOVE_NONE;
   Depth lastBestMoveDepth = DEPTH_ZERO;
   MainThread* mainThread = (this == Threads.main() ? Threads.main() : nullptr);
+  Material::Entry* me;
   double timeReduction = 1.0;
   Color us = rootPos.side_to_move();
 
@@ -308,9 +312,17 @@ void Thread::search() {
 
   multiPV = std::min(multiPV, rootMoves.size());
 
-  int ct = Options["Contempt"] * PawnValueEg / 100; // From centipawns
-  contempt = (us == WHITE ?  make_score(ct, ct / 2)
-                          : -make_score(ct, ct / 2));
+  // Calculate contempt value
+  me = Material::probe(rootPos);
+  Phase gamePhase = me->game_phase();
+
+  int fixCt = Options["Contempt"] * PawnValueEg / 100; // From centipawns
+  int ct =  fixCt * int(gamePhase)
+          + fixCt * int(PHASE_MIDGAME - gamePhase) / 2;
+  ct /= int(PHASE_MIDGAME);
+
+  DrawValue[ us] = VALUE_DRAW - ct;
+  DrawValue[~us] = VALUE_DRAW + ct;
 
   // Iterative deepening loop until requested to stop or the target depth is reached
   while (   (rootDepth += ONE_PLY) < DEPTH_MAX
@@ -348,13 +360,15 @@ void Thread::search() {
               alpha = std::max(previousScore - delta,-VALUE_INFINITE);
               beta  = std::min(previousScore + delta, VALUE_INFINITE);
 
-              ct =  Options["Contempt"] * PawnValueEg / 100; // From centipawns
-
               // Adjust contempt based on root move's previousScore (dynamic contempt)
-              ct += int(std::round(48 * atan(float(previousScore) / 128)));
+              ct = fixCt + int(std::round(48 * atan(float(previousScore) / 128)));
 
-              contempt = (us == WHITE ?  make_score(ct, ct / 2)
-                                      : -make_score(ct, ct / 2));
+              ct =  ct * int(gamePhase)
+                  + ct * int(PHASE_MIDGAME - gamePhase) / 2;
+              ct /= int(PHASE_MIDGAME);
+
+              DrawValue[ us] = VALUE_DRAW - ct;
+              DrawValue[~us] = VALUE_DRAW + ct;
           }
 
           // Start with a small aspiration window and, in the case of a fail
@@ -537,7 +551,8 @@ namespace {
         if (   Threads.stop.load(std::memory_order_relaxed)
             || pos.is_draw(ss->ply)
             || ss->ply >= MAX_PLY)
-            return (ss->ply >= MAX_PLY && !inCheck) ? evaluate(pos) : VALUE_DRAW;
+            return (ss->ply >= MAX_PLY && !inCheck) ? evaluate(pos)
+                                                    : DrawValue[pos.side_to_move()];
 
         // Step 3. Mate distance pruning. Even if we mate at the next move our score
         // would be at best mate_in(ss->ply+1), but if alpha is already bigger because
@@ -628,7 +643,7 @@ namespace {
 
                 value =  wdl < -drawScore ? -VALUE_MATE + MAX_PLY + ss->ply + 1
                        : wdl >  drawScore ?  VALUE_MATE - MAX_PLY - ss->ply - 1
-                                          :  VALUE_DRAW + 2 * wdl * drawScore;
+                                          :  DrawValue[pos.side_to_move()] + 2 * wdl * drawScore;
 
                 Bound b =  wdl < -drawScore ? BOUND_UPPER
                          : wdl >  drawScore ? BOUND_LOWER : BOUND_EXACT;
@@ -1109,7 +1124,7 @@ moves_loop: // When in check, search starts from here
 
     if (!moveCount)
         bestValue = excludedMove ? alpha
-                   :     inCheck ? mated_in(ss->ply) : VALUE_DRAW;
+                   :     inCheck ? mated_in(ss->ply) : DrawValue[pos.side_to_move()];
     else if (bestMove)
     {
         // Quiet best move: update move sorting heuristics
@@ -1180,7 +1195,8 @@ moves_loop: // When in check, search starts from here
     // Check for an immediate draw or maximum ply reached
     if (   pos.is_draw(ss->ply)
         || ss->ply >= MAX_PLY)
-        return (ss->ply >= MAX_PLY && !inCheck) ? evaluate(pos) : VALUE_DRAW;
+        return (ss->ply >= MAX_PLY && !inCheck) ? evaluate(pos)
+                                                : DrawValue[pos.side_to_move()];
 
     assert(0 <= ss->ply && ss->ply < MAX_PLY);
 

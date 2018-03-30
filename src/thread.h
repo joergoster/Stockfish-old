@@ -71,7 +71,6 @@ public:
   ButterflyHistory mainHistory;
   CapturePieceToHistory captureHistory;
   ContinuationHistory contHistory;
-  Score contempt;
 };
 
 
