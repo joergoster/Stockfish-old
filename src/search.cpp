@@ -98,8 +98,6 @@ namespace {
     Move best = MOVE_NONE;
   };
 
-  Value DrawValue[COLOR_NB];
-
   template <NodeType NT>
   Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth, bool cutNode, bool skipEarlyPruning);
 
@@ -552,7 +550,7 @@ namespace {
             || pos.is_draw(ss->ply)
             || ss->ply >= MAX_PLY)
             return (ss->ply >= MAX_PLY && !inCheck) ? evaluate(pos)
-                                                    : DrawValue[pos.side_to_move()];
+                                                    : thisThread->DrawValue[pos.side_to_move()];
 
         // Step 3. Mate distance pruning. Even if we mate at the next move our score
         // would be at best mate_in(ss->ply+1), but if alpha is already bigger because
@@ -643,7 +641,7 @@ namespace {
 
                 value =  wdl < -drawScore ? -VALUE_MATE + MAX_PLY + ss->ply + 1
                        : wdl >  drawScore ?  VALUE_MATE - MAX_PLY - ss->ply - 1
-                                          :  DrawValue[pos.side_to_move()] + 2 * wdl * drawScore;
+                                          :  VALUE_DRAW + 2 * wdl * drawScore;
 
                 Bound b =  wdl < -drawScore ? BOUND_UPPER
                          : wdl >  drawScore ? BOUND_LOWER : BOUND_EXACT;
@@ -1124,7 +1122,7 @@ moves_loop: // When in check, search starts from here
 
     if (!moveCount)
         bestValue = excludedMove ? alpha
-                   :     inCheck ? mated_in(ss->ply) : DrawValue[pos.side_to_move()];
+                   :     inCheck ? mated_in(ss->ply) : thisThread->DrawValue[pos.side_to_move()];
     else if (bestMove)
     {
         // Quiet best move: update move sorting heuristics
@@ -1196,7 +1194,7 @@ moves_loop: // When in check, search starts from here
     if (   pos.is_draw(ss->ply)
         || ss->ply >= MAX_PLY)
         return (ss->ply >= MAX_PLY && !inCheck) ? evaluate(pos)
-                                                : DrawValue[pos.side_to_move()];
+                                                : pos.this_thread()->DrawValue[pos.side_to_move()];
 
     assert(0 <= ss->ply && ss->ply < MAX_PLY);
 
