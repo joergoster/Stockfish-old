@@ -62,6 +62,9 @@ const vector<string> Defaults = {
   "6k1/4pp1p/3p2p1/P1pPb3/R7/1r2P1PP/3B1P2/6K1 w - - 0 1",
   "8/3p3B/5p2/5P2/p7/PP5b/k7/6K1 w - - 0 1",
 
+  // 4-man positions
+  "K1k5/P7/8/8/8/8/8/7N w - - 0 1",        // Draw
+
   // 5-man positions
   "8/8/8/8/5kp1/P7/8/1K1N4 w - - 0 1",     // Kc2 - mate
   "8/8/8/5N2/8/p7/8/2NK3k w - - 0 1",      // Na2 - mate

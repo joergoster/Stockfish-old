@@ -741,11 +741,21 @@ ScaleFactor Endgame<KNPK>::operator()(const Position& pos) const {
   assert(verify_material(pos, weakSide, VALUE_ZERO, 0));
 
   // Assume strongSide is white and the pawn is on files A-D
-  Square pawnSq     = normalize(pos, strongSide, pos.square<PAWN>(strongSide));
-  Square weakKingSq = normalize(pos, strongSide, pos.square<KING>(weakSide));
+  Square pawnSq       = normalize(pos, strongSide, pos.square<PAWN>(strongSide));
+  Square knightSq     = normalize(pos, strongSide, pos.square<KNIGHT>(strongSide));
+  Square strongKingSq = normalize(pos, strongSide, pos.square<KING>(strongSide));
+  Square weakKingSq   = normalize(pos, strongSide, pos.square<KING>(weakSide));
 
-  if (pawnSq == SQ_A7 && distance(SQ_A8, weakKingSq) <= 1)
-      return SCALE_FACTOR_DRAW;
+  if (pawnSq == SQ_A7)
+  {
+      if (weakKingSq == SQ_A8 || weakKingSq == SQ_B7)
+          return SCALE_FACTOR_DRAW;
+
+      else if ((weakKingSq == SQ_C8 || weakKingSq == SQ_C7)
+          &&  strongKingSq == SQ_A8
+          && (strongSide == pos.side_to_move()) != opposite_colors(weakKingSq, knightSq))
+          return SCALE_FACTOR_DRAW;
+  }
 
   return SCALE_FACTOR_NONE;
 }
