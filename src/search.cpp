@@ -554,10 +554,6 @@ namespace {
         if (Threads.stop.load(std::memory_order_relaxed))
             return VALUE_ZERO;
 
-        // Step 3b. Check for draw by repetition
-        if (pos.is_repetition(ss->ply))
-            return VALUE_DRAW;
-
         // Step 3b. Check for draw by 50-move rule
         if (TB::UseRule50)
         {
@@ -567,6 +563,10 @@ namespace {
             if (pos.rule50_count() == 100 && (!inCheck || MoveList<LEGAL>(pos).size()))
                 return VALUE_DRAW;
         }
+
+        // Step 3c. Check for draw by repetition
+        if (pos.is_repetition(ss->ply))
+            return VALUE_DRAW;
 
         // Step 3d. Check for maximum ply reached
         if (ss->ply >= MAX_PLY)
@@ -1222,6 +1222,16 @@ moves_loop: // When in check, search starts from here
     }
 
     inCheck = bool(pos.checkers());
+
+    // Check for draw by 50-move rule
+    if (TB::UseRule50)
+    {
+        if (pos.rule50_count() > 100)
+            return VALUE_DRAW;
+
+        if (pos.rule50_count() == 100 && (!inCheck || MoveList<LEGAL>(pos).size()))
+            return VALUE_DRAW;
+    }
 
     // Check for draw by repetition
     if (pos.is_repetition(ss->ply))
