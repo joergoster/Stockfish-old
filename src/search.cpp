@@ -899,10 +899,10 @@ moves_loop: // When in check, search starts from here
       // that move is singular and should be extended. To verify this we do a
       // reduced search on on all the other moves but the ttMove and if the
       // result is lower than ttValue minus a margin then we will extend the ttMove.
-      if (    depth >= 8 * ONE_PLY
-          &&  move == ttMove
-          && !rootNode
+      if (   !rootNode
           && !excludedMove // Recursive singular search is not allowed
+          &&  depth >= 8 * ONE_PLY
+          &&  move == ttMove
           &&  ttValue != VALUE_NONE
           && (tte->bound() & BOUND_LOWER)
           &&  tte->depth() >= depth - 3 * ONE_PLY
