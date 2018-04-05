@@ -150,17 +150,21 @@ Entry* probe(const Position& pos) {
           return e;
       }
 
-  // Now evaluate the material imbalance to ensure our main evaluation function
-  // uses consistent data in any case. We use PIECE_TYPE_NONE as a place holder
-  // for the bishop pair "extended piece", which allows us to be more flexible
-  // in defining bishop pair bonuses.
-  const int pieceCount[COLOR_NB][PIECE_TYPE_NB] = {
-  { pos.bishop_pair(WHITE)  , pos.count<PAWN>(WHITE), pos.count<KNIGHT>(WHITE),
-    pos.count<BISHOP>(WHITE), pos.count<ROOK>(WHITE), pos.count<QUEEN >(WHITE) },
-  { pos.bishop_pair(BLACK)  , pos.count<PAWN>(BLACK), pos.count<KNIGHT>(BLACK),
-    pos.count<BISHOP>(BLACK), pos.count<ROOK>(BLACK), pos.count<QUEEN >(BLACK) } };
+  // No need to compute imbalance when material is even
+  if (npm_w != npm_b || pos.count<PAWN>(WHITE) != pos.count<PAWN>(BLACK))
+  {
+      // Now evaluate the material imbalance to ensure our main evaluation function
+      // uses consistent data in any case. We use PIECE_TYPE_NONE as a place holder
+      // for the bishop pair "extended piece", which allows us to be more flexible
+      // in defining bishop pair bonuses.
+      const int pieceCount[COLOR_NB][PIECE_TYPE_NB] = {
+      { pos.bishop_pair(WHITE)  , pos.count<PAWN>(WHITE), pos.count<KNIGHT>(WHITE),
+        pos.count<BISHOP>(WHITE), pos.count<ROOK>(WHITE), pos.count<QUEEN >(WHITE) },
+      { pos.bishop_pair(BLACK)  , pos.count<PAWN>(BLACK), pos.count<KNIGHT>(BLACK),
+        pos.count<BISHOP>(BLACK), pos.count<ROOK>(BLACK), pos.count<QUEEN >(BLACK) } };
 
-  e->value = int16_t((imbalance<WHITE>(pieceCount) - imbalance<BLACK>(pieceCount)) / 8);
+      e->value = int16_t((imbalance<WHITE>(pieceCount) - imbalance<BLACK>(pieceCount)) / 8);
+  }
 
   // OK, we didn't find any special evaluation function for the current material
   // configuration. Is there a suitable specialized scaling function?
