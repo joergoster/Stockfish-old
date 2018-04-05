@@ -118,7 +118,7 @@ void init() {
       {
           File f = std::min(file_of(s), ~file_of(s));
           psq[ pc][ s] = score + Bonus[pc][rank_of(s)][f];
-          psq[~pc][~s] = -psq[pc][s];
+          psq[~pc][~s] = psq[pc][s];
       }
   }
 }

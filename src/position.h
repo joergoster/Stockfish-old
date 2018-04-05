@@ -39,11 +39,11 @@ struct StateInfo {
   // Copied when making a move
   Key    pawnKey;
   Key    materialKey;
+  Score  psq[COLOR_NB];
   Value  nonPawnMaterial[COLOR_NB];
   int    castlingRights;
   int    rule50;
   int    pliesFromNull;
-  Score  psq;
   Square epSquare;
 
   // Not copied when making a move (will be recomputed anyhow)
@@ -153,7 +153,7 @@ public:
   Thread* this_thread() const;
   bool is_draw(int ply) const;
   int rule50_count() const;
-  Score psq_score() const;
+  Score psq_score(Color c) const;
   Value non_pawn_material(Color c) const;
   Value non_pawn_material() const;
 
@@ -324,8 +324,8 @@ inline Key Position::material_key() const {
   return st->materialKey;
 }
 
-inline Score Position::psq_score() const {
-  return st->psq;
+inline Score Position::psq_score(Color c) const {
+  return st->psq[c];
 }
 
 inline Value Position::non_pawn_material(Color c) const {
