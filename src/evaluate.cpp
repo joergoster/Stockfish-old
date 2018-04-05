@@ -59,7 +59,7 @@ namespace Trace {
 
   std::ostream& operator<<(std::ostream& os, Term t) {
 
-    if (t == IMBALANCE || t == INITIATIVE || t == TOTAL)
+    if (t == INITIATIVE || t == TOTAL)
         os << " ----  ----"    << " | " << " ----  ----";
     else
         os << scores[t][WHITE] << " | " << scores[t][BLACK];
@@ -841,7 +841,8 @@ namespace {
     // the position object (material + piece square tables) and the material
     // imbalance. Score is computed internally from the white point of view.
     Score score = pos.psq_score(WHITE) - pos.psq_score(BLACK);
-    score += me->imbalance() + pos.this_thread()->contempt;
+    score += (me->imbalance(WHITE) - me->imbalance(BLACK)) / 16;
+    score += pos.this_thread()->contempt;
 
     // Probe the pawn hash table
     pe = Pawns::probe(pos);
@@ -883,7 +884,7 @@ namespace {
     if (T)
     {
         Trace::add(MATERIAL, pos.psq_score(WHITE), pos.psq_score(BLACK));
-        Trace::add(IMBALANCE, me->imbalance());
+        Trace::add(IMBALANCE, me->imbalance(WHITE)/16, me->imbalance(BLACK)/16);
         Trace::add(PAWN, pe->pawn_score(WHITE), pe->pawn_score(BLACK));
         Trace::add(MOBILITY, mobility[WHITE], mobility[BLACK]);
         Trace::add(TOTAL, score);
