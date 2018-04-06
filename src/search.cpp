@@ -369,7 +369,7 @@ void Thread::search() {
               beta  = std::min(previousScore + delta, VALUE_INFINITE);
 
               // Adjust contempt based on root move's previousScore (dynamic contempt)
-              ct = fixCt + int(std::round(48 * atan(float(previousScore) / 128)));
+              ct = fixCt + int(std::round(48 * atan(float(previousScore - DrawValue[us]) / 128)));
 
               ct =  ct * int(gamePhase)
                   + ct * int(PHASE_MIDGAME - gamePhase) / 2;
