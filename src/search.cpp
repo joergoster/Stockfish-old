@@ -747,6 +747,8 @@ namespace {
         && !PvNode
         &&  eval >= beta
         &&  ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
+        &&  thisThread->selDepth + 5 > thisThread->rootDepth / ONE_PLY
+        && !(depth > 12 * ONE_PLY && MoveList<LEGAL>(pos).size() < 4)
         && (ss->ply >= thisThread->nmp_ply || ss->ply % 2 != thisThread->nmp_odd))
     {
         assert(eval - beta >= 0);
