@@ -865,17 +865,17 @@ namespace {
     initialize<BLACK>();
 
     // Pieces should be evaluated first (populate attack tables)
-    score +=  pieces<WHITE, KNIGHT>() - pieces<BLACK, KNIGHT>()
-            + pieces<WHITE, BISHOP>() - pieces<BLACK, BISHOP>()
-            + pieces<WHITE, ROOK  >() - pieces<BLACK, ROOK  >()
-            + pieces<WHITE, QUEEN >() - pieces<BLACK, QUEEN >();
+    score += pieces<WHITE, KNIGHT>() - pieces<BLACK, KNIGHT>();
+    score += pieces<WHITE, BISHOP>() - pieces<BLACK, BISHOP>();
+    score += pieces<WHITE, ROOK  >() - pieces<BLACK, ROOK  >();
+    score += pieces<WHITE, QUEEN >() - pieces<BLACK, QUEEN >();
 
     score += mobility[WHITE] - mobility[BLACK];
 
-    score +=  king<   WHITE>() - king<   BLACK>()
-            + threats<WHITE>() - threats<BLACK>()
-            + passed< WHITE>() - passed< BLACK>()
-            + space<  WHITE>() - space<  BLACK>();
+    score += king<   WHITE>() - king<   BLACK>();
+    score += threats<WHITE>() - threats<BLACK>();
+    score += passed< WHITE>() - passed< BLACK>();
+    score += space<  WHITE>() - space<  BLACK>();
 
     score += initiative(eg_value(score));
 
