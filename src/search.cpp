@@ -797,35 +797,37 @@ namespace {
     {
         assert(is_ok((ss-1)->currentMove));
 
-        Value rbeta = std::min(beta + 216 - 48 * improving, VALUE_INFINITE);
-        MovePicker mp(pos, ttMove, rbeta - ss->staticEval, &thisThread->captureHistory);
         int probCutCount = 0;
+        Value rbeta = std::min(beta + 216 - 48 * improving, VALUE_INFINITE);
 
-        while (  (move = mp.next_move()) != MOVE_NONE
-               && probCutCount < 3)
-            if (pos.legal(move))
-            {
-                probCutCount++;
+        // Initialize a MovePicker object for the current position
+        MovePicker mp(pos, ttMove, rbeta - ss->staticEval, &thisThread->captureHistory);
 
-                ss->currentMove = move;
-                ss->contHistory = thisThread->contHistory[pos.moved_piece(move)][to_sq(move)].get();
+        while ((move = mp.next_move()) != MOVE_NONE && probCutCount < 3) // try at most 3 moves
+        {
+            assert(is_ok(move));
 
-                assert(depth >= 5 * ONE_PLY);
+            if (!pos.legal(move))
+                continue;
 
-                pos.do_move(move, st);
+            ++probCutCount;
+            ss->currentMove = move;
+            ss->contHistory = thisThread->contHistory[pos.moved_piece(move)][to_sq(move)].get();
 
-                // Perform a preliminary qsearch to verify that the move holds
-                value = -qsearch<NonPV>(pos, ss+1, -rbeta, -rbeta+1);
+            pos.do_move(move, st);
 
-                // If the qsearch held perform the regular search
-                if (value >= rbeta)
-                    value = -search<NonPV>(pos, ss+1, -rbeta, -rbeta+1, depth - 4 * ONE_PLY, !cutNode, false);
+            // Perform a preliminary qsearch to verify that the move holds
+            value = -qsearch<NonPV>(pos, ss+1, -rbeta, -rbeta+1);
 
-                pos.undo_move(move);
+            // If the qsearch held perform the regular search
+            if (value >= rbeta)
+                value = -search<NonPV>(pos, ss+1, -rbeta, -rbeta+1, depth - 4 * ONE_PLY, !cutNode, false);
 
-                if (value >= rbeta)
-                    return value;
-            }
+            pos.undo_move(move);
+
+            if (value >= rbeta)
+                return value;
+        }
     }
 
     // Step 11. Internal iterative deepening (skipped when in check)
