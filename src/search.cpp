@@ -355,7 +355,7 @@ void Thread::search() {
           rm.previousScore = rm.score;
 
       // MultiPV loop. We perform a full root search for each PV line
-      for (PVIdx = 0; PVIdx < multiPV && !Threads.stop; ++PVIdx)
+      for (PVIdx = 0; PVIdx < (rootDepth < 5 * ONE_PLY ? rootMoves.size() : multiPV) && !Threads.stop; ++PVIdx)
       {
           // Reset UCI info selDepth and bestValue for each depth and each PV line
           selDepth = 1;
