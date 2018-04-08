@@ -59,6 +59,9 @@ namespace {
   constexpr int PushClose[8] = { 0, 0, 100, 80, 60, 40, 20, 10 };
   constexpr int PushAway [8] = { 0, 5, 20, 40, 60, 80, 90, 100 };
 
+  // Mask used in KPKN endgame
+  constexpr Bitboard kpkn_mask1 = 0xC080C080C0E0F5FFULL;
+
   // Pawn Rank based scaling factors used in KRPPKRP endgame
   constexpr int KRPPKRPScaleFactors[RANK_NB] = { 0, 9, 10, 14, 21, 44, 0, 0 };
 
@@ -92,6 +95,10 @@ Endgames::Endgames() {
 
   add<KPK>("KPK");
   add<KBNK>("KBNK");
+  add<KPKB>("KPKB");
+  add<KQKB>("KQKB");
+  add<KPKN>("KPKN");
+  add<KQKN>("KQKN");
   add<KRKP>("KRKP");
   add<KRKB>("KRKB");
   add<KRKN>("KRKN");
@@ -194,6 +201,132 @@ Value Endgame<KPK>::operator()(const Position& pos) const {
       return VALUE_DRAW;
 
   Value result = VALUE_KNOWN_WIN + PawnValueEg + Value(rank_of(psq));
+
+  return strongSide == pos.side_to_move() ? result : -result;
+}
+
+
+/// KP vs KB. Here I consider the side with the pawn the stronger side.
+template<>
+Value Endgame<KPKB>::operator()(const Position& pos) const {
+
+  assert(verify_material(pos, strongSide, VALUE_ZERO, 1));
+  assert(verify_material(pos, weakSide, BishopValueMg, 0));
+
+  Square loserKSq = pos.square<KING>(weakSide);
+  Square pawnSq = pos.square<PAWN>(strongSide);
+  Square bishopSq = pos.square<BISHOP>(weakSide);
+  Bitboard queeningPath = forward_file_bb(strongSide, pawnSq);
+
+  // If the pawn is not far advanced, the bishop controls
+  // the squares in front of the pawn, or the weak side king
+  // can block the pawn, it's a draw.
+  if (   relative_rank(strongSide, pawnSq) <= RANK_4
+      || pos.attacks_from<BISHOP>(bishopSq) & queeningPath
+      || queeningPath & loserKSq)
+      return  VALUE_DRAW
+            + 4 * Value(relative_rank(strongSide, pawnSq));
+
+  Value result =  VALUE_KNOWN_WIN
+                + PawnValueEg
+                + 4 * Value(relative_rank(strongSide, pawnSq))
+                - BishopValueEg;
+
+  return strongSide == pos.side_to_move() ? result : -result;
+}
+
+
+/// KQ vs KB. Always a win.
+template<>
+Value Endgame<KQKB>::operator()(const Position& pos) const {
+
+  assert(verify_material(pos, strongSide, QueenValueMg, 0));
+  assert(verify_material(pos, weakSide, BishopValueMg, 0));
+
+  Square winnerKSq = pos.square<KING>(strongSide);
+  Square loserKSq = pos.square<KING>(weakSide);
+
+  Value result =  VALUE_KNOWN_WIN
+                + QueenValueEg
+                - BishopValueEg
+                + PushToEdges[loserKSq]
+                + PushClose[distance(winnerKSq, loserKSq)];
+
+  return strongSide == pos.side_to_move() ? result : -result;
+}
+
+
+/// KP vs KN. Here I consider the side with the pawn the stronger side.
+/// There are 2 well known won positions for the stronger side, and
+/// one for the weaker side. Otherwise consider it a draw.
+template<>
+Value Endgame<KPKN>::operator()(const Position& pos) const {
+
+  assert(verify_material(pos, strongSide, VALUE_ZERO, 1));
+  assert(verify_material(pos, weakSide, KnightValueMg, 0));
+
+  // Assume strongSide is white and the pawn is on files A-D
+  Square strongKingSq = normalize(pos, strongSide, pos.square<KING>(strongSide));
+  Square pawnSq       = normalize(pos, strongSide, pos.square<PAWN>(strongSide));
+  Square weakKingSq   = normalize(pos, strongSide, pos.square<KING>(weakSide));
+  Square knightSq     = normalize(pos, strongSide, pos.square<KNIGHT>(weakSide));
+
+  // Winning position for the stronger side
+  // n7/P7/2K5/8/3k4/8/8/8 w - - 0 1
+  if (    pawnSq == SQ_A7
+      &&  strongKingSq == SQ_C6
+      &&  knightSq == SQ_A8
+      &&  strongSide == pos.side_to_move()
+      && (file_of(weakKingSq) >= FILE_F || rank_of(weakKingSq) <= RANK_4))
+      return  VALUE_KNOWN_WIN
+            + 4 * Value(rank_of(pawnSq))
+            - KnightValueEg;
+
+  // Losing position for the weaker side
+  // 8/1n1k4/P5K1/8/8/8/8/8 b - - 0 1
+  if (   pawnSq == SQ_A6
+      && weakKingSq == SQ_D7
+      && knightSq == SQ_B7
+      && kpkn_mask1 & strongKingSq
+      && weakSide == pos.side_to_move())
+      return -VALUE_KNOWN_WIN
+            - 4 * Value(rank_of(pawnSq))
+            + KnightValueEg;
+
+  // Winning position for the weaker side
+  // 8/K1k5/P2n4/8/8/8/8/8 b - - 0 1
+  if (   pawnSq == SQ_A6
+      && strongKingSq == SQ_A7
+      && weakKingSq == SQ_C7
+      && knightSq == SQ_D6)
+  {
+      Value result =  VALUE_KNOWN_WIN
+                    - 4 * Value(rank_of(pawnSq))
+                    + KnightValueEg;
+
+      return strongSide == pos.side_to_move() ? -result : result;
+  }
+
+  return  VALUE_DRAW
+        + 4 * Value(rank_of(pawnSq));
+}
+
+
+/// KQ vs KN. Always a win.
+template<>
+Value Endgame<KQKN>::operator()(const Position& pos) const {
+
+  assert(verify_material(pos, strongSide, QueenValueMg, 0));
+  assert(verify_material(pos, weakSide, KnightValueMg, 0));
+
+  Square winnerKSq = pos.square<KING>(strongSide);
+  Square loserKSq = pos.square<KING>(weakSide);
+
+  Value result =  VALUE_KNOWN_WIN
+                + QueenValueEg
+                - KnightValueEg
+                + PushToEdges[loserKSq]
+                + PushClose[distance(winnerKSq, loserKSq)];
 
   return strongSide == pos.side_to_move() ? result : -result;
 }
