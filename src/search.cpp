@@ -640,12 +640,10 @@ namespace {
                                 - pos.non_pawn_material(~pos.side_to_move())
                                 + (  pos.count<PAWN>( pos.side_to_move())
                                    - pos.count<PAWN>(~pos.side_to_move())) * PawnValueEg;
-                // Guard against overflow (e.g. KQQQQK)
-                material = std::min(material, Value(6000));
 
-                value =  wdl < -drawScore ? -VALUE_KNOWN_WIN - material
-                       : wdl >  drawScore ?  VALUE_KNOWN_WIN + material
-                                          :  VALUE_DRAW + 2 * wdl * drawScore;
+                value =  wdl < -drawScore ? std::max(-VALUE_KNOWN_WIN - material, VALUE_MATED_IN_MAX_PLY + 1)
+                       : wdl >  drawScore ? std::min( VALUE_KNOWN_WIN + material, VALUE_MATE_IN_MAX_PLY - 1)
+                                          : VALUE_DRAW + 2 * wdl * drawScore;
 
                 Bound b =  wdl < -drawScore ? BOUND_UPPER
                          : wdl >  drawScore ? BOUND_LOWER : BOUND_EXACT;
