@@ -636,8 +636,15 @@ namespace {
 
                 int drawScore = TB::UseRule50 ? 1 : 0;
 
-                value =  wdl < -drawScore ? -VALUE_MATE + MAX_PLY + ss->ply + 1
-                       : wdl >  drawScore ?  VALUE_MATE - MAX_PLY - ss->ply - 1
+                Value material =  pos.non_pawn_material( pos.side_to_move())
+                                - pos.non_pawn_material(~pos.side_to_move())
+                                + (  pos.count<PAWN>( pos.side_to_move())
+                                   - pos.count<PAWN>(~pos.side_to_move())) * PawnValueEg;
+                // Guard against overflow (e.g. KQQQQK)
+                material = std::min(material, Value(6000));
+
+                value =  wdl < -drawScore ? -VALUE_KNOWN_WIN - material
+                       : wdl >  drawScore ?  VALUE_KNOWN_WIN + material
                                           :  VALUE_DRAW + 2 * wdl * drawScore;
 
                 Bound b =  wdl < -drawScore ? BOUND_UPPER
@@ -646,8 +653,7 @@ namespace {
                 if (    b == BOUND_EXACT
                     || (b == BOUND_LOWER ? value >= beta : value <= alpha))
                 {
-                    tte->save(posKey, value_to_tt(value, ss->ply), b,
-                              std::min(DEPTH_MAX - ONE_PLY, depth + 6 * ONE_PLY),
+                    tte->save(posKey, value, b, depth,
                               MOVE_NONE, VALUE_NONE, TT.generation());
 
                     return value;
