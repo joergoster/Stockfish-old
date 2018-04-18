@@ -717,8 +717,7 @@ namespace {
         &&  eval >= beta
         &&  ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
         &&  thisThread->selDepth + 5 > thisThread->rootDepth / ONE_PLY
-        && !(depth > 12 * ONE_PLY && MoveList<LEGAL>(pos).size() < 4)
-        && (ss->ply >= thisThread->nmp_ply || ss->ply % 2 != thisThread->nmp_odd))
+        && !(depth > 12 * ONE_PLY && MoveList<LEGAL>(pos).size() < 4))
     {
         assert(eval - beta >= 0);
 
@@ -739,18 +738,13 @@ namespace {
             if (nullValue >= VALUE_MATE_IN_MAX_PLY)
                 nullValue = beta;
 
-            if (abs(beta) < VALUE_KNOWN_WIN && (depth < 12 * ONE_PLY || thisThread->nmp_ply))
+            if (depth < 12 * ONE_PLY && abs(beta) < VALUE_KNOWN_WIN)
                 return nullValue;
 
-            // Do verification search at high depths. Disable null move pruning
-            // for side to move for the first part of the remaining search tree.
-            thisThread->nmp_ply = ss->ply + 3 * (depth-R) / 4;
-            thisThread->nmp_odd = ss->ply % 2;
-
+            // Do verification search at high depths
+            R = std::min(R, 5 * ONE_PLY);
             Value v = depth-R < ONE_PLY ? qsearch<NonPV>(pos, ss, beta-1, beta)
                                         :  search<NonPV>(pos, ss, beta-1, beta, depth-R, false, true);
-
-            thisThread->nmp_odd = thisThread->nmp_ply = 0;
 
             if (v >= beta)
                 return nullValue;
