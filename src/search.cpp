@@ -517,8 +517,8 @@ namespace {
         static_cast<MainThread*>(thisThread)->check_time();
 
     // Used to send selDepth info to GUI
-    if (PvNode && thisThread->selDepth < ss->ply)
-        thisThread->selDepth = ss->ply;
+    if (PvNode)
+        thisThread->selDepth = std::max(ss->ply, thisThread->selDepth);
 
     // Step 3. Check for immediate return conditions
     if (!rootNode)
@@ -1185,6 +1185,7 @@ moves_loop: // When in check, search starts from here
         oldAlpha = alpha; // To flag BOUND_EXACT when eval above alpha and no available moves
         (ss+1)->pv = pv;
         ss->pv[0] = MOVE_NONE;
+        pos.this_thread()->selDepth = std::max(ss->ply, pos.this_thread()->selDepth);
     }
 
     inCheck = bool(pos.checkers());
