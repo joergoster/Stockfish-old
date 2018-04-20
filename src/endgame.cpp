@@ -99,7 +99,6 @@ Endgames::Endgames() {
   add<KQKB>("KQKB");
   add<KPKN>("KPKN");
   add<KQKN>("KQKN");
-  add<KRKP>("KRKP");
   add<KRKB>("KRKB");
   add<KRKN>("KRKN");
   add<KQKP>("KQKP");
@@ -327,51 +326,6 @@ Value Endgame<KQKN>::operator()(const Position& pos) const {
                 - KnightValueEg
                 + PushToEdges[loserKSq]
                 + PushClose[distance(winnerKSq, loserKSq)];
-
-  return strongSide == pos.side_to_move() ? result : -result;
-}
-
-
-/// KR vs KP. This is a somewhat tricky endgame to evaluate precisely without
-/// a bitbase. The function below returns drawish scores when the pawn is
-/// far advanced with support of the king, while the attacking king is far
-/// away.
-template<>
-Value Endgame<KRKP>::operator()(const Position& pos) const {
-
-  assert(verify_material(pos, strongSide, RookValueMg, 0));
-  assert(verify_material(pos, weakSide, VALUE_ZERO, 1));
-
-  Square wksq = relative_square(strongSide, pos.square<KING>(strongSide));
-  Square bksq = relative_square(strongSide, pos.square<KING>(weakSide));
-  Square rsq  = relative_square(strongSide, pos.square<ROOK>(strongSide));
-  Square psq  = relative_square(strongSide, pos.square<PAWN>(weakSide));
-
-  Square queeningSq = make_square(file_of(psq), RANK_1);
-  Value result;
-
-  // If the stronger side's king is in front of the pawn, it's a win
-  if (wksq < psq && file_of(wksq) == file_of(psq))
-      result = RookValueEg - distance(wksq, psq);
-
-  // If the weaker side's king is too far from the pawn and the rook,
-  // it's a win.
-  else if (   distance(bksq, psq) >= 3 + (pos.side_to_move() == weakSide)
-           && distance(bksq, rsq) >= 3)
-      result = RookValueEg - distance(wksq, psq);
-
-  // If the pawn is far advanced and supported by the defending king,
-  // the position is drawish
-  else if (   rank_of(bksq) <= RANK_3
-           && distance(bksq, psq) == 1
-           && rank_of(wksq) >= RANK_4
-           && distance(wksq, psq) > 2 + (pos.side_to_move() == strongSide))
-      result = Value(80) - 8 * distance(wksq, psq);
-
-  else
-      result =  Value(200) - 8 * (  distance(wksq, psq + SOUTH)
-                                  - distance(bksq, psq + SOUTH)
-                                  - distance(psq, queeningSq));
 
   return strongSide == pos.side_to_move() ? result : -result;
 }

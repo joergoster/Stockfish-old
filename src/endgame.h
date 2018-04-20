@@ -43,7 +43,6 @@ enum EndgameCode {
   KQKB,  // KQ vs KB
   KPKN,  // KP vs KN
   KQKN,  // KQ vs KN
-  KRKP,  // KR vs KP
   KRKB,  // KR vs KB
   KRKN,  // KR vs KN
   KQKP,  // KQ vs KP
