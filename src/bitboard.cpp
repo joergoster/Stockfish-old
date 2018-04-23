@@ -2,7 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
+  Copyright (C) 2015-2018 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -45,26 +45,10 @@ Magic BishopMagics[SQUARE_NB];
 
 namespace {
 
-  // De Bruijn sequences. See chessprogramming.wikispaces.com/BitScan
-  const uint64_t DeBruijn64 = 0x3F79D71B4CB0A89ULL;
-  const uint32_t DeBruijn32 = 0x783A9B23;
-
-  int MSBTable[256];            // To implement software msb()
-  Square BSFTable[SQUARE_NB];   // To implement software bitscan
   Bitboard RookTable[0x19000];  // To store rook attacks
   Bitboard BishopTable[0x1480]; // To store bishop attacks
 
-  void init_magics(Bitboard table[], Magic magics[], Square deltas[]);
-
-  // bsf_index() returns the index into BSFTable[] to look up the bitscan. Uses
-  // Matt Taylor's folding for 32 bit case, extended to 64 bit by Kim Walisch.
-
-  unsigned bsf_index(Bitboard b) {
-    b ^= b - 1;
-    return Is64Bit ? (b * DeBruijn64) >> 58
-                   : ((unsigned(b) ^ unsigned(b >> 32)) * DeBruijn32) >> 26;
-  }
-
+  void init_magics(Bitboard table[], Magic magics[], Direction directions[]);
 
   // popcount16() counts the non-zero bits using SWAR-Popcount algorithm
 
@@ -75,46 +59,6 @@ namespace {
     return (u * 0x0101U) >> 8;
   }
 }
-
-#ifdef NO_BSF
-
-/// Software fall-back of lsb() and msb() for CPU lacking hardware support
-
-Square lsb(Bitboard b) {
-  assert(b);
-  return BSFTable[bsf_index(b)];
-}
-
-Square msb(Bitboard b) {
-
-  assert(b);
-  unsigned b32;
-  int result = 0;
-
-  if (b > 0xFFFFFFFF)
-  {
-      b >>= 32;
-      result = 32;
-  }
-
-  b32 = unsigned(b);
-
-  if (b32 > 0xFFFF)
-  {
-      b32 >>= 16;
-      result += 16;
-  }
-
-  if (b32 > 0xFF)
-  {
-      b32 >>= 8;
-      result += 8;
-  }
-
-  return Square(result + MSBTable[b32]);
-}
-
-#endif // ifdef NO_BSF
 
 
 /// Bitboards::pretty() returns an ASCII representation of a bitboard suitable
@@ -145,13 +89,7 @@ void Bitboards::init() {
       PopCnt16[i] = (uint8_t) popcount16(i);
 
   for (Square s = SQ_A1; s <= SQ_H8; ++s)
-  {
-      SquareBB[s] = 1ULL << s;
-      BSFTable[bsf_index(SquareBB[s])] = s;
-  }
-
-  for (Bitboard b = 2; b < 256; ++b)
-      MSBTable[b] = MSBTable[b - 1] + !more_than_one(b);
+      SquareBB[s] = make_bitboard(s);
 
   for (File f = FILE_A; f <= FILE_H; ++f)
       FileBB[f] = f > FILE_A ? FileBB[f - 1] << 1 : FileABB;
@@ -188,7 +126,7 @@ void Bitboards::init() {
           for (Square s = SQ_A1; s <= SQ_H8; ++s)
               for (int i = 0; steps[pt][i]; ++i)
               {
-                  Square to = s + Square(c == WHITE ? steps[pt][i] : -steps[pt][i]);
+                  Square to = s + Direction(c == WHITE ? steps[pt][i] : -steps[pt][i]);
 
                   if (is_ok(to) && distance(s, to) < 3)
                   {
@@ -199,11 +137,11 @@ void Bitboards::init() {
                   }
               }
 
-  Square RookDeltas[] = { NORTH,  EAST,  SOUTH,  WEST };
-  Square BishopDeltas[] = { NORTH_EAST, SOUTH_EAST, SOUTH_WEST, NORTH_WEST };
+  Direction RookDirections[] = { NORTH,  EAST,  SOUTH,  WEST };
+  Direction BishopDirections[] = { NORTH_EAST, SOUTH_EAST, SOUTH_WEST, NORTH_WEST };
 
-  init_magics(RookTable, RookMagics, RookDeltas);
-  init_magics(BishopTable, BishopMagics, BishopDeltas);
+  init_magics(RookTable, RookMagics, RookDirections);
+  init_magics(BishopTable, BishopMagics, BishopDirections);
 
   for (Square s1 = SQ_A1; s1 <= SQ_H8; ++s1)
   {
@@ -225,14 +163,14 @@ void Bitboards::init() {
 
 namespace {
 
-  Bitboard sliding_attack(Square deltas[], Square sq, Bitboard occupied) {
+  Bitboard sliding_attack(Direction directions[], Square sq, Bitboard occupied) {
 
     Bitboard attack = 0;
 
     for (int i = 0; i < 4; ++i)
-        for (Square s = sq + deltas[i];
-             is_ok(s) && distance(s, s - deltas[i]) == 1;
-             s += deltas[i])
+        for (Square s = sq + directions[i];
+             is_ok(s) && distance(s, s - directions[i]) == 1;
+             s += directions[i])
         {
             attack |= s;
 
@@ -249,7 +187,7 @@ namespace {
   // chessprogramming.wikispaces.com/Magic+Bitboards. In particular, here we
   // use the so called "fancy" approach.
 
-  void init_magics(Bitboard table[], Magic magics[], Square deltas[]) {
+  void init_magics(Bitboard table[], Magic magics[], Direction directions[]) {
 
     // Optimal PRNG seeds to pick the correct magics in the shortest time
     int seeds[][RANK_NB] = { { 8977, 44560, 54343, 38998,  5731, 95205, 104912, 17020 },
@@ -269,7 +207,7 @@ namespace {
         // the number of 1s of the mask. Hence we deduce the size of the shift to
         // apply to the 64 or 32 bits word to get the index.
         Magic& m = magics[s];
-        m.mask  = sliding_attack(deltas, s, 0) & ~edges;
+        m.mask  = sliding_attack(directions, s, 0) & ~edges;
         m.shift = (Is64Bit ? 64 : 32) - popcount(m.mask);
 
         // Set the offset for the attacks table of the square. We have individual
@@ -281,7 +219,7 @@ namespace {
         b = size = 0;
         do {
             occupancy[size] = b;
-            reference[size] = sliding_attack(deltas, s, b);
+            reference[size] = sliding_attack(directions, s, b);
 
             if (HasPext)
                 m.attacks[pext(b, m.mask)] = reference[size];

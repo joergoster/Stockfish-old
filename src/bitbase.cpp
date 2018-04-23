@@ -2,7 +2,7 @@
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2008 Tord Romstad (Glaurung author)
   Copyright (C) 2008-2015 Marco Costalba, Joona Kiiski, Tord Romstad
-  Copyright (C) 2015-2017 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
+  Copyright (C) 2015-2018 Marco Costalba, Joona Kiiski, Gary Linscott, Tord Romstad
 
   Stockfish is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@
 namespace {
 
   // There are 24 possible pawn squares: the first 4 files and ranks from 2 to 7
-  const unsigned MAX_INDEX = 2*24*64*64; // stm * psq * wksq * bksq = 196608
+  constexpr unsigned MAX_INDEX = 2*24*64*64; // stm * psq * wksq * bksq = 196608
 
   // Each uint32_t stores results of 32 positions, one per bit
   uint32_t KPKBitbase[MAX_INDEX / 32];
@@ -111,7 +111,7 @@ namespace {
     ksq[WHITE] = Square((idx >>  0) & 0x3F);
     ksq[BLACK] = Square((idx >>  6) & 0x3F);
     us         = Color ((idx >> 12) & 0x01);
-    psq        = make_square(File((idx >> 13) & 0x3), RANK_7 - Rank((idx >> 15) & 0x7));
+    psq        = make_square(File((idx >> 13) & 0x3), Rank(RANK_7 - ((idx >> 15) & 0x7)));
 
     // Check if two pieces are on the same square or if a king can be captured
     if (   distance(ksq[WHITE], ksq[BLACK]) <= 1
@@ -152,9 +152,9 @@ namespace {
     // as WIN, the position is classified as WIN, otherwise the current position is
     // classified as UNKNOWN.
 
-    const Color  Them = (Us == WHITE ? BLACK : WHITE);
-    const Result Good = (Us == WHITE ? WIN   : DRAW);
-    const Result Bad  = (Us == WHITE ? DRAW  : WIN);
+    constexpr Color  Them = (Us == WHITE ? BLACK : WHITE);
+    constexpr Result Good = (Us == WHITE ? WIN   : DRAW);
+    constexpr Result Bad  = (Us == WHITE ? DRAW  : WIN);
 
     Result r = INVALID;
     Bitboard b = PseudoAttacks[KING][ksq[Us]];
