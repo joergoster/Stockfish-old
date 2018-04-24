@@ -351,7 +351,7 @@ void Thread::search() {
               beta  = std::min(rootMoves[PVIdx].previousScore + delta, VALUE_INFINITE);
 
               // Adjust contempt based on best score of the previous iteration (dynamic contempt)
-              int dynCt = baseCt + int(std::round(48 * atan(float(rootMoves[0].previousScore) / 128)));
+              int dynCt = baseCt + 88 * rootMoves[0].previousScore / (abs(rootMoves[0].previousScore) + 200);
 
               Eval::Contempt = (us == WHITE ?  make_score(dynCt, dynCt / 2)
                                             : -make_score(dynCt, dynCt / 2));
