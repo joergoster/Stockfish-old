@@ -1022,11 +1022,15 @@ moves_loop: // When in check, search starts from here
               r = std::max(DEPTH_ZERO, (r / ONE_PLY - ss->statScore / 20000) * ONE_PLY);
           }
 
-          Depth d = std::max(newDepth - r, ONE_PLY);
+          doFullDepthSearch = r == DEPTH_ZERO;
 
-          value = -search<NonPV>(pos, ss+1, -(alpha+1), -alpha, d, true, false);
+          if (!doFullDepthSearch)
+          {
+              Depth d = std::max(newDepth - r, ONE_PLY);
+              value = -search<NonPV>(pos, ss+1, -(alpha+1), -alpha, d, true, false);
 
-          doFullDepthSearch = (value > alpha && d != newDepth);
+              doFullDepthSearch = value > alpha;
+          }
       }
       else
           doFullDepthSearch = !PvNode || moveCount > 1;
