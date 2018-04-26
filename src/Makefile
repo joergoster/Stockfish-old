@@ -22,7 +22,11 @@
 ### ==========================================================================
 
 ### Executable name
+ifeq ($(COMP),mingw)
+EXE = zander.exe
+else
 EXE = zander
+endif
 
 ### Installation dir definitions
 PREFIX = /usr/local
@@ -437,7 +441,7 @@ clean: objclean profileclean
 
 # clean binaries and objects
 objclean:
-	@rm -f $(EXE) $(EXE).exe *.o ./syzygy/*.o
+	@rm -f $(EXE) *.o ./syzygy/*.o
 
 # clean auxiliary profiling files
 profileclean:
