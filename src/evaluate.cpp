@@ -53,15 +53,15 @@ namespace Trace {
   }
 
   std::ostream& operator<<(std::ostream& os, Score s) {
-    os << std::setw(5) << to_cp(mg_value(s)) << " "
-       << std::setw(5) << to_cp(eg_value(s));
+    os << std::setw(6) << to_cp(mg_value(s)) << " "
+       << std::setw(6) << to_cp(eg_value(s));
     return os;
   }
 
   std::ostream& operator<<(std::ostream& os, Term t) {
 
     if (t == INITIATIVE || t == TOTAL)
-        os << " ----  ----"    << " | " << " ----  ----";
+        os << "  ----   ----"    << " | " << "  ----   ----";
     else
         os << scores[t][WHITE] << " | " << scores[t][BLACK];
 
@@ -923,9 +923,9 @@ std::string Eval::trace(const Position& pos) {
 
   std::stringstream ss;
   ss << std::showpoint << std::noshowpos << std::fixed << std::setprecision(2)
-     << "     Term    |    White    |    Black    |    Total   \n"
-     << "             |   MG    EG  |   MG    EG  |   MG    EG \n"
-     << " ------------+-------------+-------------+------------\n"
+     << "     Term    |     White     |     Black     |     Total    \n"
+     << "             |   MG     EG   |   MG     EG   |   MG     EG  \n"
+     << " ------------+---------------+---------------+--------------\n"
      << "    Material | " << Term(MATERIAL)
      << "   Imbalance | " << Term(IMBALANCE)
      << "  Initiative | " << Term(INITIATIVE)
@@ -939,7 +939,7 @@ std::string Eval::trace(const Position& pos) {
      << "     Threats | " << Term(THREAT)
      << "      Passed | " << Term(PASSED)
      << "       Space | " << Term(SPACE)
-     << " ------------+-------------+-------------+------------\n"
+     << " ------------+---------------+---------------+--------------\n"
      << "       Total | " << Term(TOTAL);
 
   ss << "\nTotal evaluation: " << to_cp(v) << " (white side)\n";
