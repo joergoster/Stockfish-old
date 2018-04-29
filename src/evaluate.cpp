@@ -85,6 +85,9 @@ namespace {
     KingSide,    KingSide,  KingSide
   };
 
+  // Maximum allowed material score
+  constexpr Score MaxMaterial = make_score(100 * PawnValueMg, 100 * PawnValueEg);
+
   // Threshold for space evaluation
   constexpr Value SpaceThreshold = Value(12222);
 
@@ -483,7 +486,8 @@ namespace {
         {
             int mobilityDanger = mg_value(mobility[Them] - mobility[Us]);
             kingDanger = std::max(0, kingDanger + mobilityDanger);
-            score -= make_score(kingDanger * kingDanger / 4096, kingDanger / 16);
+            score -= make_score(std::min(kingDanger * kingDanger / 4096, int(QueenValueMg)),
+                                std::min(kingDanger / 16, int(PawnValueEg)));
         }
     }
 
@@ -845,7 +849,8 @@ namespace {
     // Initialize score by reading the incrementally updated scores included in
     // the position object (material + piece square tables) and the material
     // imbalance. Score is computed internally from the white point of view.
-    Score score = pos.psq_score(WHITE) - pos.psq_score(BLACK);
+    Score score =  std::min(pos.psq_score(WHITE), MaxMaterial)
+                 - std::min(pos.psq_score(BLACK), MaxMaterial);
     score += (me->imbalance(WHITE)- me->imbalance(BLACK)) / 8;
 
     // Probe the pawn hash table and add the pawn eval
@@ -885,7 +890,8 @@ namespace {
     // In case of tracing add all remaining individual evaluation terms
     if (T)
     {
-        Trace::add(MATERIAL, pos.psq_score(WHITE), pos.psq_score(BLACK));
+        Trace::add(MATERIAL, std::min(pos.psq_score(WHITE), MaxMaterial),
+                             std::min(pos.psq_score(BLACK), MaxMaterial));
         Trace::add(IMBALANCE, me->imbalance(WHITE)/8, me->imbalance(BLACK)/8);
         Trace::add(PAWN, pe->pawn_score(WHITE), pe->pawn_score(BLACK));
         Trace::add(MOBILITY, mobility[WHITE], mobility[BLACK]);
