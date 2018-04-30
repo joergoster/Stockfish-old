@@ -341,14 +341,14 @@ void Thread::search() {
       {
           // Reset UCI info selDepth and bestValue for each depth and each PV line
           selDepth = 1;
-          bestValue = -VALUE_INFINITE;
+          bestValue = rootMoves[PVIdx].previousScore;
 
           // Reset aspiration window starting size
-          if (rootDepth >= 5 * ONE_PLY && abs(rootMoves[PVIdx].previousScore) < VALUE_KNOWN_WIN)
+          if (rootDepth >= 5 * ONE_PLY && abs(bestValue) < VALUE_KNOWN_WIN)
           {
               delta = Value(18);
-              alpha = std::max(rootMoves[PVIdx].previousScore - delta,-VALUE_INFINITE);
-              beta  = std::min(rootMoves[PVIdx].previousScore + delta, VALUE_INFINITE);
+              alpha = bestValue - delta;
+              beta  = bestValue + delta;
 
               // Adjust contempt based on best score of the previous iteration (dynamic contempt)
               int dynCt = baseCt + 88 * rootMoves[0].previousScore / (abs(rootMoves[0].previousScore) + 200);
