@@ -344,7 +344,7 @@ void Thread::search() {
           bestValue = -VALUE_INFINITE;
 
           // Reset aspiration window starting size
-          if (rootDepth >= 5 * ONE_PLY)
+          if (rootDepth >= 5 * ONE_PLY && abs(rootMoves[PVIdx].previousScore) < VALUE_KNOWN_WIN)
           {
               delta = Value(18);
               alpha = std::max(rootMoves[PVIdx].previousScore - delta,-VALUE_INFINITE);
@@ -355,6 +355,11 @@ void Thread::search() {
 
               Eval::Contempt = (us == WHITE ?  make_score(dynCt, dynCt / 2)
                                             : -make_score(dynCt, dynCt / 2));
+          }
+          else
+          {
+              alpha = -VALUE_INFINITE;
+              beta  =  VALUE_INFINITE;
           }
 
           // Start with a small aspiration window and, in the case of a fail
@@ -392,7 +397,7 @@ void Thread::search() {
               if (bestValue <= alpha)
               {
                   beta = (alpha + beta) / 2;
-                  alpha = std::max(bestValue - delta, -VALUE_INFINITE);
+                  alpha = bestValue - delta;
 
                   if (mainThread)
                   {
@@ -401,11 +406,18 @@ void Thread::search() {
                   }
               }
               else if (bestValue >= beta)
-                  beta = std::min(bestValue + delta, VALUE_INFINITE);
+                  beta = bestValue + delta;
               else
                   break;
 
               delta += delta / 4 + 5;
+
+              // Search with full window in case we have a win/mate score
+              if (abs(bestValue) >= VALUE_KNOWN_WIN)
+              {
+                  alpha = -VALUE_INFINITE;
+                  beta  =  VALUE_INFINITE;
+              }
 
               assert(delta >= VALUE_ZERO);
               assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE);
