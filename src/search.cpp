@@ -547,7 +547,7 @@ namespace {
 
         // Step 3c. Check for draw by repetition
         if (pos.is_repetition(ss->ply))
-            return VALUE_DRAW;
+            return VALUE_REP_DRAW;
 
         // Step 3d. Check for maximum ply reached
         if (ss->ply >= MAX_PLY)
@@ -1165,7 +1165,7 @@ moves_loop: // When in check, search starts from here
     if (PvNode)
         bestValue = std::min(bestValue, maxValue);
 
-    if (!excludedMove)
+    if (!excludedMove && bestValue != VALUE_REP_DRAW)
         tte->save(posKey, value_to_tt(bestValue, ss->ply),
                   bestValue >= beta ? BOUND_LOWER :
                   PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
@@ -1217,7 +1217,7 @@ moves_loop: // When in check, search starts from here
 
     // Check for draw by repetition
     if (pos.is_repetition(ss->ply))
-        return VALUE_DRAW;
+        return VALUE_REP_DRAW;
 
     // Check for maximum ply reached
     if (ss->ply >= MAX_PLY)
@@ -1389,9 +1389,10 @@ moves_loop: // When in check, search starts from here
     if (inCheck && bestValue == -VALUE_INFINITE)
         return mated_in(ss->ply); // Plies to mate from the root
 
-    tte->save(posKey, value_to_tt(bestValue, ss->ply),
-              PvNode && bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER,
-              ttDepth, bestMove, ss->staticEval, TT.generation());
+    if (bestValue != VALUE_REP_DRAW)
+        tte->save(posKey, value_to_tt(bestValue, ss->ply),
+                  PvNode && bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER,
+                  ttDepth, bestMove, ss->staticEval, TT.generation());
 
     assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
 
