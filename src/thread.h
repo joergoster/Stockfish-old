@@ -60,6 +60,7 @@ public:
   Pawns::Table pawnsTable;
   Material::Table materialTable;
   Endgames endgames;
+  Score contempt;
   size_t PVIdx, multiPV;
   int selDepth;
   std::atomic<uint64_t> nodes, tbHits;

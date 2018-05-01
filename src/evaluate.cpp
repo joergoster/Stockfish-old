@@ -28,8 +28,7 @@
 #include "evaluate.h"
 #include "material.h"
 #include "pawns.h"
-
-std::atomic<Score> Eval::Contempt;
+#include "thread.h"
 
 namespace Trace {
 
@@ -863,7 +862,7 @@ namespace {
     score += pe->pawn_score(WHITE) - pe->pawn_score(BLACK);
 
     // Add contempt
-    score += Eval::Contempt;
+    score += pos.this_thread()->contempt;
 
     // Main evaluation begins here
 
@@ -926,7 +925,7 @@ std::string Eval::trace(const Position& pos) {
 
   std::memset(scores, 0, sizeof(scores));
 
-  Eval::Contempt = SCORE_ZERO; // Reset any dynamic contempt
+  pos.this_thread()->contempt = SCORE_ZERO; // Reset any dynamic contempt
 
   Value v = Evaluation<TRACE>(pos).value();
 
