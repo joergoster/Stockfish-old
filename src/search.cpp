@@ -311,6 +311,17 @@ void Thread::search() {
   multiPV = std::min((size_t)Options["MultiPV"], rootMoves.size());
 
   int baseCt = Options["Contempt"] * PawnValueEg / 100; // From centipawns
+  int ct = 1; // Factor for changing sign of contempt when analyzing
+
+  // In analysis mode, adjust contempt in accordance with user preference
+  if (Limits.infinite)
+      ct =  Options["Analysis Contempt"] == "Off" ?  0
+          : Options["Analysis Contempt"] == "White" && us == BLACK ? -ct
+          : Options["Analysis Contempt"] == "Black" && us == WHITE ? -ct
+          : ct; // contempt remains with the side to move
+
+  // In evaluate.cpp the evaluation is from the white point of view
+  baseCt *= ct;
   contempt = (us == WHITE ?  make_score(baseCt, baseCt / 2)
                           : -make_score(baseCt, baseCt / 2));
 
@@ -351,7 +362,7 @@ void Thread::search() {
               beta  = bestValue + delta;
 
               // Adjust contempt based on best score of the previous iteration for each PV line (dynamic contempt)
-              int dynCt = baseCt + 88 * bestValue / (abs(bestValue) + 200);
+              int dynCt = baseCt + ct * 88 * bestValue / (abs(bestValue) + 200);
 
               contempt = (us == WHITE ?  make_score(dynCt, dynCt / 2)
                                       : -make_score(dynCt, dynCt / 2));
