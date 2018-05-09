@@ -738,6 +738,7 @@ namespace {
     if (    doNull
         && !PvNode
         &&  eval >= beta
+        && (ss-1)->statScore < 30000
         &&  ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
         &&  thisThread->selDepth + 5 > thisThread->rootDepth / ONE_PLY
         && !(depth > 12 * ONE_PLY && MoveList<LEGAL>(pos).size() < 4))
