@@ -342,10 +342,10 @@ void Thread::search() {
       if (mainThread)
           mainThread->bestMoveChanges *= 0.517, mainThread->failedLow = false;
 
-      // Save the last iteration's scores before first PV line is searched and
-      // all the move scores except the (new) PV are set to -VALUE_INFINITE.
+      // Save the last iteration's scores before first PV line is searched
+      // and reset all move scores to -VALUE_INFINITE.
       for (RootMove& rm : rootMoves)
-          rm.previousScore = rm.score;
+          rm.previousScore = rm.score, rm.score = -VALUE_INFINITE;
 
       // MultiPV loop. We perform a full root search for each PV line
       for (PVIdx = 0; PVIdx < (rootDepth < 5 * ONE_PLY ? rootMoves.size() : multiPV) && !Threads.stop; ++PVIdx)
