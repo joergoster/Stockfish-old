@@ -66,22 +66,13 @@ namespace {
   constexpr int SkipSize[]  = { 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4 };
   constexpr int SkipPhase[] = { 0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7 };
 
-  // Razor and futility margins
+  // Razor, futility and capturing margins
   constexpr int RazorMargin[] = { 0, 590, 604 };
+  constexpr int CapturePruneMargin[] = { 0, 253, 500, 693, 996, 1140, 1339 };
 
   Value futility_margin(Depth d, bool improving) {
     return Value((175 - 50 * improving) * d / ONE_PLY);
   }
-
-  // Margin for pruning capturing moves: almost linear in depth
-  constexpr int CapturePruneMargin[] = { 0,
-                                         1 * PawnValueEg * 1055 / 1000,
-                                         2 * PawnValueEg * 1042 / 1000,
-                                         3 * PawnValueEg * 963  / 1000,
-                                         4 * PawnValueEg * 1038 / 1000,
-                                         5 * PawnValueEg * 950  / 1000,
-                                         6 * PawnValueEg * 930  / 1000
-                                       };
 
   // Futility and reductions lookup tables, initialized at startup
   int FutilityMoveCounts[2][16]; // [improving][depth]
@@ -721,8 +712,9 @@ namespace {
         && depth < 3 * ONE_PLY
         && eval <= alpha - RazorMargin[depth / ONE_PLY])
     {
-        Value ralpha = alpha - (depth >= 2 * ONE_PLY) * RazorMargin[depth / ONE_PLY];
+        Value ralpha = depth < 2 * ONE_PLY ? alpha : alpha - RazorMargin[2];
         Value v = qsearch<NonPV>(pos, ss, ralpha, ralpha+1);
+
         if (depth < 2 * ONE_PLY || v <= ralpha)
             return v;
     }
@@ -730,7 +722,7 @@ namespace {
     // Step 8. Futility pruning: child node (skipped when in check)
     if (   !rootNode
         &&  depth < 7 * ONE_PLY
-        &&  eval - futility_margin(depth, improving) >= beta
+        &&  eval >= beta + futility_margin(depth, improving)
         &&  eval < VALUE_KNOWN_WIN) // Do not return unproven wins
         return eval;
 
