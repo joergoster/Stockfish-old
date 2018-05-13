@@ -46,7 +46,6 @@ enum EndgameCode {
   KRKB,  // KR vs KB
   KRKN,  // KR vs KN
   KQKP,  // KQ vs KP
-  KQKR,  // KQ vs KR
 
   SCALING_FUNCTIONS,
   KBPsK,   // KB and pawns vs K
