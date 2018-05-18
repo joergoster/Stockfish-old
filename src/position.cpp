@@ -1076,8 +1076,8 @@ bool Position::see_ge(Move m, Value threshold) const {
 }
 
 
-/// Position::is_draw() tests whether the position is drawn by 50-move rule
-/// or by repetition. It does not detect stalemates.
+/// Position::is_repetition() tests whether the position
+/// is drawn by repetition. It does not detect stalemates.
 
 bool Position::is_repetition(int ply) const {
 
@@ -1101,6 +1101,35 @@ bool Position::is_repetition(int ply) const {
   }
 
   return false;
+}
+
+
+// Position::has_repeated() tests whether there has been at least one repetition
+// of positions since the last capture or pawn move. (used by TB root move ranking)
+
+bool Position::has_repeated() const {
+
+    StateInfo* stc = st;
+    while (true)
+    {
+        int i = 4, e = std::min(stc->rule50, stc->pliesFromNull);
+
+        if (e < i)
+            return false;
+
+        StateInfo* stp = stc->previous->previous;
+
+        do {
+            stp = stp->previous->previous;
+
+            if (stp->key == stc->key)
+                return true;
+
+            i += 2;
+        } while (i <= e);
+
+        stc = stc->previous; // Step one position back
+    }
 }
 
 
