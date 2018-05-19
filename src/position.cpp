@@ -1083,7 +1083,7 @@ bool Position::is_repetition(int ply) const {
 
   int end = std::min(st->rule50, st->pliesFromNull);
 
-  if (end < 4)
+  if (end < 4) // no repetition possible
     return false;
 
   StateInfo* stp = st->previous->previous;
@@ -1093,7 +1093,7 @@ bool Position::is_repetition(int ply) const {
   {
       stp = stp->previous->previous;
 
-      // Return a draw score if a position repeats once earlier but strictly
+      // Return a draw score if a position repeats once strictly
       // after the root, or repeats twice before or at the root.
       if (   stp->key == st->key
           && ++cnt + (ply > i) == 2)
@@ -1105,20 +1105,21 @@ bool Position::is_repetition(int ply) const {
 
 
 // Position::has_repeated() tests whether there has been at least one repetition
-// of positions since the last capture or pawn move. (used by TB root move ranking)
+// of positions since the last capture or pawn move. (Used by TB probing)
 
 bool Position::has_repeated() const {
 
+    // Start with the current position
     StateInfo* stc = st;
+
     while (true)
     {
         int i = 4, e = std::min(stc->rule50, stc->pliesFromNull);
 
-        if (e < i)
+        if (e < i) // no repetition possible
             return false;
 
         StateInfo* stp = stc->previous->previous;
-
         do {
             stp = stp->previous->previous;
 
@@ -1128,7 +1129,7 @@ bool Position::has_repeated() const {
             i += 2;
         } while (i <= e);
 
-        stc = stc->previous; // Step one position back
+        stc = stc->previous; // No repetition found, step one position back
     }
 }
 

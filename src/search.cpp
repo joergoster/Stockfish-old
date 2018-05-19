@@ -372,18 +372,7 @@ void Thread::search() {
           {
               bestValue = ::search<PV>(rootPos, ss, alpha, beta, rootDepth, false, true);
 
-              // Bring the best move to the front. It is critical that sorting
-              // is done with a stable algorithm because all the values but the
-              // first and eventually the new best one are set to -VALUE_INFINITE
-              // and we want to keep the same order for all the moves except the
-              // new PV that goes to the front. Note that in case of MultiPV
-              // search the already searched PV lines are preserved.
-//              if (PVIdx + 1 == multiPV)
-//                  std::stable_sort(rootMoves.begin() + PVIdx, rootMoves.end());
-
-              // If search has been stopped, we break immediately. Sorting is
-              // safe because RootMoves is still valid, although it refers to
-              // the previous iteration.
+              // If search has been stopped, we break immediately
               if (Threads.stop)
                   break;
 
@@ -430,10 +419,12 @@ void Thread::search() {
           // Best move before sorting
           currentBestMove = rootMoves[0].pv[0];
 
-          // Sort the PV lines searched so far
+          // Sort the PV lines searched so far. In case of stop, sorting is
+          // safe because RootMoves is still valid, although it refers to
+          // the previous iteration.
           std::stable_sort(rootMoves.begin(), rootMoves.begin() + PVIdx + 1);
 
-          // Update the GUI with the new PV line
+          // Update the GUI with the new best move or the new PV line
           if (    mainThread
               && (Threads.stop || PVIdx + 1 == multiPV || rootMoves[0].pv[0] != currentBestMove))
               sync_cout << UCI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
