@@ -802,34 +802,23 @@ namespace {
   ScaleFactor Evaluation<T>::scale_factor(Value eg) const {
 
     Color strongSide = eg > VALUE_DRAW ? WHITE : BLACK;
-    int sf = me->scale_factor(pos, strongSide);
 
-    // If scale is not already specific, scale down the endgame via general heuristics
-    if (sf == SCALE_FACTOR_NORMAL)
-    {
-        if (pos.opposite_bishops())
-        {
-            // Endgame with opposite-colored bishops and no other pieces is almost a draw
-            if (   pos.non_pawn_material(WHITE) == BishopValueMg
-                && pos.non_pawn_material(BLACK) == BishopValueMg)
-                sf = 31;
+    // If scale is already specific, return immediately
+    if (me->scale_factor(pos, strongSide) != SCALE_FACTOR_NORMAL)
+        return me->scale_factor(pos, strongSide);
 
-            // Endgame with opposite-colored bishops, but also other pieces. Still
-            // a bit drawish, but not as drawish as with only the two bishops.
-            else
-                sf = 46;
-        }
-        else
-            sf = std::min(40 + 7 * pos.count<PAWN>(strongSide), sf);
-    }
+    // Scale down endgames with opposite-colored bishops, more with no other pieces.
+    // Otherwise scale depending on the number of pawns.
+    int sf = pos.opposite_bishops() ? pos.non_pawn_material() == 2 * BishopValueMg ? 31 : 46
+                                    : std::min(40 + 7 * pos.count<PAWN>(strongSide), int(SCALE_FACTOR_NORMAL));
 
     return ScaleFactor(sf);
   }
 
 
-  // Evaluation::value() is the main function of the class. It computes the various
-  // parts of the evaluation and returns the value of the position from the point
-  // of view of the side to move.
+  // Evaluation::value() is the main function of the class.
+  // It computes the various parts of the evaluation and returns the
+  // value of the position from the point of view of the side to move.
 
   template<Tracing T>
   Value Evaluation<T>::value() {
@@ -839,17 +828,17 @@ namespace {
     // Probe the material hash table
     me = Material::probe(pos);
 
-    // If we have a specialized evaluation function for the current material
-    // configuration, call it and return.
+    // If we have a specialized evaluation function for the current
+    // material configuration, call it and return.
     if (me->specialized_eval_exists())
         return me->evaluate(pos);
 
-    // Initialize score by reading the incrementally updated scores included in
-    // the position object (material + piece square tables) and the material
-    // imbalance. Score is computed internally from the white point of view.
+    // Initialize score by reading the incrementally updated scores included in the
+    // position object (material + piece square tables) and the material imbalance.
+    // Score is computed internally from the white point of view.
     Score score =  std::min(pos.psq_score(WHITE), MaxMaterial)
                  - std::min(pos.psq_score(BLACK), MaxMaterial);
-    score += (me->imbalance(WHITE)- me->imbalance(BLACK)) / 8;
+    score += (me->imbalance(WHITE) - me->imbalance(BLACK)) / 8;
 
     // Probe the pawn hash table and add the pawn eval
     pe = Pawns::probe(pos);
@@ -877,9 +866,9 @@ namespace {
     score += space<  WHITE>() - space<  BLACK>();
 
     score += initiative(eg_value(score));
-
-    // Interpolate between a middlegame and a (scaled by 'sf') endgame score
     ScaleFactor sf = scale_factor(eg_value(score));
+
+    // Finally, interpolate between a middlegame and a scaled by sf endgame score
     Value v =  mg_value(score) * int(me->game_phase())
              + eg_value(score) * int(PHASE_MIDGAME - me->game_phase()) * sf / SCALE_FACTOR_NORMAL;
 
