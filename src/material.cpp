@@ -164,26 +164,6 @@ Entry* probe(const Position& pos) {
       e->value = int16_t((imbalance<WHITE>(pieceCount) - imbalance<BLACK>(pieceCount)) / 16);
   }
 
-  // Zero or just one pawn makes it difficult to win, even with a small material
-  // advantage. This catches some trivial draws like KK, KBK and KNK and gives a
-  // drawish scale factor for cases such as KRKBP and KmmKm (except for KBBKN).
-  if (!pos.count<PAWN>(WHITE) && npm_w - npm_b <= BishopValueMg)
-      e->factor[WHITE] = uint8_t(npm_w <  RookValueMg   ? SCALE_FACTOR_DRAW :
-                                 npm_b <= BishopValueMg ? 4 : 14);
-
-  if (!pos.count<PAWN>(BLACK) && npm_b - npm_w <= BishopValueMg)
-      e->factor[BLACK] = uint8_t(npm_b <  RookValueMg   ? SCALE_FACTOR_DRAW :
-                                 npm_w <= BishopValueMg ? 4 : 14);
-
-  // Scale down endgames with opposite-colored bishops, more with no other pieces.
-  // Otherwise scale depending on the number of pawns.
-  for (Color c = WHITE; c <= BLACK; ++c)
-  {
-      if (e->factor[c] == SCALE_FACTOR_NORMAL)
-          e->factor[c] = uint8_t(pos.opposite_bishops() ? npm_w + npm_b == 2 * BishopValueMg ? 31 : 46
-                                                        : std::min(40 + 7 * pos.count<PAWN>(c), 64));
-  }
-
   // OK, we didn't find any special evaluation function for the current material
   // configuration. Is there a suitable specialized scaling function?
   EndgameBase<ScaleFactor>* sf;
@@ -191,7 +171,9 @@ Entry* probe(const Position& pos) {
   if ((sf = pos.this_thread()->endgames.probe<ScaleFactor>(key)) != nullptr)
   {
       e->scalingFunction[sf->strongSide] = sf; // Only strong color assigned
-      return e;
+
+      if ((*e->scalingFunction[sf->strongSide])(pos) != SCALE_FACTOR_NONE)
+          return e;
   }
 
   // We didn't find any specialized scaling function, so fall back on generic
@@ -227,6 +209,26 @@ Entry* probe(const Position& pos) {
           e->scalingFunction[WHITE] = &ScaleKPKP[WHITE];
           e->scalingFunction[BLACK] = &ScaleKPKP[BLACK];
       }
+  }
+
+  // Zero or just one pawn makes it difficult to win, even with a small material
+  // advantage. This catches some trivial draws like KK, KBK and KNK and gives a
+  // drawish scale factor for cases such as KRKBP and KmmKm (except for KBBKN).
+  if (!pos.count<PAWN>(WHITE) && npm_w - npm_b <= BishopValueMg)
+      e->factor[WHITE] = uint8_t(npm_w <  RookValueMg   ? SCALE_FACTOR_DRAW :
+                                 npm_b <= BishopValueMg ? 4 : 14);
+
+  if (!pos.count<PAWN>(BLACK) && npm_b - npm_w <= BishopValueMg)
+      e->factor[BLACK] = uint8_t(npm_b <  RookValueMg   ? SCALE_FACTOR_DRAW :
+                                 npm_w <= BishopValueMg ? 4 : 14);
+
+  // Scale down endgames with opposite-colored bishops, more with no other pieces.
+  // Otherwise scale depending on the number of pawns.
+  for (Color c = WHITE; c <= BLACK; ++c)
+  {
+      if (e->factor[c] == SCALE_FACTOR_NORMAL)
+          e->factor[c] = uint8_t(pos.opposite_bishops() ? npm_w + npm_b == 2 * BishopValueMg ? 31 : 46
+                                                        : std::min(40 + 7 * pos.count<PAWN>(c), 64));
   }
 
   return e;
