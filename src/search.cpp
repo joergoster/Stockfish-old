@@ -509,6 +509,7 @@ namespace {
     TTEntry* tte;
     Key posKey;
     Move ttMove, move, excludedMove, bestMove;
+    Color us;
     Depth extension, newDepth;
     Value bestValue, value, ttValue, eval, maxValue;
     bool ttHit, inCheck, givesCheck, improving;
@@ -519,6 +520,7 @@ namespace {
     // Step 1. Initialize node
     Thread* thisThread = pos.this_thread();
     inCheck = bool(pos.checkers());
+    us = pos.side_to_move();
     moveCount = captureCount = quietCount = ss->moveCount = 0;
     bestValue = -VALUE_INFINITE;
     maxValue = VALUE_INFINITE;
@@ -614,7 +616,7 @@ namespace {
             else if (!pos.capture_or_promotion(ttMove))
             {
                 int penalty = -stat_bonus(depth);
-                thisThread->mainHistory[pos.side_to_move()][from_to(ttMove)] << penalty;
+                thisThread->mainHistory[us][from_to(ttMove)] << penalty;
                 update_continuation_histories(ss, pos.moved_piece(ttMove), to_sq(ttMove), penalty);
             }
         }
@@ -701,7 +703,7 @@ namespace {
 
     if (    skipEarlyPruning
         ||  thisThread->rootDepth < 7 * ONE_PLY
-        || !pos.non_pawn_material(pos.side_to_move()))
+        || !pos.non_pawn_material(us))
         goto moves_loop;
 
     // Step 7. Razoring (skipped when in check)
@@ -908,7 +910,7 @@ moves_loop: // When in check, search starts from here
       // Step 14. Pruning at shallow depth
       if (  !rootNode
           && thisThread->rootDepth > 6 * ONE_PLY
-          && pos.non_pawn_material(pos.side_to_move())
+          && pos.non_pawn_material(us)
           && bestValue > VALUE_MATED_IN_MAX_PLY
           && beta < VALUE_MATE_IN_MAX_PLY)
       {
@@ -1011,7 +1013,7 @@ moves_loop: // When in check, search starts from here
                        && !pos.see_ge(make_move(to_sq(move), from_sq(move))))
                   r -= 2 * ONE_PLY;
 
-              ss->statScore =  thisThread->mainHistory[~pos.side_to_move()][from_to(move)]
+              ss->statScore =  thisThread->mainHistory[us][from_to(move)]
                              + (*contHist[0])[movedPiece][to_sq(move)]
                              + (*contHist[1])[movedPiece][to_sq(move)]
                              + (*contHist[3])[movedPiece][to_sq(move)]
