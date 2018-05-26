@@ -89,6 +89,7 @@ namespace {
 
   // Global switch for Null-move search
   bool doNull;
+  int PruningLevel;
 
   template <NodeType NT>
   Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth, bool cutNode, bool skipEarlyPruning);
@@ -279,7 +280,7 @@ void MainThread::search() {
 void Thread::search() {
 
   Stack stack[MAX_PLY+7], *ss = stack+4; // To reference from (ss-4) to (ss+2)
-  Value bestValue, alpha, beta, delta;
+  Value lastBestScore, bestValue, alpha, beta, delta;
   Move currentBestMove, lastBestMove;
   Depth lastBestMoveDepth = DEPTH_ZERO;
   MainThread* mainThread = (this == Threads.main() ? Threads.main() : nullptr);
@@ -299,6 +300,7 @@ void Thread::search() {
   if (mainThread)
       mainThread->bestMoveChanges = 0, mainThread->failedLow = false;
 
+  PruningLevel = 0;
   doNull = Options["NullMove"];
   multiPV = std::min((size_t)Options["MultiPV"], rootMoves.size());
 
@@ -323,7 +325,7 @@ void Thread::search() {
          && !(Limits.depth && mainThread && rootDepth / ONE_PLY > Limits.depth))
   {
       // Distribute search depths across the helper threads
-      if (idx > 0)
+      if (idx > 0 && rootDepth > 5 * ONE_PLY)
       {
           int i = (idx - 1) % 20;
           if (((rootDepth / ONE_PLY + rootPos.game_ply() + SkipPhase[i]) / SkipSize[i]) % 2)
@@ -338,6 +340,8 @@ void Thread::search() {
       // and reset all move scores to -VALUE_INFINITE.
       for (RootMove& rm : rootMoves)
           rm.previousScore = rm.score, rm.score = -VALUE_INFINITE;
+
+      lastBestScore = rootMoves[0].previousScore;
 
       // MultiPV loop. We perform a full root search for each PV line
       for (PVIdx = 0; PVIdx < rootMoves.size() && !Threads.stop; ++PVIdx)
@@ -363,6 +367,16 @@ void Thread::search() {
           {
               alpha = -VALUE_INFINITE;
               beta  =  VALUE_INFINITE;
+          }
+
+          if (rootDepth >= 7 * ONE_PLY)
+          {
+              if (PVIdx == 0)
+                  PruningLevel = 2;
+
+              else
+                  PruningLevel =  bestValue >= lastBestScore - 100 ? 3
+                                : bestValue >= lastBestScore - 300 ? 4 : 5;
           }
 
           // Start with a small aspiration window and, in the case of a fail
@@ -702,12 +716,13 @@ namespace {
                ||(ss-2)->staticEval == VALUE_NONE;
 
     if (    skipEarlyPruning
-        ||  thisThread->rootDepth < 7 * ONE_PLY
+        ||  PruningLevel == 0
         || !pos.non_pawn_material(us))
         goto moves_loop;
 
     // Step 7. Razoring (skipped when in check)
     if (  !PvNode
+        && PruningLevel > 1
         && depth < 3 * ONE_PLY
         && eval <= alpha - RazorMargin[depth / ONE_PLY])
     {
@@ -720,7 +735,7 @@ namespace {
 
     // Step 8. Futility pruning: child node (skipped when in check)
     if (   !rootNode
-        &&  depth < 7 * ONE_PLY
+        &&  depth < std::min(2 * PruningLevel + 1, 7) * ONE_PLY
         &&  eval >= beta + futility_margin(depth, improving)
         &&  eval < VALUE_KNOWN_WIN) // Do not return unproven wins
         return eval;
@@ -736,8 +751,16 @@ namespace {
     {
         assert(eval - beta >= 0);
 
-        // Null move dynamic reduction based on depth and value
-        Depth R = ((823 + 67 * depth / ONE_PLY) / 256 + std::min((eval - beta) / PawnValueMg, 3)) * ONE_PLY;
+        Depth R = 3 * ONE_PLY;
+
+        if (PruningLevel >= 2)
+        {
+            if (PruningLevel == 2)
+                R += (depth / (8 * ONE_PLY)) * ONE_PLY;
+            else
+                // Null move dynamic reduction based on depth and value
+                R = ((823 + 67 * depth / ONE_PLY) / 256 + std::min((eval - beta) / PawnValueMg, 3)) * ONE_PLY;
+        }
 
         ss->currentMove = MOVE_NULL;
         ss->contHistory = thisThread->contHistory[NO_PIECE][0].get();
@@ -870,7 +893,8 @@ moves_loop: // When in check, search starts from here
       movedPiece = pos.moved_piece(move);
       givesCheck = gives_check(pos, move);
 
-      moveCountPruning =   depth < 16 * ONE_PLY
+      moveCountPruning =   PruningLevel != 0
+                        && depth < std::min(6 * PruningLevel - 2, 16) * ONE_PLY
                         && moveCount >= FutilityMoveCounts[improving][depth / ONE_PLY];
 
       // Step 13. Extensions
@@ -909,7 +933,7 @@ moves_loop: // When in check, search starts from here
 
       // Step 14. Pruning at shallow depth
       if (  !rootNode
-          && thisThread->rootDepth > 6 * ONE_PLY
+          && PruningLevel > 0
           && pos.non_pawn_material(us)
           && bestValue > VALUE_MATED_IN_MAX_PLY
           && beta < VALUE_MATE_IN_MAX_PLY)
@@ -974,10 +998,14 @@ moves_loop: // When in check, search starts from here
       // Step 16. Reduced depth search (LMR). If the move fails high it will be
       // re-searched at full depth.
       if (    depth >= 3 * ONE_PLY
-          &&  moveCount > 1
+          &&  PruningLevel > 0
+          &&  moveCount > (PruningLevel == 1 ? 3 : PruningLevel == 2 ? 2 : 1)
           && (!captureOrPromotion || moveCountPruning))
       {
           Depth r = reduction<PvNode>(improving, depth, moveCount);
+
+          // Reduce/increase reduction according to the pruning level
+          r = std::max(r - (3 - PruningLevel) * ONE_PLY, DEPTH_ZERO);
 
           if (captureOrPromotion)
           {
