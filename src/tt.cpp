@@ -62,10 +62,10 @@ void TranspositionTable::clear() {
 
   const size_t stride = clusterCount / Options["Threads"];
   std::vector<std::thread> threads;
-  for (size_t idx = 0; idx < Options["Threads"]; idx++)
+  for (size_t idx = 0; idx < (size_t)Options["Threads"]; idx++)
   {
       const size_t start =  stride * idx,
-                   len =    idx != Options["Threads"] - 1 ?
+                   len =    idx != (size_t)Options["Threads"] - 1 ?
                             stride :
                             clusterCount - start;
       threads.push_back(std::thread([this, idx, start, len]() {
