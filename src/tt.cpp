@@ -60,16 +60,17 @@ void TranspositionTable::resize(size_t mbSize) {
 
 void TranspositionTable::clear() {
 
-  const size_t stride = clusterCount / Options["Threads"];
+  size_t requested = (size_t)Options["Threads"];
+  const size_t stride = clusterCount / requested;
   std::vector<std::thread> threads;
-  for (size_t idx = 0; idx < (size_t)Options["Threads"]; idx++)
+
+  for (size_t idx = 0; idx < requested; idx++)
   {
-      const size_t start =  stride * idx,
-                   len =    idx != (size_t)Options["Threads"] - 1 ?
-                            stride :
-                            clusterCount - start;
+      const size_t start = stride * idx,
+                     len = idx != requested - 1 ? stride
+                                                : clusterCount - start;
       threads.push_back(std::thread([this, idx, start, len]() {
-          if (Options["Threads"] >= 8)
+          if (requested >= 8)
               WinProcGroup::bindThisThread(idx);
           std::memset(&table[start], 0, len * sizeof(Cluster));
       }));
