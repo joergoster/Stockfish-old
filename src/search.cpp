@@ -239,34 +239,12 @@ void MainThread::search() {
   if (Limits.npmsec)
       Time.availableNodes += Limits.inc[us] - Threads.nodes_searched();
 
-  // Check if there are threads with a better score than main thread
-  Thread* bestThread = this;
-  if (    Options["MultiPV"] == 1
-      && !Limits.depth
-      &&  rootMoves[0].pv[0] != MOVE_NONE)
-  {
-      for (Thread* th : Threads)
-      {
-          Depth depthDiff = th->completedDepth - bestThread->completedDepth;
-          Value scoreDiff = th->rootMoves[0].score - bestThread->rootMoves[0].score;
+  previousScore = rootMoves[0].score;
 
-          // Select the thread with the best score, always if it is a mate
-          if (    scoreDiff > 0
-              && (depthDiff >= 0 || th->rootMoves[0].score >= VALUE_MATE_IN_MAX_PLY))
-              bestThread = th;
-      }
-  }
+  sync_cout << "bestmove " << UCI::move(rootMoves[0].pv[0], rootPos.is_chess960());
 
-  previousScore = bestThread->rootMoves[0].score;
-
-  // Send again PV info if we have a new best thread
-  if (bestThread != this)
-      sync_cout << UCI::pv(bestThread->rootPos, bestThread->completedDepth, -VALUE_INFINITE, VALUE_INFINITE) << sync_endl;
-
-  sync_cout << "bestmove " << UCI::move(bestThread->rootMoves[0].pv[0], rootPos.is_chess960());
-
-  if (bestThread->rootMoves[0].pv.size() > 1 || bestThread->rootMoves[0].extract_ponder_from_tt(rootPos))
-      std::cout << " ponder " << UCI::move(bestThread->rootMoves[0].pv[1], rootPos.is_chess960());
+  if (rootMoves[0].pv.size() > 1 || rootMoves[0].extract_ponder_from_tt(rootPos))
+      std::cout << " ponder " << UCI::move(rootMoves[0].pv[1], rootPos.is_chess960());
 
   std::cout << sync_endl;
 }
@@ -279,12 +257,13 @@ void MainThread::search() {
 void Thread::search() {
 
   Stack stack[MAX_PLY+7], *ss = stack+4; // To reference from (ss-4) to (ss+2)
-  Value bestValue, alpha, beta, delta;
+  Value lastBestScore, bestValue, alpha, beta, delta;
   Move currentBestMove, lastBestMove;
   Depth lastBestMoveDepth = DEPTH_ZERO;
   MainThread* mainThread = (this == Threads.main() ? Threads.main() : nullptr);
   double timeReduction = 1.0;
   Color us = rootPos.side_to_move();
+  Material::Entry* me;
 
   std::memset(ss-4, 0, 7 * sizeof(Stack));
   for (int i = 4; i > 0; i--)
@@ -301,6 +280,10 @@ void Thread::search() {
 
   doNull = Options["NullMove"];
   multiPV = std::min((size_t)Options["MultiPV"], rootMoves.size());
+
+  // Probe the material hash table
+  me = Material::probe(rootPos);
+  double mf = 8 - 7.0 * (PHASE_MIDGAME - me->game_phase()) / PHASE_MIDGAME;
 
   int baseCt = Options["Contempt"] * PawnValueEg / 100; // From centipawns
   int ct = 1; // Used for changing sign of contempt when analyzing
@@ -337,10 +320,26 @@ void Thread::search() {
       // Save the last iteration's scores before first PV line is searched
       // and reset all move scores to -VALUE_INFINITE.
       for (RootMove& rm : rootMoves)
-          rm.previousScore = rm.score, rm.score = -VALUE_INFINITE;
+          if (rm.score != -VALUE_INFINITE)
+              rm.previousScore = rm.score, rm.score = -VALUE_INFINITE;
+
+      lastBestScore = rootMoves[0].previousScore;
+
+      if (rootDepth < 9 * ONE_PLY)
+          PVLines = rootMoves.size();
+      else
+      {
+          PVLines = 1;
+
+          for (size_t i = 1; i < rootMoves.size(); i++)
+              if (rootMoves[i].previousScore >= lastBestScore - int(int(PawnValueEg) / mf))
+                  PVLines++;
+
+          PVLines = std::max(multiPV, PVLines);
+      }
 
       // MultiPV loop. We perform a full root search for each PV line
-      for (PVIdx = 0; PVIdx < rootMoves.size() && !Threads.stop; ++PVIdx)
+      for (PVIdx = 0; PVIdx < PVLines && !Threads.stop; ++PVIdx)
       {
           // Reset UCI info selDepth and bestValue for each depth and each PV line
           selDepth = 1;
@@ -372,6 +371,15 @@ void Thread::search() {
           {
               bestValue = ::search<PV>(rootPos, ss, alpha, beta, rootDepth, false, true);
 
+              // Bring the best move to the front. It is critical that sorting
+              // is done with a stable algorithm because all the values but the
+              // first and eventually the new best one are set to -VALUE_INFINITE
+              // and we want to keep the same order for all the moves except the
+              // new PV that goes to the front. Note that in case of MultiPV
+              // search the already searched PV lines are preserved.
+              if (PVIdx + 1 == PVLines)
+                  std::stable_sort(rootMoves.begin() + PVIdx, rootMoves.end());
+
               // If search has been stopped, we break immediately
               if (Threads.stop)
                   break;
@@ -379,8 +387,8 @@ void Thread::search() {
               // When failing high/low give some update (without cluttering
               // the UI) before a re-search.
               if (   mainThread
-                  && multiPV == 1
-                  && PVIdx == 0
+                  && PVLines == 1
+//                  && PVIdx == 0
                   && (bestValue <= alpha || bestValue >= beta)
                   && Time.elapsed() > 3000)
                   sync_cout << UCI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
@@ -417,16 +425,17 @@ void Thread::search() {
           }
 
           // Best move before sorting
-          currentBestMove = rootMoves[0].pv[0];
+          if (mainThread)
+              currentBestMove = rootMoves[0].pv[0];
 
-          // Sort the PV lines searched so far. In case of stop, sorting is
-          // safe because RootMoves is still valid, although it refers to
-          // the previous iteration.
+          // Let each thread sort the PV lines searched so far. In case of stop,
+          // sorting is safe because RootMoves is still valid, although it refers
+          // to the previous iteration.
           std::stable_sort(rootMoves.begin(), rootMoves.begin() + PVIdx + 1);
 
           // Update the GUI with the new best move or the new PV line
           if (    mainThread
-              && (Threads.stop || PVIdx + 1 == multiPV || rootMoves[0].pv[0] != currentBestMove))
+              && (Threads.stop || PVIdx + 1 == PVLines || rootMoves[0].pv[0] != currentBestMove))
               sync_cout << UCI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
       }
 
@@ -851,8 +860,9 @@ moves_loop: // When in check, search starts from here
                           thisThread->rootMoves.end(), move))
               continue;
 
-          // Skip all moves but the current PV line
-          if (move != ttMove)
+          // Skip all other moves until we have reached the last PV line
+          if (   thisThread->PVIdx + 1 < thisThread->PVLines
+              && move != ttMove)
               continue;
       }
 

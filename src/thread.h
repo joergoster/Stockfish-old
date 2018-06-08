@@ -61,7 +61,7 @@ public:
   Material::Table materialTable;
   Endgames endgames;
   Score contempt;
-  size_t PVIdx, multiPV;
+  size_t PVIdx, PVLines, multiPV;
   int selDepth;
   std::atomic<uint64_t> nodes, tbHits;
 
