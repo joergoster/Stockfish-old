@@ -448,10 +448,8 @@ void Thread::search() {
       if (!Threads.stop)
           completedDepth = rootDepth;
 
-      if (rootMoves[0].pv[0] != lastBestMove) {
-         lastBestMove = rootMoves[0].pv[0];
-         lastBestMoveDepth = rootDepth;
-      }
+      if (rootMoves[0].pv[0] != lastBestMove)
+         lastBestMove = rootMoves[0].pv[0], lastBestMoveDepth = rootDepth;
 
       // Have we found a "mate in x"?
       if (   Limits.mate
@@ -470,34 +468,34 @@ void Thread::search() {
       if (    Limits.use_time_management()
           && !Threads.stop
           && !Threads.stopOnPonderhit)
+      {
+          const int F[] = { mainThread->failedLow,
+                            bestValue - mainThread->previousScore };
+
+          int improvingFactor = std::max(246, std::min(832, 306 + 119 * F[0] - 6 * F[1]));
+
+          // If the bestMove is stable over several iterations, reduce time accordingly
+          timeReduction = 1.0;
+          for (int i : {3, 4, 5})
+              if (lastBestMoveDepth * i < completedDepth)
+                 timeReduction *= 1.20;
+
+          // Use part of the gained time from a previous stable move for the current move
+          double bestMoveInstability = 1.0 + mainThread->bestMoveChanges;
+          bestMoveInstability *= std::pow(mainThread->previousTimeReduction, 0.528) / timeReduction;
+
+          // Stop the search if we have only one legal move, or if available time elapsed
+          if (   rootMoves.size() == 1
+              || Time.elapsed() > Time.optimum() * bestMoveInstability * improvingFactor / 581)
           {
-              const int F[] = { mainThread->failedLow,
-                                bestValue - mainThread->previousScore };
-
-              int improvingFactor = std::max(246, std::min(832, 306 + 119 * F[0] - 6 * F[1]));
-
-              // If the bestMove is stable over several iterations, reduce time accordingly
-              timeReduction = 1.0;
-              for (int i : {3, 4, 5})
-                  if (lastBestMoveDepth * i < completedDepth)
-                     timeReduction *= 1.25;
-
-              // Use part of the gained time from a previous stable move for the current move
-              double bestMoveInstability = 1.0 + mainThread->bestMoveChanges;
-              bestMoveInstability *= std::pow(mainThread->previousTimeReduction, 0.528) / timeReduction;
-
-              // Stop the search if we have only one legal move, or if available time elapsed
-              if (   rootMoves.size() == 1
-                  || Time.elapsed() > Time.optimum() * bestMoveInstability * improvingFactor / 581)
-              {
-                  // If we are allowed to ponder do not stop the search now but
-                  // keep pondering until the GUI sends "ponderhit" or "stop".
-                  if (Threads.ponder)
-                      Threads.stopOnPonderhit = true;
-                  else
-                      Threads.stop = true;
-              }
+              // If we are allowed to ponder do not stop the search now but
+              // keep pondering until the GUI sends "ponderhit" or "stop".
+              if (Threads.ponder)
+                  Threads.stopOnPonderhit = true;
+              else
+                  Threads.stop = true;
           }
+      }
   }
 
   if (!mainThread)
