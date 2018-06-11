@@ -635,6 +635,7 @@ namespace {
         int piecesCount = pos.count<ALL_PIECES>();
 
         if (    piecesCount <= TB::Cardinality
+            &&  piecesCount > 3
             && (piecesCount <  TB::Cardinality || depth >= TB::ProbeDepth)
             &&  pos.rule50_count() == 0
             && !pos.can_castle(ANY_CASTLING))
@@ -648,22 +649,18 @@ namespace {
 
                 int drawScore = TB::UseRule50 ? 1 : 0;
 
-                value =  wdl < -drawScore ? -VALUE_MATE + MAX_PLY + ss->ply + 1
-                       : wdl >  drawScore ?  VALUE_MATE - MAX_PLY - ss->ply - 1
+                value =  wdl < -drawScore ? -VALUE_KNOWN_WIN
+                       : wdl >  drawScore ?  VALUE_KNOWN_WIN
                                           :  VALUE_DRAW + 2 * wdl * drawScore;
 
                 Bound b =  wdl < -drawScore ? BOUND_UPPER
                          : wdl >  drawScore ? BOUND_LOWER : BOUND_EXACT;
 
+                // Always return draw scores and values outside the search window.
+                // Otherwise, continue searching.
                 if (    b == BOUND_EXACT
                     || (b == BOUND_LOWER ? value >= beta : value <= alpha))
-                {
-                    tte->save(posKey, value_to_tt(value, ss->ply), b,
-                              std::min(DEPTH_MAX - ONE_PLY, depth + 6 * ONE_PLY),
-                              MOVE_NONE, VALUE_NONE, TT.generation());
-
                     return value;
-                }
 
                 if (PvNode)
                 {
@@ -1638,6 +1635,7 @@ void Tablebases::rank_root_moves(Position& pos, Search::RootMoves& rootMoves) {
     ProbeDepth = int(Options["SyzygyProbeDepth"]) * ONE_PLY;
     Cardinality = int(Options["SyzygyProbeLimit"]);
     bool dtz_available = true;
+    int piecesCount = pos.count<ALL_PIECES>();
 
     // Tables with fewer pieces than SyzygyProbeLimit are searched with
     // ProbeDepth == DEPTH_ZERO
@@ -1647,7 +1645,10 @@ void Tablebases::rank_root_moves(Position& pos, Search::RootMoves& rootMoves) {
         ProbeDepth = DEPTH_ZERO;
     }
 
-    if (Cardinality >= popcount(pos.pieces()) && !pos.can_castle(ANY_CASTLING))
+    // Don't rank basic 3-men endgames
+    if (    Cardinality >= piecesCount
+        &&  piecesCount > 3
+        && !pos.can_castle(ANY_CASTLING))
     {
         // Rank moves using DTZ tables
         RootInTB = root_probe(pos, rootMoves);
