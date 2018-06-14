@@ -34,12 +34,11 @@ public:
   TimePoint optimum() const { return optimumTime; }
   TimePoint maximum() const { return maximumTime; }
   TimePoint elapsed() const { return Search::Limits.npmsec ? 
-                                     TimePoint(Threads.nodes_searched()) : now() - startTime; }
+                                     TimePoint(Threads.nodes_searched()) : now() - Search::Limits.startTime; }
 
   int64_t availableNodes; // When in 'nodes as time' mode
 
 private:
-  TimePoint startTime;
   TimePoint optimumTime;
   TimePoint maximumTime;
 };

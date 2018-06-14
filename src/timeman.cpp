@@ -104,8 +104,8 @@ void TimeManagement::init(Search::LimitsType& limits, Color us, int ply) {
       limits.npmsec = npmsec;
   }
 
-  startTime = limits.startTime;
   optimumTime = maximumTime = std::max(limits.time[us], minThinkingTime);
+  int increment = limits.inc[us] * 9 / 10;
 
   const int maxMTG = limits.movestogo ? std::min(limits.movestogo, MoveHorizon) : MoveHorizon;
 
@@ -116,7 +116,7 @@ void TimeManagement::init(Search::LimitsType& limits, Color us, int ply) {
   {
       // Calculate thinking time for hypothetical "moves to go"-value
       hypMyTime =  limits.time[us]
-                 + limits.inc[us] * (hypMTG - 1)
+                 + increment * (hypMTG - 1)
                  - moveOverhead * (2 + std::min(hypMTG, 40));
 
       hypMyTime = std::max(hypMyTime, TimePoint(0));
