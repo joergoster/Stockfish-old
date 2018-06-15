@@ -152,8 +152,7 @@ public:
   int game_ply() const;
   bool is_chess960() const;
   Thread* this_thread() const;
-  bool is_repetition(int ply) const;
-  bool has_repeated() const;
+  bool has_repeated(bool tb, int ply) const;
   int rule50_count() const;
   Score psq_score(Color c) const;
   Value non_pawn_material(Color c) const;

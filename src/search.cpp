@@ -553,7 +553,7 @@ namespace {
             return VALUE_DRAW;
 
         // Step 3c. Check for draw by repetition
-        if (pos.is_repetition(ss->ply))
+        if (pos.has_repeated(false, ss->ply))
             return VALUE_REP_DRAW;
 
         // Step 3d. Check for maximum ply reached
@@ -1228,7 +1228,7 @@ moves_loop: // When in check, search starts from here
         return VALUE_DRAW;
 
     // Check for draw by repetition
-    if (pos.is_repetition(ss->ply))
+    if (pos.has_repeated(false, ss->ply))
         return VALUE_REP_DRAW;
 
     // Check for maximum ply reached

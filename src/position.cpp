@@ -1076,58 +1076,37 @@ bool Position::see_ge(Move m, Value threshold) const {
 }
 
 
-/// Position::is_repetition() tests whether the position
-/// is drawn by repetition. It does not detect stalemates.
+// Position::has_repeated() tests whether there has been at least
+// one repetition of positions since the last capture or pawn move.
+// Used by both, search and TB root ranking.
 
-bool Position::is_repetition(int ply) const {
-
-  int end = std::min(st->rule50, st->pliesFromNull);
-
-  if (end < 4) // no repetition possible
-    return false;
-
-  StateInfo* stp = st->previous->previous;
-  int cnt = 0;
-
-  for (int i = 4; i <= end; i += 2)
-  {
-      stp = stp->previous->previous;
-
-      // Return a draw score if a position repeats once strictly
-      // after the root, or repeats twice before or at the root.
-      if (   stp->key == st->key
-          && ++cnt + (ply > i) == 2)
-          return true;
-  }
-
-  return false;
-}
-
-
-// Position::has_repeated() tests whether there has been at least one repetition
-// of positions since the last capture or pawn move. (Used by TB probing)
-
-bool Position::has_repeated() const {
+bool Position::has_repeated(bool tb, int ply) const {
 
     // Start with the current position
     StateInfo* stc = st;
 
     while (true)
     {
-        int i = 4, e = std::min(stc->rule50, stc->pliesFromNull);
+        int end = std::min(stc->rule50, stc->pliesFromNull);
 
-        if (e < i) // no repetition possible
+        if (end < 4) // No repetition possible
             return false;
 
         StateInfo* stp = stc->previous->previous;
-        do {
+        int cnt = 0;
+
+        for (int i = 4; i <= end; i += 2)
+        {
             stp = stp->previous->previous;
 
-            if (stp->key == stc->key)
+            if (   stp->key == stc->key
+                && ++cnt + tb + (ply > i) == 2)
                 return true;
+        }
 
-            i += 2;
-        } while (i <= e);
+        // When called from search, we can stop here
+        if (!tb)
+            return false;
 
         stc = stc->previous; // No repetition found, step one position back
     }

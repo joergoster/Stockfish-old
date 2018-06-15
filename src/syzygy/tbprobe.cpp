@@ -1450,8 +1450,8 @@ bool Tablebases::root_probe(Position& pos, Search::RootMoves& rootMoves) {
     // Obtain 50-move counter for the root position
     int cnt50 = pos.rule50_count();
 
-    // Check whether a position was repeated since the last zeroing move.
-    bool rep = pos.has_repeated();
+    // Check whether a position was repeated since the last zeroing move
+    bool rep = pos.has_repeated(true, 0);
 
     int dtz, bound = Options["Syzygy50MoveRule"] ? 900 : 1;
 
