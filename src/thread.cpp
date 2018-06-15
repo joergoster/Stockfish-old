@@ -68,6 +68,7 @@ void Thread::clear() {
   contHistory[NO_PIECE][0].get()->fill(Search::CounterMovePruneThreshold - 1);
 }
 
+
 /// Thread::start_searching() wakes up the thread that will start the search
 
 void Thread::start_searching() {
@@ -117,30 +118,37 @@ void Thread::idle_loop() {
   }
 }
 
+
 /// ThreadPool::set() creates/destroys threads to match the requested number.
 /// Created and launched threads wil go immediately to sleep in idle_loop.
 /// Upon resizing, threads are recreated to allow for binding if necessary.
 
 void ThreadPool::set(size_t requested) {
 
-  if (size() > 0) { // destroy any existing thread(s)
+  // Destroy existing thread(s)
+  if (size())
+  {
       main()->wait_for_search_finished();
 
-      while (size() > 0)
+      while (size())
           delete back(), pop_back();
   }
 
-  if (requested > 0) { // create new thread(s)
+  // Create new thread(s)
+  if (requested)
+  {
       push_back(new MainThread(0));
 
       while (size() < requested)
           push_back(new Thread(size()));
+
       clear();
   }
 
   // Reallocate the hash with the new threadpool size
   TT.resize(Options["Hash"]);
 }
+
 
 /// ThreadPool::clear() sets threadPool data to initial values.
 
@@ -153,6 +161,7 @@ void ThreadPool::clear() {
   main()->previousScore = VALUE_INFINITE;
   main()->previousTimeReduction = 1.0;
 }
+
 
 /// ThreadPool::start_thinking() wakes up main thread waiting in idle_loop() and
 /// returns immediately. Main thread will wake up other threads and start the search.
