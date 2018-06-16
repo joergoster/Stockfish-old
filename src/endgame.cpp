@@ -215,19 +215,20 @@ Value Endgame<KPKB>::operator()(const Position& pos) const {
   Square pawnSq = pos.square<PAWN>(strongSide);
   Square bishopSq = pos.square<BISHOP>(weakSide);
   Bitboard queeningPath = forward_file_bb(strongSide, pawnSq);
+  Rank pawnRank = relative_rank(strongSide, pawnSq);
 
   // If the pawn is not far advanced, the bishop controls
   // the squares in front of the pawn, or the weak side king
   // can block the pawn, it's a draw.
-  if (   relative_rank(strongSide, pawnSq) <= RANK_4
+  if (   pawnRank <= RANK_4
       || pos.attacks_from<BISHOP>(bishopSq) & queeningPath
       || queeningPath & loserKSq)
-      return  VALUE_DRAW
-            + 4 * Value(relative_rank(strongSide, pawnSq));
+      return strongSide == pos.side_to_move() ? VALUE_DRAW + 4 * pawnRank
+                                              : VALUE_DRAW - 4 * pawnRank;
 
   Value result =  VALUE_KNOWN_WIN
                 + PawnValueEg
-                + 4 * Value(relative_rank(strongSide, pawnSq))
+                + 4 * pawnRank
                 - BishopValueEg;
 
   return strongSide == pos.side_to_move() ? result : -result;
@@ -277,7 +278,7 @@ Value Endgame<KPKN>::operator()(const Position& pos) const {
       &&  strongSide == pos.side_to_move()
       && (file_of(weakKingSq) >= FILE_F || rank_of(weakKingSq) <= RANK_4))
       return  VALUE_KNOWN_WIN
-            + 4 * Value(rank_of(pawnSq))
+            + 4 * rank_of(pawnSq)
             - KnightValueEg;
 
   // Losing position for the weaker side
@@ -288,7 +289,7 @@ Value Endgame<KPKN>::operator()(const Position& pos) const {
       && kpkn_mask1 & strongKingSq
       && weakSide == pos.side_to_move())
       return -VALUE_KNOWN_WIN
-            - 4 * Value(rank_of(pawnSq))
+            - 4 * rank_of(pawnSq)
             + KnightValueEg;
 
   // Winning position for the weaker side
@@ -299,14 +300,15 @@ Value Endgame<KPKN>::operator()(const Position& pos) const {
       && knightSq == SQ_D6)
   {
       Value result =  VALUE_KNOWN_WIN
-                    - 4 * Value(rank_of(pawnSq))
+                    - 4 * rank_of(pawnSq)
                     + KnightValueEg;
 
       return strongSide == pos.side_to_move() ? -result : result;
   }
 
-  return  VALUE_DRAW
-        + 4 * Value(rank_of(pawnSq));
+  return strongSide == pos.side_to_move() ?
+         VALUE_DRAW + 4 * rank_of(pawnSq) :
+         VALUE_DRAW - 4 * rank_of(pawnSq);
 }
 
 
