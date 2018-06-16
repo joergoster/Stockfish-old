@@ -32,9 +32,12 @@ namespace {
   #define S(mg, eg) make_score(mg, eg)
 
   // Pawn penalties
-  constexpr Score Backward = S(17, 11);
-  constexpr Score Doubled  = S(13, 40);
-  constexpr Score Isolated = S(13, 16);
+  constexpr Score Backward   = S(17, 11);
+  constexpr Score Doubled    = S(13, 40);
+  constexpr Score Isolated   = S(13, 16);
+
+  // Pawn bonuses
+  constexpr Score CenterBind = S(24,  0);
 
   // Connected pawn bonus by opposed, phalanx, #support and rank
   Score Connected[2][2][3][RANK_NB];
@@ -68,8 +71,14 @@ namespace {
   template<Color Us>
   Score evaluate(const Position& pos, Pawns::Entry* e) {
 
-    constexpr Color     Them = (Us == WHITE ? BLACK : WHITE);
-    constexpr Direction Up   = (Us == WHITE ? NORTH : SOUTH);
+    constexpr Color     Them  = (Us == WHITE ? BLACK : WHITE);
+    constexpr Direction Up    = (Us == WHITE ? NORTH : SOUTH);
+    constexpr Direction Right = (Us == WHITE ? NORTH_EAST : SOUTH_WEST);
+    constexpr Direction Left  = (Us == WHITE ? NORTH_WEST : SOUTH_EAST);
+
+    constexpr Bitboard CenterBindMask =
+      Us == WHITE ? (FileDBB | FileEBB) & (Rank5BB | Rank6BB)
+                  : (FileDBB | FileEBB) & (Rank4BB | Rank3BB);
 
     Bitboard b, neighbours, stoppers, doubled, supported, phalanx;
     Bitboard lever, leverPush;
@@ -145,6 +154,11 @@ namespace {
         if (doubled && !supported)
             score -= Doubled;
     }
+
+    // Center bind: two pawns controlling the same central square
+    b = shift<Right>(ourPawns) & shift<Left>(ourPawns) & ~ourPawns & CenterBindMask;
+    if (b)
+        score += CenterBind;
 
     return score;
   }
