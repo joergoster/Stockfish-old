@@ -808,8 +808,9 @@ namespace {
         return me->scale_factor(pos, strongSide);
 
     // Scale down endgames with opposite-colored bishops, more with no other pieces.
-    // Otherwise scale depending on the number of pawns.
-    int sf = pos.opposite_bishops() ? pos.non_pawn_material() == 2 * BishopValueMg ? 31 : 46
+    // Also scale depending on the number of pawns.
+    int sf = pos.opposite_bishops() ? pos.non_pawn_material() == 2 * BishopValueMg ? 31
+                                    : std::min(40 + 2 * pos.count<PAWN>(strongSide), int(SCALE_FACTOR_NORMAL))
                                     : std::min(40 + 7 * pos.count<PAWN>(strongSide), int(SCALE_FACTOR_NORMAL));
 
     return ScaleFactor(sf);
