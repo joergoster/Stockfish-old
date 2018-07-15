@@ -106,8 +106,10 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
       os << " |\n +---+---+---+---+---+---+---+---+\n";
   }
 
-  os << "\nFen: " << pos.fen() << "\nKey: " << std::hex << std::uppercase
-     << std::setfill('0') << std::setw(16) << pos.key()
+  os << "\nFen: " << pos.fen()
+     << "\nPositionKey: " << std::hex << std::uppercase << std::setfill('0') << std::setw(16) << pos.key()
+     << "\nMaterialKey: " << std::hex << std::uppercase << std::setfill('0') << std::setw(16) << pos.material_key()
+     << "\nPawnKey:     " << std::hex << std::uppercase << std::setfill('0') << std::setw(16) << pos.pawn_key()
      << std::setfill(' ') << std::dec << "\nCheckers: ";
 
   for (Bitboard b = pos.checkers(); b; )
