@@ -151,7 +151,8 @@ Entry* probe(const Position& pos) {
       }
 
   // No need to compute imbalance when material is even
-  if (npm_w != npm_b || pos.count<PAWN>(WHITE) != pos.count<PAWN>(BLACK))
+  if (npm_w != npm_b || pos.count<PAWN>(WHITE) != pos.count<PAWN>(BLACK)
+                     || pos.bishop_pair(WHITE) != pos.bishop_pair(BLACK))
   {
       // Now evaluate the material imbalance to ensure our main evaluation function
       // uses consistent data in any case. We use PIECE_TYPE_NONE as a place holder
