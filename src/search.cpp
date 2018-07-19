@@ -444,14 +444,14 @@ void Thread::search() {
       if (rootMoves[0].pv[0] != lastBestMove)
          lastBestMove = rootMoves[0].pv[0], lastBestMoveDepth = rootDepth;
 
+      if (!mainThread)
+          continue;
+
       // Have we found a "mate in x"?
       if (   Limits.mate
           && bestValue >= VALUE_MATE_IN_MAX_PLY
           && VALUE_MATE - bestValue <= 2 * Limits.mate)
           Threads.stop = true;
-
-      if (!mainThread)
-          continue;
 
       // Do we have time for the next iteration? Can we stop searching now?
       if (    Limits.use_time_management()
