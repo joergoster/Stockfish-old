@@ -266,7 +266,7 @@ void Thread::search() {
 
   std::memset(ss-4, 0, 7 * sizeof(Stack));
   for (int i = 4; i > 0; i--)
-     (ss-i)->contHistory = this->contHistory[NO_PIECE][0].get(); // Use as sentinel
+     (ss-i)->continuationHistory = this->continuationHistory[NO_PIECE][0].get(); // Use as sentinel
 
   bestValue = alpha = -VALUE_INFINITE;
   beta = VALUE_INFINITE;
@@ -577,7 +577,7 @@ namespace {
 
     (ss+1)->ply = ss->ply + 1;
     ss->currentMove = (ss+1)->excludedMove = bestMove = MOVE_NONE;
-    ss->contHistory = thisThread->contHistory[NO_PIECE][0].get();
+    ss->continuationHistory = thisThread->continuationHistory[NO_PIECE][0].get();
     (ss+2)->killers[0] = (ss+2)->killers[1] = MOVE_NONE;
     Square prevSq = to_sq((ss-1)->currentMove);
 
@@ -743,7 +743,7 @@ namespace {
         Depth R = ((823 + 67 * depth / ONE_PLY) / 256 + std::min((eval - beta) / PawnValueMg, 3)) * ONE_PLY;
 
         ss->currentMove = MOVE_NULL;
-        ss->contHistory = thisThread->contHistory[NO_PIECE][0].get();
+        ss->continuationHistory = thisThread->continuationHistory[NO_PIECE][0].get();
 
         pos.do_null_move(st);
         Value nullValue = depth-R < ONE_PLY ? -qsearch<NonPV>(pos, ss+1, -beta, -beta+1)
@@ -793,7 +793,7 @@ namespace {
 
             ++probCutCount;
             ss->currentMove = move;
-            ss->contHistory = thisThread->contHistory[pos.moved_piece(move)][to_sq(move)].get();
+            ss->continuationHistory = thisThread->continuationHistory[pos.moved_piece(move)][to_sq(move)].get();
 
             pos.do_move(move, st);
 
@@ -826,7 +826,7 @@ namespace {
 
 moves_loop: // When in check, search starts from here
 
-    const PieceToHistory* contHist[] = { (ss-1)->contHistory, (ss-2)->contHistory, nullptr, (ss-4)->contHistory };
+    const PieceToHistory* contHist[] = { (ss-1)->continuationHistory, (ss-2)->continuationHistory, nullptr, (ss-4)->continuationHistory };
     Move countermove = thisThread->counterMoves[pos.piece_on(prevSq)][prevSq];
 
     MovePicker mp(pos, ttMove, depth, &thisThread->mainHistory, &thisThread->captureHistory,
@@ -968,7 +968,7 @@ moves_loop: // When in check, search starts from here
 
       // Update the current move (this must be done after singular extension search)
       ss->currentMove = move;
-      ss->contHistory = thisThread->contHistory[movedPiece][to_sq(move)].get();
+      ss->continuationHistory = thisThread->continuationHistory[movedPiece][to_sq(move)].get();
 
       // Step 15. Make the move
       pos.do_move(move, st, givesCheck);
@@ -1209,15 +1209,17 @@ moves_loop: // When in check, search starts from here
     bool ttHit, inCheck, givesCheck, evasionPrunable;
     int moveCount;
 
+    // Initialize node
+    Thread* thisThread = pos.this_thread();
+    inCheck = bool(pos.checkers());
+
     if (PvNode)
     {
         oldAlpha = alpha; // To flag BOUND_EXACT when eval above alpha and no available moves
         (ss+1)->pv = pv;
         ss->pv[0] = MOVE_NONE;
-        pos.this_thread()->selDepth = std::max(ss->ply, pos.this_thread()->selDepth);
+        thisThread->selDepth = std::max(ss->ply, thisThread->selDepth);
     }
-
-    inCheck = bool(pos.checkers());
 
     // Check for draw by 50-move rule
     if (    TB::UseRule50
@@ -1237,6 +1239,7 @@ moves_loop: // When in check, search starts from here
 
     (ss+1)->ply = ss->ply + 1;
     ss->currentMove = bestMove = MOVE_NONE;
+    ss->continuationHistory = thisThread->continuationHistory[NO_PIECE][0].get();
     moveCount = 0;
 
     // Decide whether or not to include checks: this fixes also the type of
@@ -1299,12 +1302,14 @@ moves_loop: // When in check, search starts from here
         futilityBase = bestValue + 128;
     }
 
+    const PieceToHistory* contHist[] = { (ss-1)->continuationHistory, (ss-2)->continuationHistory, nullptr, (ss-4)->continuationHistory };
+
     // Initialize a MovePicker object for the current position, and prepare
     // to search the moves. Because the depth is <= 0 here, only captures,
     // queen promotions and checks (only if depth >= DEPTH_QS_CHECKS) will
     // be generated.
-    MovePicker mp(pos, ttMove, depth, &pos.this_thread()->mainHistory,
-                  &pos.this_thread()->captureHistory, to_sq((ss-1)->currentMove));
+    MovePicker mp(pos, ttMove, depth, &thisThread->mainHistory,
+                  &thisThread->captureHistory, contHist, to_sq((ss-1)->currentMove));
 
     // Loop through the moves until no moves remain or a beta cutoff occurs
     while ((move = mp.next_move()) != MOVE_NONE)
@@ -1361,6 +1366,7 @@ moves_loop: // When in check, search starts from here
       }
 
       ss->currentMove = move;
+      ss->continuationHistory = thisThread->continuationHistory[pos.moved_piece(move)][to_sq(move)].get();
 
       // Make and search the move
       pos.do_move(move, st, givesCheck);
@@ -1453,7 +1459,7 @@ moves_loop: // When in check, search starts from here
 
     for (int i : {1, 2, 4})
         if (is_ok((ss-i)->currentMove))
-            (*(ss-i)->contHistory)[pc][to] << bonus;
+            (*(ss-i)->continuationHistory)[pc][to] << bonus;
   }
 
 
