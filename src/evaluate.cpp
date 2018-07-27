@@ -79,9 +79,8 @@ namespace {
   constexpr Bitboard Center      = (FileDBB | FileEBB) & (Rank4BB | Rank5BB);
 
   constexpr Bitboard KingFlank[FILE_NB] = {
-    QueenSide,   QueenSide, QueenSide,
-    CenterFiles, CenterFiles,
-    KingSide,    KingSide,  KingSide
+    QueenSide ^ FileDBB, QueenSide, QueenSide, CenterFiles,
+    CenterFiles, KingSide, KingSide, KingSide ^ FileEBB
   };
 
   // Maximum allowed material score
@@ -161,7 +160,7 @@ namespace {
   constexpr Score CloseEnemies       = S(  6,  0);
   constexpr Score CorneredBishop     = S( 50, 50);
   constexpr Score Hanging            = S( 52, 30);
-  constexpr Score HinderPassedPawn   = S(  4,  0);
+  constexpr Score HinderPassedPawn   = S(  8,  0);
   constexpr Score KingProtector      = S(  6,  6);
   constexpr Score KnightOnQueen      = S( 21, 11);
   constexpr Score LongDiagonalBishop = S( 22,  0);
@@ -517,7 +516,7 @@ namespace {
     constexpr Direction Up       = (Us == WHITE ? NORTH   : SOUTH);
     constexpr Bitboard  TRank3BB = (Us == WHITE ? Rank3BB : Rank6BB);
 
-    Bitboard b, weak, defended, nonPawnEnemies, stronglyProtected, safeThreats;
+    Bitboard b, weak, defended, nonPawnEnemies, stronglyProtected, safe;
     Score score = SCORE_ZERO;
 
     // Non-pawn enemies
@@ -533,6 +532,9 @@ namespace {
 
     // Enemies not strongly protected and under our attack
     weak = pos.pieces(Them) & ~stronglyProtected & attackedBy[Us][ALL_PIECES];
+
+    // Safe or protected squares
+    safe = ~attackedBy[Them][ALL_PIECES] | attackedBy[Us][ALL_PIECES];
 
     // Bonus according to the kind of attacking pieces
     if (defended | weak)
@@ -577,39 +579,37 @@ namespace {
     if (pos.pieces(Us, ROOK, QUEEN))
         score += WeakUnopposedPawn * pe->weak_unopposed(Them);
 
-    // Our safe or protected pawns
-    b =   pos.pieces(Us, PAWN)
-       & (~attackedBy[Them][ALL_PIECES] | attackedBy[Us][ALL_PIECES]);
-
-    safeThreats = pawn_attacks_bb<Us>(b) & nonPawnEnemies;
-    score += ThreatBySafePawn * popcount(safeThreats);
-
     // Find squares where our pawns can push on the next move
     b  = shift<Up>(pos.pieces(Us, PAWN)) & ~pos.pieces();
     b |= shift<Up>(b & TRank3BB) & ~pos.pieces();
 
     // Keep only the squares which are relatively safe
-    b &= ~attackedBy[Them][PAWN]
-        & (attackedBy[Us][ALL_PIECES] | ~attackedBy[Them][ALL_PIECES]);
+    b &= ~attackedBy[Them][PAWN] & safe;
 
     // Bonus for safe pawn threats on the next move
     b = pawn_attacks_bb<Us>(b) & pos.pieces(Them);
     score += ThreatByPawnPush * popcount(b);
 
+    // Our safe or protected pawns
+    b = pos.pieces(Us, PAWN) & safe;
+
+    b = pawn_attacks_bb<Us>(b) & nonPawnEnemies;
+    score += ThreatBySafePawn * popcount(b);
+
     // Bonus for threats on the next moves against enemy queen
     if (pos.count<QUEEN>(Them) == 1)
     {
         Square s = pos.square<QUEEN>(Them);
-        safeThreats = mobilityArea[Us] & ~stronglyProtected;
+        safe = mobilityArea[Us] & ~stronglyProtected;
 
         b = attackedBy[Us][KNIGHT] & pos.attacks_from<KNIGHT>(s);
 
-        score += KnightOnQueen * popcount(b & safeThreats);
+        score += KnightOnQueen * popcount(b & safe);
 
         b =  (attackedBy[Us][BISHOP] & pos.attacks_from<BISHOP>(s))
            | (attackedBy[Us][ROOK  ] & pos.attacks_from<ROOK  >(s));
 
-        score += SliderOnQueen * popcount(b & safeThreats & attackedBy2[Us]);
+        score += SliderOnQueen * popcount(b & safe & attackedBy2[Us]);
     }
 
     if (T)
@@ -642,8 +642,8 @@ namespace {
 
         assert(!(pos.pieces(Them, PAWN) & forward_file_bb(Us, s + Up)));
 
-        bb = forward_file_bb(Us, s) & pos.pieces(Them);
-        score -= HinderPassedPawn * popcount(bb);
+        if (forward_file_bb(Us, s) & pos.pieces(Them))
+            score -= HinderPassedPawn;
 
         int r = relative_rank(Us, s);
         int w = PassedDanger[r];
