@@ -933,7 +933,7 @@ moves_loop: // When in check, search starts from here
               int lmrDepth = std::max(newDepth - reduction<PvNode>(improving, depth, moveCount), DEPTH_ZERO) / ONE_PLY;
 
               // Countermoves based pruning
-              if (    lmrDepth < ((ss-1)->statScore > 0 ? 3 : 2)
+              if (    lmrDepth < 3 + ((ss-1)->statScore > 0)
                   && (*contHist[0])[movedPiece][to_sq(move)] < CounterMovePruneThreshold
                   && (*contHist[1])[movedPiece][to_sq(move)] < CounterMovePruneThreshold)
                   continue;
@@ -1018,12 +1018,8 @@ moves_loop: // When in check, search starts from here
                              + (*contHist[3])[movedPiece][to_sq(move)]
                              - 4000;
 
-              // Decrease/increase reduction by comparing opponent's stat score
-              if (ss->statScore >= 0 && (ss-1)->statScore < 0)
-                  r -= ONE_PLY;
-
-              else if ((ss-1)->statScore >= 0 && ss->statScore < 0)
-                  r += ONE_PLY;
+              // Decrease/increase reduction by comparing our and opponent's stat scores
+              r -= ((ss->statScore >= 0) - ((ss-1)->statScore >= 0)) * ONE_PLY;
 
               // Decrease/increase reduction for moves with a good/bad history
               r -= ss->statScore / 20000 * ONE_PLY;
