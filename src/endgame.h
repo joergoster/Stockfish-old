@@ -37,6 +37,7 @@ enum EndgameCode {
 
   EVALUATION_FUNCTIONS,
   KXK,   // Generic "mate lone king" eval
+  KQXKX, // Big material advantage eval
   KBNK,  // KBN vs K
   KPK,   // KP vs K
   KPKB,  // KP vs KB
