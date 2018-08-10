@@ -981,18 +981,12 @@ moves_loop: // When in check, search starts from here
       {
           Depth r = reduction<PvNode>(improving, depth, moveCount);
 
-          if (captureOrPromotion)
-          {
-              // Decrease reduction by comparing opponent's stat score
-              if ((ss-1)->statScore < 0)
-                  r -= ONE_PLY;
-          }
-          else
-          {
-              // Decrease reduction if opponent's move count is high
-              if ((ss-1)->moveCount > 15)
-                  r -= ONE_PLY;
+          // Decrease reduction if opponent's move count is high
+          if ((ss-1)->moveCount > 15)
+              r -= ONE_PLY;
 
+          if (!captureOrPromotion)
+          {
               // Decrease reduction for exact PV nodes
               if (pvExact)
                   r -= ONE_PLY;
