@@ -41,7 +41,6 @@ enum EndgameCode {
 
   SCALING_FUNCTIONS,
   KXK,     // Generic "mate lone king" eval
-  KBNK,    // Mate with B and N
   KPK,     // KP vs K
   KQKP,    // KQ vs KP
   KRKB,    // KR vs KB
@@ -118,7 +117,6 @@ public:
 
     add<KRKP>("KRKP");
 
-    add<KBNK>("KBNK");
     add<KPK>("KPK");
     add<KQKP>("KQKP");
     add<KRKB>("KRKB");

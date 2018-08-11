@@ -138,10 +138,6 @@ ScaleFactor Endgame<KXK>::operator()(const Position& pos) const {
 
   assert(verify_material(pos, weakSide, VALUE_ZERO, 0));
 
-  // Stalemate detection with lone king
-//  if (pos.side_to_move() == weakSide && !MoveList<LEGAL>(pos).size())
-//      return VALUE_DRAW;
-
   // Draw with two knights
   if (    pos.count<KNIGHT>(strongSide) == 2
       && !pos.count<PAWN>(strongSide)
@@ -160,41 +156,7 @@ ScaleFactor Endgame<KXK>::operator()(const Position& pos) const {
       && !pos.count<QUEEN>(strongSide))
       return SCALE_FACTOR_DRAW;
 
-  Square winnerKSq = pos.square<KING>(strongSide);
-  Square loserKSq  = pos.square<KING>(weakSide);
-
-  int mopUp = (PushToEdges[loserKSq]
-             + PushClose[distance(winnerKSq, loserKSq)]) / 10;
-
-  return ScaleFactor(64 + mopUp);
-}
-
-
-/// Mate with KBN vs K. This is similar to KX vs K, but we have to drive the
-/// defending king towards a corner square of the right color.
-template<>
-ScaleFactor Endgame<KBNK>::operator()(const Position& pos) const {
-
-  assert(verify_material(pos, strongSide, KnightValueMg + BishopValueMg, 0));
-  assert(verify_material(pos, weakSide, VALUE_ZERO, 0));
-
-  Square winnerKSq = pos.square<KING>(strongSide);
-  Square loserKSq  = pos.square<KING>(weakSide);
-  Square bishopSq  = pos.square<BISHOP>(strongSide);
-
-  // kbnk_mate_table() tries to drive toward corners A1 or H8. If we have a
-  // bishop that cannot reach the above squares, we flip the kings in order
-  // to drive the enemy toward corners A8 or H1.
-  if (opposite_colors(bishopSq, SQ_A1))
-  {
-      winnerKSq = ~winnerKSq;
-      loserKSq  = ~loserKSq;
-  }
-
-  int mopUp = (PushClose[distance(winnerKSq, loserKSq)]
-             + PushToCorners[loserKSq]) / 10;
-
-  return ScaleFactor(64 + mopUp);
+  return SCALE_FACTOR_NONE;
 }
 
 
