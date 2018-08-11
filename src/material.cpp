@@ -55,8 +55,7 @@ namespace {
 
   // Endgame evaluation and scaling functions are accessed directly and not through
   // the function maps because they correspond to more than one material hash key.
-  Endgame<KXK>    EvaluateKXK[] = { Endgame<KXK>(WHITE),    Endgame<KXK>(BLACK) };
-
+  Endgame<KXK>    ScaleKXK[]    = { Endgame<KXK>(WHITE),    Endgame<KXK>(BLACK) };
   Endgame<KBPsK>  ScaleKBPsK[]  = { Endgame<KBPsK>(WHITE),  Endgame<KBPsK>(BLACK) };
   Endgame<KQKRPs> ScaleKQKRPs[] = { Endgame<KQKRPs>(WHITE), Endgame<KQKRPs>(BLACK) };
   Endgame<KPsK>   ScaleKPsK[]   = { Endgame<KPsK>(WHITE),   Endgame<KPsK>(BLACK) };
@@ -137,21 +136,8 @@ Entry* probe(const Position& pos) {
   // Map total non-pawn material into [PHASE_ENDGAME, PHASE_MIDGAME]
   e->gamePhase = Phase(((npm - EndgameLimit) * PHASE_MIDGAME) / (MidgameLimit - EndgameLimit));
 
-  // Let's look if we have a specialized evaluation function for this particular
-  // material configuration. Firstly we look for a fixed configuration one, then
-  // for a generic one if the previous search failed.
-  if ((e->evaluationFunction = pos.this_thread()->endgames.probe<Value>(key)) != nullptr)
-      return e;
-
-  for (Color c = WHITE; c <= BLACK; ++c)
-      if (is_KXK(pos, c))
-      {
-          e->evaluationFunction = &EvaluateKXK[c];
-          return e;
-      }
-
-  // OK, we didn't find any special evaluation function for the current material
-  // configuration. Is there a suitable specialized scaling function?
+  // Let's look if we have a specialized scaling function for this
+  // particular material configuration.
   const EndgameBase<ScaleFactor>* sf;
 
   if ((sf = pos.this_thread()->endgames.probe<ScaleFactor>(key)) != nullptr)
@@ -165,11 +151,14 @@ Entry* probe(const Position& pos) {
   // case we don't return after setting the function.
   for (Color c = WHITE; c <= BLACK; ++c)
   {
-    if (is_KBPsK(pos, c))
-        e->scalingFunction[c] = &ScaleKBPsK[c];
+      if (is_KXK(pos, c))
+          e->scalingFunction[c] = &ScaleKXK[c];
 
-    else if (is_KQKRPs(pos, c))
-        e->scalingFunction[c] = &ScaleKQKRPs[c];
+      else if (is_KBPsK(pos, c))
+          e->scalingFunction[c] = &ScaleKBPsK[c];
+
+      else if (is_KQKRPs(pos, c))
+          e->scalingFunction[c] = &ScaleKQKRPs[c];
   }
 
   if (npm_w + npm_b == VALUE_ZERO && pos.pieces(PAWN)) // Only pawns on the board

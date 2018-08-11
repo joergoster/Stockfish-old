@@ -36,17 +36,16 @@
 enum EndgameCode {
 
   EVALUATION_FUNCTIONS,
-  KNNK,  // KNN vs K
-  KXK,   // Generic "mate lone king" eval
-  KBNK,  // KBN vs K
-  KPK,   // KP vs K
+
   KRKP,  // KR vs KP
-  KRKB,  // KR vs KB
-  KRKN,  // KR vs KN
-  KQKP,  // KQ vs KP
-  KQKR,  // KQ vs KR
 
   SCALING_FUNCTIONS,
+  KXK,     // Generic "mate lone king" eval
+  KBNK,    // Mate with B and N
+  KPK,     // KP vs K
+  KQKP,    // KQ vs KP
+  KRKB,    // KR vs KB
+  KRKN,    // KR vs KN
   KBPsK,   // KB and pawns vs K
   KQKRPs,  // KQ vs KR and pawns
   KRPKR,   // KRP vs KR
@@ -117,15 +116,13 @@ class Endgames {
 public:
   Endgames() {
 
-    add<KPK>("KPK");
-    add<KNNK>("KNNK");
-    add<KBNK>("KBNK");
     add<KRKP>("KRKP");
+
+    add<KBNK>("KBNK");
+    add<KPK>("KPK");
+    add<KQKP>("KQKP");
     add<KRKB>("KRKB");
     add<KRKN>("KRKN");
-    add<KQKP>("KQKP");
-    add<KQKR>("KQKR");
-
     add<KNPK>("KNPK");
     add<KNPKB>("KNPKB");
     add<KRPKR>("KRPKR");
