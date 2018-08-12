@@ -66,7 +66,7 @@ namespace {
   constexpr int SkipPhase[] = { 0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7 };
 
   // Razor and futility margins
-  constexpr int RazorMargin[] = { 0, 590, 604 };
+  constexpr int RazorMargin = 600;
 
   Value futility_margin(Depth d, bool improving) {
     return Value((175 - 50 * improving) * d / ONE_PLY);
@@ -83,7 +83,7 @@ namespace {
   // History and stats update bonus, based on depth
   int stat_bonus(Depth depth) {
     int d = depth / ONE_PLY;
-    return d > 17 ? 0 : 33 * d * d + 66 * d - 66;
+    return d > 17 ? 0 : 29 * d * d + 138 * d - 134;
   }
 
   // Global switch for Null-move search
@@ -710,16 +710,9 @@ namespace {
         goto moves_loop;
 
     // Step 7. Razoring (skipped when in check)
-    if (  !PvNode
-        && depth < 3 * ONE_PLY
-        && eval <= alpha - RazorMargin[depth / ONE_PLY])
-    {
-        Value ralpha = depth < 2 * ONE_PLY ? alpha : alpha - RazorMargin[2];
-        Value v = qsearch<NonPV>(pos, ss, ralpha, ralpha+1);
-
-        if (depth < 2 * ONE_PLY || v <= ralpha)
-            return v;
-    }
+    if (   depth < 2 * ONE_PLY
+        && eval <= alpha - RazorMargin)
+        return qsearch<NT>(pos, ss, alpha, beta);
 
     // Step 8. Futility pruning: child node (skipped when in check)
     if (   !rootNode
@@ -732,7 +725,7 @@ namespace {
     if (    doNull
         && !PvNode
         &&  eval >= beta
-        && (ss-1)->statScore < 22500
+        && (ss-1)->statScore < 23200
         &&  ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
         &&  thisThread->selDepth + 5 > thisThread->rootDepth / ONE_PLY
         && !(depth > 12 * ONE_PLY && MoveList<LEGAL>(pos).size() < 4))
