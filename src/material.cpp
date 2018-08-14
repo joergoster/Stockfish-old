@@ -34,12 +34,12 @@ namespace {
   constexpr int QuadraticOurs[][PIECE_TYPE_NB] = {
     //            OUR PIECES
     // pair pawn knight bishop rook queen
-    { 834                               }, // Bishop pair
-    {  20,    0                         }, // Pawn
-    {  16,  128,  -2                    }, // Knight      OUR PIECES
+    { 719                               }, // Bishop pair
+    {  20,   19                         }, // Pawn
+    {  16,  128, -31                    }, // Knight      OUR PIECES
     {   0,   52,   2,    0              }, // Bishop
-    { -13,   -1,  24,    53,   -75      }, // Rook
-    { -93,   12,  59,    67,   -67,  -5 }  // Queen
+    { -13,   -1,  24,    53,  -104      }, // Rook
+    { -93,   12,  59,    67,   -67,  -3 }  // Queen
   };
 
   constexpr int QuadraticTheirs[][PIECE_TYPE_NB] = {
