@@ -684,7 +684,7 @@ namespace {
     {
         // Never assume anything on values stored in TT
         if ((ss->staticEval = eval = tte->eval()) == VALUE_NONE)
-            eval = ss->staticEval = evaluate(pos);
+            eval = ss->staticEval = evaluate(pos) - 10 * ((ss-1)->statScore > 0);
 
         // Can ttValue be used as a better position evaluation?
         if (    ttValue != VALUE_NONE
@@ -693,8 +693,11 @@ namespace {
     }
     else
     {
+        int malus = (ss-1)->statScore > 0 ? ((ss-1)->statScore + 5000) / 1024 :
+                    (ss-1)->statScore < 0 ? ((ss-1)->statScore - 5000) / 1024 : 0;
+
         ss->staticEval = eval =
-        (ss-1)->currentMove != MOVE_NULL ? evaluate(pos)
+        (ss-1)->currentMove != MOVE_NULL ? evaluate(pos) - malus
                                          : -(ss-1)->staticEval + 2 * Eval::Tempo;
 
         tte->save(posKey, VALUE_NONE, BOUND_NONE, DEPTH_NONE, MOVE_NONE,
