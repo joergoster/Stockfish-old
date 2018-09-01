@@ -163,7 +163,7 @@ namespace {
   constexpr Score HinderPassedPawn   = S(  8,  0);
   constexpr Score KingProtector      = S(  6,  6);
   constexpr Score KnightOnQueen      = S( 21, 11);
-  constexpr Score LongDiagonalBishop = S( 22,  0);
+  constexpr Score LongDiagonalBishop = S( 46,  0);
   constexpr Score MinorBehindPawn    = S( 16,  0);
   constexpr Score Overload           = S( 13,  6);
   constexpr Score PawnlessFlank      = S( 19, 84);
@@ -353,7 +353,7 @@ namespace {
                                      * (1 + popcount(blocked & CenterFiles));
 
                 // Bonus for bishop on a long diagonal which can "see" both center squares
-                if (more_than_one(Center & (attacks_bb<BISHOP>(s, pos.pieces(PAWN)) | s)))
+                if (more_than_one(attacks_bb<BISHOP>(s, pos.pieces(PAWN)) & Center))
                     score += LongDiagonalBishop;
             }
 
@@ -775,7 +775,7 @@ namespace {
                     + 12 * outflanking
                     + 16 * pawnsOnBothFlanks
                     + 48 * !pos.non_pawn_material()
-                    -136 ;
+                    -118;
 
     // Now apply the bonus: note that we find the attacking side by extracting
     // the sign of the endgame value, and that we carefully cap the bonus so

@@ -517,7 +517,7 @@ namespace {
     Move ttMove, move, excludedMove, bestMove;
     Color us;
     Depth extension, newDepth;
-    Value bestValue, value, ttValue, eval, maxValue;
+    Value bestValue, value, ttValue, eval, pureStaticEval, maxValue;
     bool ttHit, inCheck, givesCheck, improving;
     bool captureOrPromotion, doFullDepthSearch, moveCountPruning, skipQuiets, ttCapture, pvExact;
     Piece movedPiece;
@@ -676,15 +676,16 @@ namespace {
     // Step 6. Evaluate the position statically
     if (inCheck)
     {
-        ss->staticEval = eval = VALUE_NONE;
+        ss->staticEval = eval = pureStaticEval = VALUE_NONE;
         improving = false;
         goto moves_loop;
     }
     else if (ttHit)
     {
         // Never assume anything on values stored in TT
-        if ((ss->staticEval = eval = tte->eval()) == VALUE_NONE)
-            eval = ss->staticEval = evaluate(pos) - 10 * ((ss-1)->statScore > 0);
+        ss->staticEval = eval = pureStaticEval = tte->eval();
+        if (eval == VALUE_NONE)
+            ss->staticEval = eval = pureStaticEval = evaluate(pos);
 
         // Can ttValue be used as a better position evaluation?
         if (    ttValue != VALUE_NONE
@@ -693,15 +694,19 @@ namespace {
     }
     else
     {
-        int malus = (ss-1)->statScore > 0 ? ((ss-1)->statScore + 5000) / 1024 :
-                    (ss-1)->statScore < 0 ? ((ss-1)->statScore - 5000) / 1024 : 0;
+        if ((ss-1)->currentMove != MOVE_NULL)
+        {
+            int bonus = (ss-1)->statScore > 0 ? (-(ss-1)->statScore - 2500) / 512 :
+                        (ss-1)->statScore < 0 ? (-(ss-1)->statScore + 2500) / 512 : 0;
 
-        ss->staticEval = eval =
-        (ss-1)->currentMove != MOVE_NULL ? evaluate(pos) - malus
-                                         : -(ss-1)->staticEval + 2 * Eval::Tempo;
+            pureStaticEval = evaluate(pos);
+            ss->staticEval = eval = pureStaticEval + bonus;
+        }
+        else
+            ss->staticEval = eval = pureStaticEval = -(ss-1)->staticEval + 2 * Eval::Tempo;
 
         tte->save(posKey, VALUE_NONE, BOUND_NONE, DEPTH_NONE, MOVE_NONE,
-                  ss->staticEval, TT.generation());
+                  pureStaticEval, TT.generation());
     }
 
     improving =   ss->staticEval >= (ss-2)->staticEval
@@ -1163,7 +1168,7 @@ moves_loop: // When in check, search starts from here
         tte->save(posKey, value_to_tt(bestValue, ss->ply),
                   bestValue >= beta ? BOUND_LOWER :
                   PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
-                  depth, bestMove, ss->staticEval, TT.generation());
+                  depth, bestMove, pureStaticEval, TT.generation());
 
     assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
 
