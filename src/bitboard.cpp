@@ -92,16 +92,19 @@ void Bitboards::init() {
       SquareBB[s] = (1ULL << s);
 
   for (File f = FILE_A; f <= FILE_H; ++f)
-      FileBB[f] = f > FILE_A ? FileBB[f - 1] << 1 : FileABB;
+      FileBB[f] = FileABB << f;
 
   for (Rank r = RANK_1; r <= RANK_8; ++r)
-      RankBB[r] = r > RANK_1 ? RankBB[r - 1] << 8 : Rank1BB;
+      RankBB[r] = Rank1BB << (8 * r);
 
   for (File f = FILE_A; f <= FILE_H; ++f)
-      AdjacentFilesBB[f] = (f > FILE_A ? FileBB[f - 1] : 0) | (f < FILE_H ? FileBB[f + 1] : 0);
+      AdjacentFilesBB[f] = shift<EAST>(FileBB[f]) | shift<WEST>(FileBB[f]);
 
-  for (Rank r = RANK_1; r < RANK_8; ++r)
-      ForwardRanksBB[WHITE][r] = ~(ForwardRanksBB[BLACK][r + 1] = ForwardRanksBB[BLACK][r] | RankBB[r]);
+  for (Rank r = RANK_1; r <= RANK_8; ++r)
+  {
+      ForwardRanksBB[WHITE][r]   = AllSquares << (8 * (r + 1));
+      ForwardRanksBB[BLACK][7-r] = AllSquares >> (8 * (r + 1));
+  }
 
   for (Color c = WHITE; c <= BLACK; ++c)
       for (Square s = SQ_A1; s <= SQ_H8; ++s)
