@@ -734,7 +734,7 @@ namespace {
         && !PvNode
         &&  eval >= beta
         && (ss-1)->statScore < 23200
-        &&  ss->staticEval >= beta - 36 * depth / ONE_PLY + 225
+        &&  pureStaticEval >= beta - 36 * depth / ONE_PLY + 225
         &&  thisThread->selDepth + 5 > thisThread->rootDepth / ONE_PLY
         && !(depth > 12 * ONE_PLY && MoveList<LEGAL>(pos).size() < 4))
     {
@@ -904,9 +904,8 @@ moves_loop: // When in check, search starts from here
           if (value < rBeta)
               extension = ONE_PLY;
       }
-      else if (    givesCheck // Check extension
-               && !moveCountPruning
-               &&  pos.see_ge(move))
+      else if (   givesCheck // Check extension
+               && pos.see_ge(move))
           extension = ONE_PLY;
 
       // Calculate new depth for this move
@@ -1109,6 +1108,8 @@ moves_loop: // When in check, search starts from here
                   break;
               }
           }
+          else if (PvNode && !rootNode && value == alpha)
+              update_pv(ss->pv, move, (ss+1)->pv);
       }
 
       if (move != bestMove)
