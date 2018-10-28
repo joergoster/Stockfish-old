@@ -103,6 +103,8 @@ namespace {
     Move best = MOVE_NONE;
   };
 
+  int legalPv = 0;
+
   template <NodeType NT>
   Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth, bool cutNode);
 
@@ -289,8 +291,9 @@ void MainThread::search() {
   sync_cout << "bestmove " << UCI::move(bestThread->rootMoves[0].pv[0], rootPos.is_chess960());
 
   if (bestThread->rootMoves[0].pv.size() > 1 || bestThread->rootMoves[0].extract_ponder_from_tt(rootPos))
-      std::cout << " ponder " << UCI::move(bestThread->rootMoves[0].pv[1], rootPos.is_chess960());
+      std::cout << " ponder " << UCI::move(bestThread->rootMoves[0].pv[1], rootPos.is_chess960()) << sync_endl;
 
+  std::cout << legalPv << " PVs successfully checked for legality.";
   std::cout << sync_endl;
 }
 
@@ -427,8 +430,24 @@ void Thread::search() {
               if (   mainThread
                   && multiPV == 1
                   && (bestValue <= alpha || bestValue >= beta)
-                  && Time.elapsed() > 3000)
+                  && Time.elapsed() > 1000)
+              {
+                  auto& pv = rootMoves[0].pv;
+                  StateInfo st[MAX_PLY];
+
+                  for (size_t i = 0; i < pv.size(); i++)
+                  {
+                       assert(MoveList<LEGAL>(rootPos).contains(pv[i]));
+                       rootPos.do_move(pv[i], st[i]);
+                  }
+
+                  for (size_t i = pv.size(); i > 0; i--)
+                      rootPos.undo_move(pv[i-1]);
+
+                  legalPv++;
+
                   sync_cout << UCI::pv(rootPos, adjustedDepth, alpha, beta) << sync_endl;
+              }
 
               // In case of failing low/high increase aspiration window and
               // re-search, otherwise exit the loop.
@@ -463,7 +482,23 @@ void Thread::search() {
 
           if (    mainThread
               && (Threads.stop || pvIdx + 1 == multiPV || Time.elapsed() > 3000))
+          {
+              auto& pv = rootMoves[0].pv;
+              StateInfo st[MAX_PLY];
+
+              for (size_t i = 0; i < pv.size(); i++)
+              {
+                  assert(MoveList<LEGAL>(rootPos).contains(pv[i]));
+                  rootPos.do_move(pv[i], st[i]);
+              }
+
+              for (size_t i = pv.size(); i > 0; i--)
+                  rootPos.undo_move(pv[i-1]);
+
+              legalPv++;
+
               sync_cout << UCI::pv(rootPos, adjustedDepth, alpha, beta) << sync_endl;
+          }
       }
 
       if (!Threads.stop)
