@@ -754,7 +754,8 @@ namespace {
     }
 
     // Step 7. Razoring (~2 Elo)
-    if (   depth < 2 * ONE_PLY
+    if (  !PvNode
+        && depth < 2 * ONE_PLY
         && eval <= alpha - RazorMargin)
         return qsearch<NT>(pos, ss, alpha, beta);
 
@@ -762,7 +763,7 @@ namespace {
                || (ss-2)->staticEval == VALUE_NONE;
 
     // Step 8. Futility pruning: child node (~30 Elo)
-    if (   !rootNode
+    if (   !PvNode
         &&  depth < 7 * ONE_PLY
         &&  eval - futility_margin(depth, improving) >= beta
         &&  eval < VALUE_KNOWN_WIN) // Do not return unproven wins
@@ -948,7 +949,7 @@ moves_loop: // When in check, search starts from here
       newDepth = depth - ONE_PLY + extension;
 
       // Step 14. Pruning at shallow depth (~170 Elo)
-      if (  !rootNode
+      if (  !PvNode
           && pos.non_pawn_material(us)
           && bestValue > VALUE_MATED_IN_MAX_PLY)
       {
@@ -1124,12 +1125,16 @@ moves_loop: // When in check, search starts from here
       {
           bestValue = value;
 
+          // We have a new best move. At PV nodes and if the move
+          // is above alpha or we are still without a 'bestMove'
+          // because all the moves we tried so far failed low, 
+          // we must save this move as PV move.
+          if (PvNode && !rootNode && (value > alpha || !bestMove))
+              update_pv(ss->pv, move, (ss+1)->pv);
+
           if (value > alpha)
           {
               bestMove = move;
-
-              if (PvNode && !rootNode) // Update pv even in fail-high case
-                  update_pv(ss->pv, move, (ss+1)->pv);
 
               if (PvNode && value < beta) // Update alpha! Always alpha < beta
                   alpha = value;
@@ -1327,7 +1332,8 @@ moves_loop: // When in check, search starts from here
       moveCount++;
 
       // Futility pruning
-      if (   !inCheck
+      if (   !PvNode
+          && !inCheck
           && !givesCheck
           &&  futilityBase > -VALUE_KNOWN_WIN
           && !pos.advanced_pawn_push(move))
@@ -1351,13 +1357,14 @@ moves_loop: // When in check, search starts from here
 
       // Detect non-capture evasions that are candidates to be pruned
       evasionPrunable =    inCheck
-                       &&  (depth != DEPTH_ZERO || moveCount > 2)
+                       && (depth != DEPTH_ZERO || moveCount > 2)
                        &&  bestValue > VALUE_MATED_IN_MAX_PLY
                        && !pos.capture(move);
 
       // Don't search moves with negative SEE values
-      if (  (!inCheck || evasionPrunable)
-          && !pos.see_ge(move))
+      if (    !PvNode
+          && (!inCheck || evasionPrunable)
+          &&  !pos.see_ge(move))
           continue;
 
       // Speculative prefetch as early as possible
