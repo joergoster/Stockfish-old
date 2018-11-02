@@ -347,7 +347,7 @@ void Thread::search() {
           // Reset aspiration window starting size
           if (rootDepth >= 5 * ONE_PLY && abs(bestValue) < VALUE_KNOWN_WIN)
           {
-              delta = Value(18);
+              delta = Value(20);
               alpha = bestValue - delta;
               beta  = bestValue + delta;
 
