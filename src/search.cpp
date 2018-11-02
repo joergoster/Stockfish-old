@@ -1369,21 +1369,15 @@ moves_loop: // When in check, search starts from here
 
           if (value > alpha)
           {
+              bestMove = move;
+
               if (PvNode) // Update pv even in fail-high case
                   update_pv(ss->pv, move, (ss+1)->pv);
 
               if (PvNode && value < beta) // Update alpha here!
-              {
                   alpha = value;
-                  bestMove = move;
-              }
-              else // Fail high
-              {
-                  tte->save(posKey, value_to_tt(value, ss->ply), BOUND_LOWER,
-                            ttDepth, move, ss->staticEval, TT.generation());
-
-                  return value;
-              }
+              else                        // Fail high
+                  break;
           }
        }
     }
@@ -1395,7 +1389,8 @@ moves_loop: // When in check, search starts from here
 
     if (bestValue != VALUE_REP_DRAW)
         tte->save(posKey, value_to_tt(bestValue, ss->ply),
-                  PvNode && bestValue > oldAlpha ? BOUND_EXACT : BOUND_UPPER,
+                  bestValue >= beta ? BOUND_LOWER :
+                  PvNode && bestValue > oldAlpha  ? BOUND_EXACT : BOUND_UPPER,
                   ttDepth, bestMove, ss->staticEval, TT.generation());
 
     assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
