@@ -1099,24 +1099,23 @@ moves_loop: // When in check, search starts from here
       {
           bestValue = value;
 
+          if (PvNode && !rootNode) // Always update pv
+              update_pv(ss->pv, move, (ss+1)->pv);
+
           if (value > alpha)
           {
               bestMove = move;
-
-              if (PvNode && !rootNode) // Update pv even in fail-high case
-                  update_pv(ss->pv, move, (ss+1)->pv);
 
               if (PvNode && value < beta) // Update alpha! Always alpha < beta
                   alpha = value;
               else
               {
                   assert(value >= beta); // Fail high
+
                   ss->statScore = 0;
                   break;
               }
           }
-          else if (PvNode && !rootNode && value == alpha)
-              update_pv(ss->pv, move, (ss+1)->pv);
       }
 
       if (move != bestMove)
