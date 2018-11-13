@@ -201,12 +201,13 @@ Entry* probe(const Position& pos) {
 /// penalty for a king, looking at the king file and the two closest files.
 
 template<Color Us>
-Value Entry::evaluate_shelter(const Position& pos, Square ksq) {
+Value Entry::evaluate_shelter(const Position& pos) {
 
   constexpr Color     Them = (Us == WHITE ? BLACK : WHITE);
   constexpr Direction Down = (Us == WHITE ? SOUTH : NORTH);
   constexpr Bitboard  BlockRanks = (Us == WHITE ? Rank1BB | Rank2BB : Rank8BB | Rank7BB);
 
+  Square ksq = pos.square<KING>(Us);
   Bitboard b = pos.pieces(PAWN) & ~forward_ranks_bb(Them, ksq);
   Bitboard ourPawns = b & pos.pieces(Us);
   Bitboard theirPawns = b & pos.pieces(Them);
@@ -248,14 +249,10 @@ Score Entry::do_king_safety(const Position& pos) {
   if (pawns)
       while (!(DistanceRingBB[ksq][++minKingPawnDistance] & pawns)) {}
 
-  Value bonus = evaluate_shelter<Us>(pos, ksq);
+  Value bonus = evaluate_shelter<Us>(pos);
 
-  // If we can castle use the bonus after the castling if it is bigger
-  if (pos.can_castle(Us | KING_SIDE))
-      bonus = std::max(bonus, evaluate_shelter<Us>(pos, relative_square(Us, SQ_G1)));
-
-  if (pos.can_castle(Us | QUEEN_SIDE))
-      bonus = std::max(bonus, evaluate_shelter<Us>(pos, relative_square(Us, SQ_C1)));
+  if (pos.can_castle(Us))
+      bonus += Value(100);
 
   return make_score(bonus, -16 * minKingPawnDistance);
 }
