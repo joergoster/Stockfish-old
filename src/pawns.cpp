@@ -251,9 +251,6 @@ Score Entry::do_king_safety(const Position& pos) {
 
   Value bonus = evaluate_shelter<Us>(pos);
 
-  if (pos.can_castle(Us))
-      bonus += Value(100);
-
   return make_score(bonus, -16 * minKingPawnDistance);
 }
 
