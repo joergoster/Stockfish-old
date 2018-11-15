@@ -100,9 +100,9 @@ void Bitboards::init() {
   for (File f = FILE_A; f <= FILE_H; ++f)
       AdjacentFilesBB[f] = shift<EAST>(FileBB[f]) | shift<WEST>(FileBB[f]);
 
-  for (Rank r = RANK_1; r <= RANK_8; ++r)
+  for (Rank r = RANK_1; r < RANK_8; ++r)
   {
-      ForwardRanksBB[WHITE][r]   = AllSquares << (8 * (r + 1));
+      ForwardRanksBB[WHITE][  r] = AllSquares << (8 * (r + 1));
       ForwardRanksBB[BLACK][7-r] = AllSquares >> (8 * (r + 1));
   }
 

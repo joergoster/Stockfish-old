@@ -39,7 +39,7 @@ const std::string pretty(Bitboard b);
 
 }
 
-constexpr Bitboard AllSquares = ~Bitboard(0);
+constexpr Bitboard AllSquares = 0xFFFFFFFFFFFFFFFFULL;
 constexpr Bitboard DarkSquares = 0xAA55AA55AA55AA55ULL;
 
 constexpr Bitboard FileABB = 0x0101010101010101ULL;
@@ -51,7 +51,7 @@ constexpr Bitboard FileFBB = FileABB << 5;
 constexpr Bitboard FileGBB = FileABB << 6;
 constexpr Bitboard FileHBB = FileABB << 7;
 
-constexpr Bitboard Rank1BB = 0xFF;
+constexpr Bitboard Rank1BB = 0x00000000000000FFULL;
 constexpr Bitboard Rank2BB = Rank1BB << (8 * 1);
 constexpr Bitboard Rank3BB = Rank1BB << (8 * 2);
 constexpr Bitboard Rank4BB = Rank1BB << (8 * 3);
