@@ -122,6 +122,7 @@ void Bitboards::init() {
               DistanceRingBB[s1][SquareDistance[s1][s2]] |= s2;
           }
 
+  // Generate the attack boards for pawns and non-sliding pieces first ...
   int steps[][5] = { {}, { 7, 9 }, { 6, 10, 15, 17 }, {}, {}, {}, { 1, 7, 8, 9 } };
 
   for (Color c = WHITE; c <= BLACK; ++c)
@@ -131,15 +132,18 @@ void Bitboards::init() {
               {
                   Square to = s + Direction(c == WHITE ? steps[pt][i] : -steps[pt][i]);
 
-                  if (is_ok(to) && distance(s, to) < 3)
-                  {
-                      if (pt == PAWN)
-                          PawnAttacks[c][s] |= to;
-                      else
-                          PseudoAttacks[pt][s] |= to;
-                  }
+                  // Take care, 'to' square is still on the board
+                  // and also not wrapped from one side to the other.
+                  if (!is_ok(to) || distance(s, to) > 2)
+                      continue;
+
+                  if (pt == PAWN)
+                      PawnAttacks[c][s] |= to;
+                  else
+                      PseudoAttacks[pt][s] |= to;
               }
 
+  // ... now the sliders
   Direction RookDirections[] = { NORTH, EAST, SOUTH, WEST };
   Direction BishopDirections[] = { NORTH_EAST, SOUTH_EAST, SOUTH_WEST, NORTH_WEST };
 
