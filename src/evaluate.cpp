@@ -152,9 +152,6 @@ namespace {
     S(-30,-14), S(-9, -8), S( 0,  9), S( -1,  7)
   };
 
-  // PassedDanger[Rank] contains a term to weight the passed score
-  constexpr int PassedDanger[RANK_NB] = { 0, 0, 0, 3, 7, 11, 20 };
-
   // Assorted bonuses and penalties
   constexpr Score BishopPawns        = S(  3,  7);
   constexpr Score CloseEnemies       = S(  6,  0);
@@ -418,13 +415,13 @@ namespace {
     Bitboard kingFlank, weak, b, b1, b2, safe, unsafeChecks;
 
     // King shelter and enemy pawns storm
-    Score score = pe->king_safety<Us>(pos, ksq);
+    Score score = pe->king_safety<Us>(pos);
 
     // Find the squares that opponent attacks in our king flank, and the squares
     // which are attacked twice in that flank but not defended by our pawns.
     kingFlank = KingFlank[file_of(ksq)];
     b1 = attackedBy[Them][ALL_PIECES] & kingFlank & Camp;
-    b2 = b1 & attackedBy2[Them] & ~attackedBy[Us][PAWN];
+    b2 = b1 & attackedBy2[Them];
 
     int tropism = popcount(b1) + popcount(b2);
 
@@ -633,18 +630,18 @@ namespace {
     {
         Square s = pop_lsb(&b);
 
+        assert(s >= SQ_A2 && s <= SQ_H7);
         assert(!(pos.pieces(Them, PAWN) & forward_file_bb(Us, s + Up)));
 
         if (forward_file_bb(Us, s) & pos.pieces(Them))
             score -= HinderPassedPawn;
 
         int r = relative_rank(Us, s);
-        int w = PassedDanger[r];
-
         Score bonus = PassedRank[r];
 
-        if (w)
+        if (r > RANK_3)
         {
+            int w = (r-2) * (r-2) + 2;
             Square blockSq = s + Up;
 
             // Adjust bonus based on the king's proximity
@@ -687,7 +684,7 @@ namespace {
             }
             else if (pos.pieces(Us) & blockSq)
                 bonus += make_score(w + r * 2, w + r * 2);
-        } // rr != 0
+        }
 
         // Scale down bonus for candidate passers which need more than one
         // pawn push to become passed or have a pawn in front of them.
