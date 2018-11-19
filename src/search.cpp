@@ -173,6 +173,7 @@ void Search::clear() {
   Time.availableNodes = 0;
   TT.clear();
   Threads.clear();
+  Tablebases::init(Options["SyzygyPath"]); // Free up mapped files
 }
 
 
@@ -908,11 +909,8 @@ moves_loop: // When in check, search starts from here
                && pos.see_ge(move))
           extension = ONE_PLY;
 
-      // Extension for king moves that change castling rights
-      if (  !extension
-          && depth < 12 * ONE_PLY
-          && pos.can_castle(us)
-          && type_of(movedPiece) == KING)
+      else if (   pos.can_castle(us) // Extension for king moves that change castling rights
+               && type_of(movedPiece) == KING)
           extension = ONE_PLY;
 
       // Calculate new depth for this move
