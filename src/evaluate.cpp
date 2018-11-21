@@ -272,11 +272,11 @@ namespace {
         else if (rank_of(ksq) == RANK_8)
             kingRing[Us] |= shift<SOUTH>(kingRing[Us]);
 
-        if (file_of(ksq) == FILE_A)
-            kingRing[Us] |= shift<EAST>(kingRing[Us]);
-
-        else if (file_of(ksq) == FILE_H)
+        if (file_of(ksq) == FILE_H)
             kingRing[Us] |= shift<WEST>(kingRing[Us]);
+
+        else if (file_of(ksq) == FILE_A)
+            kingRing[Us] |= shift<EAST>(kingRing[Us]);
 
         kingAttackersCount[Them] = popcount(kingRing[Us] & pe->pawn_attacks(Them));
         kingAttacksCount[Them] = kingAttackersWeight[Them] = 0;
