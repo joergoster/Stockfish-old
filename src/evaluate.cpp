@@ -242,7 +242,6 @@ namespace {
   void Evaluation<T>::initialize() {
 
     constexpr Color     Them = (Us == WHITE ? BLACK : WHITE);
-    constexpr Direction Up   = (Us == WHITE ? NORTH : SOUTH);
     constexpr Direction Down = (Us == WHITE ? SOUTH : NORTH);
     constexpr Bitboard LowRanks = (Us == WHITE ? Rank2BB | Rank3BB: Rank7BB | Rank6BB);
 
@@ -253,7 +252,7 @@ namespace {
     // are excluded from the mobility area.
     mobilityArea[Us] = ~(b | pos.pieces(Us, KING, QUEEN) | pe->pawn_attacks(Them));
 
-    // Initialise attackedBy bitboards for kings and pawns
+    // Initialize attackedBy bitboards for kings and pawns
     attackedBy[Us][KING] = pos.attacks_from<KING>(pos.square<KING>(Us));
     attackedBy[Us][PAWN] = pe->pawn_attacks(Us);
     attackedBy[Us][ALL_PIECES] = attackedBy[Us][KING] | attackedBy[Us][PAWN];
@@ -264,15 +263,20 @@ namespace {
     // Init our king safety tables only if we are going to use them
     if (pos.non_pawn_material(Them) >= RookValueMg + KnightValueMg)
     {
+        Square ksq = pos.square<KING>(Us);
         kingRing[Us] = attackedBy[Us][KING];
-        if (relative_rank(Us, pos.square<KING>(Us)) == RANK_1)
-            kingRing[Us] |= shift<Up>(kingRing[Us]);
 
-        if (file_of(pos.square<KING>(Us)) == FILE_H)
-            kingRing[Us] |= shift<WEST>(kingRing[Us]);
+        if (rank_of(ksq) == RANK_1)
+            kingRing[Us] |= shift<NORTH>(kingRing[Us]);
 
-        else if (file_of(pos.square<KING>(Us)) == FILE_A)
+        else if (rank_of(ksq) == RANK_8)
+            kingRing[Us] |= shift<SOUTH>(kingRing[Us]);
+
+        if (file_of(ksq) == FILE_A)
             kingRing[Us] |= shift<EAST>(kingRing[Us]);
+
+        else if (file_of(ksq) == FILE_H)
+            kingRing[Us] |= shift<WEST>(kingRing[Us]);
 
         kingAttackersCount[Them] = popcount(kingRing[Us] & pe->pawn_attacks(Them));
         kingAttacksCount[Them] = kingAttackersWeight[Them] = 0;
