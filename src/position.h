@@ -353,8 +353,8 @@ inline bool Position::opposite_bishops() const {
 
 inline bool Position::bishop_pair(Color c) const {
   return   pieceCount[make_piece(c, BISHOP)] > 1
-        && byColorBB[c] & byTypeBB[BISHOP] &  DarkSquares
-        && byColorBB[c] & byTypeBB[BISHOP] & ~DarkSquares;
+        && byColorBB[c] & byTypeBB[BISHOP] & LightSquares
+        && byColorBB[c] & byTypeBB[BISHOP] & DarkSquares;
 }
 
 inline bool Position::is_chess960() const {
