@@ -70,14 +70,14 @@ void TranspositionTable::clear() {
                      len = idx != requested - 1 ? stride
                                                 : clusterCount - start;
 
-      threads.push_back(std::thread([this, idx, requested, start, len]() {
+      threads.emplace_back([this, idx, requested, start, len]() {
           if (requested >= 8)
               WinProcGroup::bindThisThread(idx);
           std::memset(&table[start], 0, len * sizeof(Cluster));
-      }));
+      });
   }
 
-  for (std::thread& th: threads)
+  for (std::thread& th : threads)
       th.join();
 }
 
