@@ -1145,10 +1145,10 @@ moves_loop: // When in check, search starts from here
 							   stat_bonus(depth + (bestValue > beta + PawnValueMg ? ONE_PLY : DEPTH_ZERO)));
 
         // Extra penalty for a quiet TT move or the main killer in previous ply when it gets refuted
-		if (!pos.captured_piece())
+        if (!pos.captured_piece())
         {
             if (    (ss-1)->moveCount == 1
-		        || ((ss-1)->killers[0] && (ss-1)->currentMove == (ss-1)->killers[0]))
+                || ((ss-1)->killers[0] && (ss-1)->currentMove == (ss-1)->killers[0]))
                 update_continuation_histories(ss-1, pos.piece_on(prevSq), prevSq, -stat_bonus(depth + ONE_PLY));
         }
 
