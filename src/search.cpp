@@ -459,10 +459,8 @@ void Thread::search() {
           && !Threads.stop
           && !Threads.stopOnPonderhit)
       {
-          const int F[] = { mainThread->failedLow,
-                            bestValue - mainThread->previousScore };
-
-          int improvingFactor = std::max(246, std::min(832, 306 + 119 * F[0] - 6 * F[1]));
+          double fallingEval = (306 + 119 * mainThread->failedLow + 6 * (mainThread->previousScore - bestValue)) / 581.0;
+          fallingEval        = std::max(0.5, std::min(1.5, fallingEval));
 
           // If the bestMove is stable over several iterations, reduce time accordingly
           timeReduction = 1.0;
@@ -476,7 +474,7 @@ void Thread::search() {
 
           // Stop the search if we have only one legal move, or if available time elapsed
           if (   rootMoves.size() == 1
-              || Time.elapsed() > Time.optimum() * bestMoveInstability * improvingFactor / 581)
+              || Time.elapsed() > Time.optimum() * bestMoveInstability * fallingEval)
           {
               // If we are allowed to ponder do not stop the search now but
               // keep pondering until the GUI sends "ponderhit" or "stop".
@@ -941,7 +939,7 @@ moves_loop: // When in check, search starts from here
               int lmrDepth = std::max(newDepth - reduction<PvNode>(improving, depth, moveCount), DEPTH_ZERO) / ONE_PLY;
 
               // Countermoves based pruning
-              if (    lmrDepth < 3 + ((ss-1)->statScore > 0)
+              if (    lmrDepth < 3 + ((ss-1)->statScore > 0 || (ss-1)->moveCount == 1)
                   && (*contHist[0])[movedPiece][to_sq(move)] < CounterMovePruneThreshold
                   && (*contHist[1])[movedPiece][to_sq(move)] < CounterMovePruneThreshold)
                   continue;
@@ -1129,18 +1127,10 @@ moves_loop: // When in check, search starts from here
       }
     }
 
-    // The following condition would detect a stop only after move loop has been
-    // completed. But in this case bestValue is valid because we have fully
-    // searched our subtree, and we can anyhow save the result in TT.
-    /*
-       if (Threads.stop)
-        return VALUE_DRAW;
-    */
-
-    // Step 20. Check for mate and stalemate
+    // Step 20. Check for mate and stalemate and update various stats.
     // All legal moves have been searched and if there are no legal moves, it
-    // must be a mate or a stalemate. If we are in a singular extension search then
-    // return a fail low score.
+    // must be a mate or a stalemate. If we are in a singular extension search
+    // return a fail low score (Single Reply Extension).
 
     assert(moveCount || !inCheck || excludedMove || !MoveList<LEGAL>(pos).size());
 
@@ -1153,18 +1143,17 @@ moves_loop: // When in check, search starts from here
         if (!pos.capture_or_promotion(bestMove))
             update_quiet_stats(pos, ss, bestMove, quietsSearched, quietCount, 
 							   stat_bonus(depth + (bestValue > beta + PawnValueMg ? ONE_PLY : DEPTH_ZERO)));
-        // Update capture stats in any case
+
+        // Extra penalty for a quiet TT move or the main killer in previous ply when it gets refuted
+		if (!pos.captured_piece())
+        {
+            if (    (ss-1)->moveCount == 1
+		        || ((ss-1)->killers[0] && (ss-1)->currentMove == (ss-1)->killers[0]))
+                update_continuation_histories(ss-1, pos.piece_on(prevSq), prevSq, -stat_bonus(depth + ONE_PLY));
+        }
+
+        // Update capture stats
         update_capture_stats(pos, bestMove, capturesSearched, captureCount, stat_bonus(depth + ONE_PLY));
-
-        // Extra penalty for a quiet TT move in previous ply when it gets refuted
-        if ((ss-1)->moveCount == 1 && !pos.captured_piece())
-            update_continuation_histories(ss-1, pos.piece_on(prevSq), prevSq, -stat_bonus(depth + ONE_PLY));
-
-        // Extra penalty for killer move in previous ply when it gets refuted
-        else if (  (ss-1)->killers[0]
-                && (ss-1)->currentMove == (ss-1)->killers[0]
-                && !pos.captured_piece())
-            update_continuation_histories(ss-1, pos.piece_on(prevSq), prevSq, -stat_bonus(depth));
     }
     // Bonus for prior countermove that caused the fail low
     else if (   (PvNode || depth >= 3 * ONE_PLY)
@@ -1172,9 +1161,11 @@ moves_loop: // When in check, search starts from here
              && is_ok((ss-1)->currentMove))
         update_continuation_histories(ss-1, pos.piece_on(prevSq), prevSq, stat_bonus(depth));
 
+    // Don't overrule a TB loss at PV nodes
     if (PvNode)
         bestValue = std::min(bestValue, maxValue);
 
+    // Step 21. Save this node into TT
     if (!excludedMove && bestValue != VALUE_REP_DRAW)
         tte->save(posKey, value_to_tt(bestValue, ss->ply),
                   bestValue >= beta ? BOUND_LOWER :
