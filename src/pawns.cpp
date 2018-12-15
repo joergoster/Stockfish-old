@@ -228,10 +228,10 @@ Value Entry::evaluate_shelter(const Position& pos, Square ksq) {
   for (File f = File(center - 1); f <= File(center + 1); ++f)
   {
       b = ourPawns & file_bb(f);
-      int ourRank = b ? relative_rank(Us, backmost_sq(Us, b)) : 0;
+      Rank ourRank = b ? relative_rank(Us, backmost_sq(Us, b)) : RANK_1;
 
       b = theirPawns & file_bb(f);
-      int theirRank = b ? relative_rank(Us, frontmost_sq(Them, b)) : 0;
+      Rank theirRank = b ? relative_rank(Us, frontmost_sq(Them, b)) : RANK_1;
 
       int d = std::min(f, ~f);
       safety += ShelterStrength[d][ourRank];
@@ -251,7 +251,7 @@ Score Entry::do_king_safety(const Position& pos) {
 
   Square ksq = pos.square<KING>(Us);
   kingSquares[Us] = ksq;
-  castlingRights[Us] = pos.can_castle(Us);
+  castlingRights[Us] = pos.castling_rights(Us);
   int minKingPawnDistance = 0;
 
   Bitboard pawns = pos.pieces(Us, PAWN);

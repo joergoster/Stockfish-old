@@ -783,10 +783,10 @@ namespace {
         assert(is_ok((ss-1)->currentMove));
 
         int probCutCount = 0;
-        Value rbeta = std::min(beta + 216 - 48 * improving, VALUE_INFINITE);
+        Value raisedBeta = std::min(beta + 216 - 48 * improving, VALUE_INFINITE);
 
         // Initialize a MovePicker object for the current position
-        MovePicker mp(pos, ttMove, rbeta - ss->staticEval, &thisThread->captureHistory);
+        MovePicker mp(pos, ttMove, raisedBeta - ss->staticEval, &thisThread->captureHistory);
 
         while ((move = mp.next_move()) != MOVE_NONE && probCutCount < 3) // try at most 3 moves
         {
@@ -802,15 +802,15 @@ namespace {
             pos.do_move(move, st);
 
             // Perform a preliminary qsearch to verify that the move holds
-            value = -qsearch<NonPV>(pos, ss+1, -rbeta, -rbeta+1);
+            value = -qsearch<NonPV>(pos, ss+1, -raisedBeta, -raisedBeta+1);
 
             // If the qsearch held perform the regular search
-            if (value >= rbeta)
-                value = -search<NonPV>(pos, ss+1, -rbeta, -rbeta+1, depth - 4 * ONE_PLY, !cutNode, false);
+            if (value >= raisedBeta)
+                value = -search<NonPV>(pos, ss+1, -raisedBeta, -raisedBeta+1, depth - 4 * ONE_PLY, !cutNode, false);
 
             pos.undo_move(move);
 
-            if (value >= rbeta)
+            if (value >= raisedBeta)
                 return value;
         }
     }
@@ -889,7 +889,7 @@ moves_loop: // When in check, search starts from here
       // reduced search on all the other moves but the ttMove and if the result
       // is lower than ttValue minus a margin then we will extend the ttMove.
       if (   !rootNode
-          && !excludedMove // Recursive singular search is not allowed
+          && !excludedMove // Avoid recursive singular search
           &&  depth >= 8 * ONE_PLY
           &&  move == ttMove
           &&  ttValue != VALUE_NONE
@@ -897,14 +897,14 @@ moves_loop: // When in check, search starts from here
           &&  tte->depth() >= depth - 3 * ONE_PLY
           &&  pos.legal(move))
       {
-          Value rBeta = std::max(ttValue - 2 * depth / ONE_PLY, -VALUE_MATE);
+          Value reducedBeta = std::max(ttValue - 2 * depth / ONE_PLY, -VALUE_MATE);
           Depth d = (depth / (2 * ONE_PLY)) * ONE_PLY;
 
           ss->excludedMove = move;
-          value = search<NonPV>(pos, ss, rBeta - 1, rBeta, d, cutNode, true);
+          value = search<NonPV>(pos, ss, reducedBeta - 1, reducedBeta, d, cutNode, true);
           ss->excludedMove = MOVE_NONE;
 
-          if (value < rBeta)
+          if (value < reducedBeta)
               extension = ONE_PLY;
       }
       else if (   givesCheck // Check extension
