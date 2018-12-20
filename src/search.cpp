@@ -61,6 +61,9 @@ namespace {
   // Different node types, used as a template parameter
   enum NodeType { NonPV, PV };
 
+  // Threshold for root score averaging
+  constexpr Value averagingThreshold = Value(13438);
+
   // Sizes and phases of the skip-blocks, used for distributing search depths across the threads
   constexpr int SkipSize[]  = { 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4 };
   constexpr int SkipPhase[] = { 0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7 };
@@ -1110,7 +1113,16 @@ moves_loop: // When in check, search starts from here
           // PV move or new best move?
           if (moveCount == 1 || value > alpha)
           {
-              rm.score = value;
+              if (   abs(value) < VALUE_MATE_IN_MAX_PLY
+                  && pos.non_pawn_material() >= averagingThreshold)
+              {
+                  rm.totalValue += int(value);
+                  rm.totalCnt++;
+                  rm.score = Value(rm.totalValue / rm.totalCnt);
+              }
+              else
+                  rm.score = value;
+
               rm.selDepth = thisThread->selDepth;
               rm.pv.resize(1);
 
