@@ -125,6 +125,9 @@ namespace {
     { S( 9, 2), S(15, 5) }  // Bishop
   };
 
+  // Extra bonus for a knight outpost on 6th rank
+  constexpr Score KnightOutpostOn6thRank = S(40, 0);
+
   // RookOnFile[semiopen/open] contains bonuses for each rook when there is
   // no (friendly) pawn on the rook file.
   constexpr Score RookOnFile[] = { S(18, 7), S(44, 20) };
@@ -326,8 +329,12 @@ namespace {
             // Bonus if piece is on an outpost square or can reach one
             bb = OutpostRanks & ~pe->pawn_attacks_span(Them);
             if (bb & s)
+            {
                 score += Outpost[Pt == BISHOP][bool(attackedBy[Us][PAWN] & s)] * 2;
 
+                if (Pt == KNIGHT && relative_rank(Us, s) == RANK_6 && attackedBy[Us][PAWN] & s)
+                    score += KnightOutpostOn6thRank;
+            }
             else if (bb &= b & ~pos.pieces(Us))
                 score += Outpost[Pt == BISHOP][bool(attackedBy[Us][PAWN] & bb)];
 
