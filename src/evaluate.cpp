@@ -126,7 +126,7 @@ namespace {
   };
 
   // Extra bonus for a knight outpost on 6th rank
-  constexpr Score KnightOutpostOn6thRank = S(40, 0);
+  constexpr Score KnightOutpostOn6thRank = S(20, 0);
 
   // RookOnFile[semiopen/open] contains bonuses for each rook when there is
   // no (friendly) pawn on the rook file.
