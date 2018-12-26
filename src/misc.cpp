@@ -41,6 +41,7 @@ typedef bool(*fun3_t)(HANDLE, CONST GROUP_AFFINITY*, PGROUP_AFFINITY);
 }
 #endif
 
+#include <cassert>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -257,7 +258,7 @@ int best_group(size_t idx) {
       return -1;
   }
 
-  while (ptr->Size > 0 && byteOffset + ptr->Size <= returnLength)
+  while (byteOffset < returnLength)
   {
       if (ptr->Relationship == RelationNumaNode)
           nodes++;
@@ -267,6 +268,8 @@ int best_group(size_t idx) {
           cores++;
           threads += (ptr->Processor.Flags == LTP_PC_SMT) ? 2 : 1;
       }
+
+      assert(ptr->Size);
 
       byteOffset += ptr->Size;
       ptr = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)(((char*)ptr) + ptr->Size);

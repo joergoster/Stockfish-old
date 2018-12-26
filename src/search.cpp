@@ -256,7 +256,11 @@ void MainThread::search() {
 
 void Thread::search() {
 
-  Stack stack[MAX_PLY+7], *ss = stack+4; // To reference from (ss-4) to (ss+2)
+  // To allow access to (ss-5) up to (ss+2), the stack must be oversized.
+  // The former is needed to allow update_continuation_histories(ss-1, ...),
+  // which accesses its argument at ss-4, also near the root.
+  // The latter is needed for statScores and killer initialization.
+  Stack stack[MAX_PLY+8], *ss = stack+5;
   Value lastBestScore, bestValue, alpha, beta, delta;
   Move currentBestMove, lastBestMove;
   Depth lastBestMoveDepth = DEPTH_ZERO;
@@ -265,8 +269,8 @@ void Thread::search() {
   Color us = rootPos.side_to_move();
   Material::Entry* me;
 
-  std::memset(ss-4, 0, 7 * sizeof(Stack));
-  for (int i = 4; i > 0; i--)
+  std::memset(ss-5, 0, 8 * sizeof(Stack));
+  for (int i = 5; i > 0; i--)
      (ss-i)->continuationHistory = &this->continuationHistory[NO_PIECE][0]; // Use as sentinel
 
   bestValue = alpha = -VALUE_INFINITE;
@@ -614,8 +618,9 @@ namespace {
                     update_quiet_stats(pos, ss, ttMove, nullptr, 0, stat_bonus(depth));
 
                 // Extra penalty for a quiet TT move in previous ply when it gets refuted
-                if ((ss-1)->moveCount == 1 && !pos.captured_piece())
-                    update_continuation_histories(ss-1, pos.piece_on(prevSq), prevSq, -stat_bonus(depth + ONE_PLY));
+                if (   !pos.captured_piece()
+                    && ((ss-1)->moveCount == 1 || (ss-1)->currentMove == (ss-1)->killers[0]))
+                        update_continuation_histories(ss-1, pos.piece_on(prevSq), prevSq, -stat_bonus(depth + ONE_PLY));
             }
             // Penalty for a quiet ttMove that fails low
             else if (!pos.capture_or_promotion(ttMove))
@@ -1146,12 +1151,9 @@ moves_loop: // When in check, search starts from here
 							   stat_bonus(depth + (bestValue > beta + PawnValueMg ? ONE_PLY : DEPTH_ZERO)));
 
         // Extra penalty for a quiet TT move or the main killer in previous ply when it gets refuted
-        if (!pos.captured_piece())
-        {
-            if (    (ss-1)->moveCount == 1
-                || ((ss-1)->killers[0] && (ss-1)->currentMove == (ss-1)->killers[0]))
+        if (   !pos.captured_piece()
+            && ((ss-1)->moveCount == 1 || (ss-1)->currentMove == (ss-1)->killers[0]))
                 update_continuation_histories(ss-1, pos.piece_on(prevSq), prevSq, -stat_bonus(depth + ONE_PLY));
-        }
 
         // Update capture stats
         update_capture_stats(pos, bestMove, capturesSearched, captureCount, stat_bonus(depth + ONE_PLY));
