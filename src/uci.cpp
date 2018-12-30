@@ -263,7 +263,7 @@ string UCI::value(Value v) {
   stringstream ss;
 
   if (abs(v) < VALUE_MATE - MAX_PLY)
-      ss << "cp " << v * 600 / (BishopValueMg + BishopValueEg);
+      ss << "cp " << v * 1000 / (RookValueMg + RookValueEg);
   else
       ss << "mate " << (v > 0 ? VALUE_MATE - v + 1 : -VALUE_MATE - v) / 2;
 

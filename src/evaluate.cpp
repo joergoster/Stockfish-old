@@ -40,7 +40,7 @@ namespace Trace {
 
   Score scores[TERM_NB][COLOR_NB];
 
-  double to_cp(Value v) { return double(v) * 600 / (BishopValueMg + BishopValueEg); }
+  double to_cp(Value v) { return double(v) * 10 / (RookValueMg + RookValueEg); }
 
   void add(int idx, Color c, Score s) {
     scores[idx][c] = s;
@@ -84,7 +84,7 @@ namespace {
   };
 
   // Maximum allowed material score
-  constexpr Score MaxMaterial = make_score(100 * PawnValueMg, 100 * PawnValueEg);
+  constexpr Score MaxMaterial = make_score(20 * RookValueMg, 20 * RookValueEg);
 
   // Threshold for space evaluation
   constexpr Value SpaceThreshold = Value(12222);
