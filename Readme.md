@@ -51,9 +51,23 @@ Increasing the "SyzygyProbeDepth" option lets the engine probe less
 aggressively. Set this option to a higher value if you experience too much
 slowdown (in terms of nps) due to TB probing.
 
+<<<<<<< HEAD
 Set the "Syzygy50MoveRule" option to false if you want tablebase positions
 that are drawn by the 50-move rule to count as win or loss. This may be useful
 for correspondence games (because of tablebase adjudication).
+=======
+  * #### SyzygyPath
+    Path to the folders/directories storing the Syzygy tablebase files. Multiple 
+    directories are to be separated by ";" on Windows and by ":" on Unix-based 
+    operating systems. Do not use spaces around the ";" or ":".
+    
+    Example: `C:\tablebases\wdl345;C:\tablebases\wdl6;D:\tablebases\dtz345;D:\tablebases\dtz6`
+    
+    It is recommended to store .rtbw files on an SSD. There is no loss in storing 
+    the .rtbz files on a regular HD. It is recommended to verify all md5 checksums
+    of the downloaded tablebase files (`md5sum -c checksum.md5`) as corruption will
+    lead to engine crashes.
+>>>>>>> bb843a00... Check tablebase files
 
 The "SyzygyProbeLimit" option should normally be left at its default value.
 
