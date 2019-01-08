@@ -829,7 +829,7 @@ namespace {
     // Score is computed internally from the white point of view.
     Score score =  std::min(pos.psq_score(WHITE), MaxMaterial)
                  - std::min(pos.psq_score(BLACK), MaxMaterial);
-    score += (me->imbalance(WHITE) - me->imbalance(BLACK)) / 8;
+    score += me->imbalance(WHITE) - me->imbalance(BLACK);
 
     // Probe the pawn hash table and add the pawn eval
     pe = Pawns::probe(pos);
@@ -870,7 +870,7 @@ namespace {
     {
         Trace::add(MATERIAL, std::min(pos.psq_score(WHITE), MaxMaterial),
                              std::min(pos.psq_score(BLACK), MaxMaterial));
-        Trace::add(IMBALANCE, me->imbalance(WHITE)/8, me->imbalance(BLACK)/8);
+        Trace::add(IMBALANCE, me->imbalance(WHITE), me->imbalance(BLACK));
         Trace::add(PAWN, pe->pawn_score(WHITE), pe->pawn_score(BLACK));
         Trace::add(MOBILITY, mobility[WHITE], mobility[BLACK]);
         Trace::add(TOTAL, score);
