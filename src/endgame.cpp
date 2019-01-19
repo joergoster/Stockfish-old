@@ -837,6 +837,9 @@ ScaleFactor Endgame<KNPK>::operator()(const Position& pos) const {
 template<>
 ScaleFactor Endgame<KNPKB>::operator()(const Position& pos) const {
 
+  assert(verify_material(pos, strongSide, KnightValueMg, 1));
+  assert(verify_material(pos, weakSide, BishopValueMg, 0));
+
   Square pawnSq = pos.square<PAWN>(strongSide);
   Square bishopSq = pos.square<BISHOP>(weakSide);
   Square weakKingSq = pos.square<KING>(weakSide);

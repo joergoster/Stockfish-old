@@ -521,7 +521,7 @@ namespace {
     Score score = SCORE_ZERO;
 
     // Non-pawn enemies
-    nonPawnEnemies = pos.pieces(Them) & ~pos.pieces(Them, PAWN);
+    nonPawnEnemies = pos.pieces(Them) & ~pos.pieces(PAWN);
 
     // Squares strongly protected by the enemy, either because they defend the
     // square with a pawn, or because they defend the square twice and we don't.
@@ -742,7 +742,8 @@ namespace {
     behind |= (Us == WHITE ? behind >> 16 : behind << 16);
 
     int bonus = popcount(safe) + popcount(behind & safe);
-    int weight = pos.count<ALL_PIECES>(Us) - 2 * pe->open_files();
+    int weight =  pos.count<ALL_PIECES>(Us)
+                - 2 * popcount(pe->semiopenFiles[WHITE] & pe->semiopenFiles[BLACK]);
 
     Score score = make_score(bonus * weight * weight / 16, 0);
 

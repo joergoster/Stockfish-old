@@ -99,8 +99,8 @@ namespace {
   Value value_from_tt(Value v, int ply);
   void update_pv(Move* pv, Move move, Move* childPv);
   void update_continuation_histories(Stack* ss, Piece pc, Square to, int bonus);
-  void update_quiet_stats(const Position& pos, Stack* ss, Move move, Move* quiets, int quietsCnt, int bonus);
-  void update_capture_stats(const Position& pos, Move move, Move* captures, int captureCnt, int bonus);
+  void update_quiet_stats(const Position& pos, Stack* ss, Move move, Move* quiets, int quietCount, int bonus);
+  void update_capture_stats(const Position& pos, Move move, Move* captures, int captureCount, int bonus);
 
   inline bool gives_check(const Position& pos, Move move) {
     Color us = pos.side_to_move();
@@ -1455,7 +1455,7 @@ moves_loop: // When in check, search starts from here
   // update_capture_stats() updates move sorting heuristics when a new capture best move is found
 
   void update_capture_stats(const Position& pos, Move move,
-                            Move* captures, int captureCnt, int bonus) {
+                            Move* captures, int captureCount, int bonus) {
 
       CapturePieceToHistory& captureHistory =  pos.this_thread()->captureHistory;
       Piece moved_piece = pos.moved_piece(move);
@@ -1466,7 +1466,7 @@ moves_loop: // When in check, search starts from here
           captureHistory[moved_piece][to_sq(move)][captured] << bonus;
 
       // Decrease all the other played capture moves
-      for (int i = 0; i < captureCnt; ++i)
+      for (int i = 0; i < captureCount; ++i)
       {
           moved_piece = pos.moved_piece(captures[i]);
           captured = type_of(pos.piece_on(to_sq(captures[i])));
@@ -1478,7 +1478,7 @@ moves_loop: // When in check, search starts from here
   // update_quiet_stats() updates move sorting heuristics when a new quiet best move is found
 
   void update_quiet_stats(const Position& pos, Stack* ss, Move move,
-                          Move* quiets, int quietsCnt, int bonus) {
+                          Move* quiets, int quietCount, int bonus) {
 
     if (ss->killers[0] != move)
     {
@@ -1498,7 +1498,7 @@ moves_loop: // When in check, search starts from here
     }
 
     // Decrease all the other played quiet moves
-    for (int i = 0; i < quietsCnt; ++i)
+    for (int i = 0; i < quietCount; ++i)
     {
         thisThread->mainHistory[us][from_to(quiets[i])] << -bonus;
         update_continuation_histories(ss, pos.moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
@@ -1607,7 +1607,7 @@ bool RootMove::extract_ponder_from_tt(Position& pos) {
 
     assert(pv.size() == 1);
 
-    if (!pv[0])
+    if (pv[0] == MOVE_NONE)
         return false;
 
     pos.do_move(pv[0], st);
