@@ -798,6 +798,32 @@ namespace {
     if (me->scale_factor(pos, strongSide) != SCALE_FACTOR_NORMAL)
         return me->scale_factor(pos, strongSide);
 
+    // Try to handle a fully blocked position with all pawns still
+    // on the board and directly blocked by their counterpart,
+    // and all remaining pieces on their respective side.
+    // Test position r7/1b1r4/k1p1p1p1/1p1pPpPp/p1PP1P1P/PP1K4/8/4Q3 w - - bm Qa5+
+    if (   pos.count<PAWN>() == 16
+        && popcount(shift<NORTH>(pos.pieces(WHITE, PAWN)) & pos.pieces(BLACK, PAWN)) == 8)
+    {
+        Bitboard b, Camp[COLOR_NB];
+
+        for (Color c : { WHITE, BLACK })
+        {
+            b = pos.pieces(c, PAWN);
+            Camp[c] = 0;
+
+            while (b)
+            {
+                Square s = pop_lsb(&b);
+                Camp[c] |= forward_file_bb(~c, s);
+            }
+        }
+
+        if (   !(pos.pieces(WHITE) & Camp[BLACK])
+            && !(pos.pieces(BLACK) & Camp[WHITE]))
+            return SCALE_FACTOR_DRAW;
+    }
+
     // Scale down endgames with opposite-colored bishops, more with no other pieces.
     // Also scale depending on the number of pawns.
     int sf = pos.opposite_bishops() ? pos.non_pawn_material() == 2 * BishopValueMg ? 8 + 4 * pe->pawn_asymmetry()
