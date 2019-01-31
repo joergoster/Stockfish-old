@@ -171,7 +171,7 @@ enum Value : int {
   VALUE_ZERO      = 0,
   VALUE_DRAW      = 0,
   VALUE_KNOWN_WIN = 10000,
-  VALUE_MATE      = 32000,
+  VALUE_MATE      = 27008,
   VALUE_INFINITE  = 32001,
   VALUE_NONE      = 32002,
 
@@ -366,12 +366,12 @@ constexpr CastlingRight operator|(Color c, CastlingSide s) {
   return CastlingRight(WHITE_OO << ((s == QUEEN_SIDE) + 2 * c));
 }
 
-constexpr Value mate_in(int ply) {
-  return VALUE_MATE - ply;
+constexpr Value mate_in(int prisoners, int ply) {
+  return VALUE_MATE + prisoners * MAX_PLY - ply;
 }
 
-constexpr Value mated_in(int ply) {
-  return -VALUE_MATE + ply;
+constexpr Value mated_in(int prisoners, int ply) {
+  return -VALUE_MATE - prisoners * MAX_PLY + ply;
 }
 
 constexpr Square make_square(File f, Rank r) {

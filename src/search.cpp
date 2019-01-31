@@ -609,8 +609,13 @@ namespace {
         // because we will never beat the current alpha. Same logic but with reversed
         // signs applies also in the opposite condition of being mated instead of giving
         // mate. In this case return a fail-high score.
-        alpha = std::max(mated_in(ss->ply), alpha);
-        beta = std::min(mate_in(ss->ply+1), beta);
+        int prisoners =  pos.count<QUEEN >(us) * 9 + pos.count<ROOK  >(us) * 5
+                       + pos.count<BISHOP>(us) * 3 + pos.count<KNIGHT>(us) * 3
+                       + pos.count<PAWN>(us);
+        prisoners = std::min(prisoners, 39); // Limit to start position
+
+        alpha = std::max(mated_in(prisoners, ss->ply), alpha);
+        beta = std::min(mate_in(prisoners, ss->ply+1), beta);
         if (alpha >= beta)
             return alpha;
     }
@@ -1187,8 +1192,15 @@ moves_loop: // When in check, search starts from here
     assert(moveCount || !inCheck || excludedMove || !MoveList<LEGAL>(pos).size());
 
     if (!moveCount)
+    {
+        int prisoners =  pos.count<QUEEN >(us) * 9 + pos.count<ROOK  >(us) * 5
+                       + pos.count<BISHOP>(us) * 3 + pos.count<KNIGHT>(us) * 3
+                       + pos.count<PAWN>(us);
+        prisoners = std::min(prisoners, 39); // Limit to start position
+
         bestValue = excludedMove ? alpha
-                   :     inCheck ? mated_in(ss->ply) : VALUE_DRAW;
+                   :     inCheck ? mated_in(prisoners, ss->ply) : VALUE_DRAW;
+    }
     else if (bestMove)
     {
         // Quiet best move: update move sorting heuristics
@@ -1424,7 +1436,15 @@ moves_loop: // When in check, search starts from here
     // All legal moves have been searched. A special case: If we're in check
     // and no legal moves were found, it is checkmate.
     if (inCheck && bestValue == -VALUE_INFINITE)
-        return mated_in(ss->ply); // Plies to mate from the root
+    {
+        Color us = pos.side_to_move();
+        int prisoners =  pos.count<QUEEN >(us) * 9 + pos.count<ROOK  >(us) * 5
+                       + pos.count<BISHOP>(us) * 3 + pos.count<KNIGHT>(us) * 3
+                       + pos.count<PAWN>(us);
+        prisoners = std::min(prisoners, 39); // Limit to start position
+
+        return mated_in(prisoners, ss->ply); // Plies to mate from the root
+    }
 
     tte->save(posKey, value_to_tt(bestValue, ss->ply), pvHit,
               bestValue >= beta ? BOUND_LOWER :

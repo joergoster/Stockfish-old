@@ -257,7 +257,15 @@ string UCI::value(Value v) {
   if (abs(v) < VALUE_MATE - MAX_PLY)
       ss << "cp " << v * 100 / PawnValueEg;
   else
-      ss << "mate " << (v > 0 ? VALUE_MATE - v + 1 : -VALUE_MATE - v) / 2;
+  {
+      if (abs(v) > VALUE_MATE)
+      {
+          int k = (abs(v) - VALUE_MATE) / MAX_PLY + 1;            // Get the number of prisoners
+          v = v > VALUE_ZERO ? v - k * MAX_PLY : v + k * MAX_PLY; // Reduce v to default mate value preserving plies
+      }
+
+      ss << "mate " << (v > VALUE_ZERO ? VALUE_MATE - v + 1 : -VALUE_MATE - v) / 2;
+  }
 
   return ss.str();
 }
