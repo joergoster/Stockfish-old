@@ -609,13 +609,19 @@ namespace {
         // because we will never beat the current alpha. Same logic but with reversed
         // signs applies also in the opposite condition of being mated instead of giving
         // mate. In this case return a fail-high score.
-        int prisoners =  pos.count<QUEEN >(us) * 9 + pos.count<ROOK  >(us) * 5
-                       + pos.count<BISHOP>(us) * 3 + pos.count<KNIGHT>(us) * 3
-                       + pos.count<PAWN>(us);
-        prisoners = std::min(prisoners, 39); // Limit to start position
+        int prisonersUs =  pos.count<QUEEN >(us) * 9 + pos.count<ROOK  >(us) * 5
+                         + pos.count<BISHOP>(us) * 3 + pos.count<KNIGHT>(us) * 3
+                         + pos.count<PAWN>(us);
+        prisonersUs = std::min(prisonersUs, 39); // Limit to start position
 
-        alpha = std::max(mated_in(prisoners, ss->ply), alpha);
-        beta = std::min(mate_in(prisoners, ss->ply+1), beta);
+        int prisonersThem =  pos.count<QUEEN >(~us) * 9 + pos.count<ROOK  >(~us) * 5
+                           + pos.count<BISHOP>(~us) * 3 + pos.count<KNIGHT>(~us) * 3
+                           + pos.count<PAWN>(~us);
+        prisonersThem = std::min(prisonersThem, 39); // Limit to start position
+
+        alpha = std::max(mated_in(prisonersUs, ss->ply), alpha);
+        beta = std::min(mate_in(prisonersThem, ss->ply+1), beta);
+
         if (alpha >= beta)
             return alpha;
     }
