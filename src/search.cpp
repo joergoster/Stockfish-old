@@ -92,6 +92,13 @@ namespace {
                      : VALUE_DRAW + Value(2 * (thisThread->nodes.load(std::memory_order_relaxed) % 2) - 1);
   }
 
+  // Returns the number of prisoners for a given color (Prisoners Chess)
+  int prisoners(const Position& pos, Color us) {
+    return std::min(pos.count<QUEEN >(us) * 9 + pos.count<ROOK  >(us) * 5
+                  + pos.count<BISHOP>(us) * 3 + pos.count<KNIGHT>(us) * 3
+                  + pos.count<PAWN>(us), 39);
+  }
+
   // Skill structure is used to implement strength limit
   struct Skill {
     explicit Skill(int l) : level(l) {}
@@ -609,18 +616,11 @@ namespace {
         // because we will never beat the current alpha. Same logic but with reversed
         // signs applies also in the opposite condition of being mated instead of giving
         // mate. In this case return a fail-high score.
-        int prisonersUs =  pos.count<QUEEN >(us) * 9 + pos.count<ROOK  >(us) * 5
-                         + pos.count<BISHOP>(us) * 3 + pos.count<KNIGHT>(us) * 3
-                         + pos.count<PAWN>(us);
-        prisonersUs = std::min(prisonersUs, 39); // Limit to start position
+        int ourPrisoners   = prisoners(pos,  us);
+        int theirPrisoners = prisoners(pos, ~us);
 
-        int prisonersThem =  pos.count<QUEEN >(~us) * 9 + pos.count<ROOK  >(~us) * 5
-                           + pos.count<BISHOP>(~us) * 3 + pos.count<KNIGHT>(~us) * 3
-                           + pos.count<PAWN>(~us);
-        prisonersThem = std::min(prisonersThem, 39); // Limit to start position
-
-        alpha = std::max(mated_in(prisonersUs, ss->ply), alpha);
-        beta = std::min(mate_in(prisonersThem, ss->ply+1), beta);
+        alpha = std::max(mated_in(ourPrisoners, ss->ply), alpha);
+        beta = std::min(mate_in(theirPrisoners, ss->ply+1), beta);
 
         if (alpha >= beta)
             return alpha;
@@ -1199,13 +1199,10 @@ moves_loop: // When in check, search starts from here
 
     if (!moveCount)
     {
-        int prisoners =  pos.count<QUEEN >(us) * 9 + pos.count<ROOK  >(us) * 5
-                       + pos.count<BISHOP>(us) * 3 + pos.count<KNIGHT>(us) * 3
-                       + pos.count<PAWN>(us);
-        prisoners = std::min(prisoners, 39); // Limit to start position
+        int ourPrisoners = prisoners(pos, us);
 
         bestValue = excludedMove ? alpha
-                   :     inCheck ? mated_in(prisoners, ss->ply) : VALUE_DRAW;
+                   :     inCheck ? mated_in(ourPrisoners, ss->ply) : VALUE_DRAW;
     }
     else if (bestMove)
     {
@@ -1443,13 +1440,8 @@ moves_loop: // When in check, search starts from here
     // and no legal moves were found, it is checkmate.
     if (inCheck && bestValue == -VALUE_INFINITE)
     {
-        Color us = pos.side_to_move();
-        int prisoners =  pos.count<QUEEN >(us) * 9 + pos.count<ROOK  >(us) * 5
-                       + pos.count<BISHOP>(us) * 3 + pos.count<KNIGHT>(us) * 3
-                       + pos.count<PAWN>(us);
-        prisoners = std::min(prisoners, 39); // Limit to start position
-
-        return mated_in(prisoners, ss->ply); // Plies to mate from the root
+        int ourPrisoners = prisoners(pos, pos.side_to_move());
+        return mated_in(ourPrisoners, ss->ply); // Plies to mate from the root
     }
 
     tte->save(posKey, value_to_tt(bestValue, ss->ply), pvHit,
