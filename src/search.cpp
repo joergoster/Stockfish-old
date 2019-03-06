@@ -272,13 +272,13 @@ void MainThread::search() {
 
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   // Print stats of all root moves
-  sync_cout << "Printing some stats of all root moves!" << sync_endl;
+/*  sync_cout << "Printing some stats of all root moves!" << sync_endl;
 
   for (auto& rm : bestThread->rootMoves)
       if (rm.visits) // avoids a division by zero
           sync_cout << UCI::move(rm.pv[0], rootPos.is_chess960()) << "      AB score: "        << (rm.score == -VALUE_INFINITE ? "n/a   " : UCI::value(rm.score))
                                                                   << "      MCTS-like score: " << UCI::value(Value(rm.zScore / rm.visits))
-                                                                  << "      Visits: "          << rm.visits << sync_endl;
+                                                                  << "      Visits: "          << rm.visits << sync_endl;*/
   ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   sync_cout << "bestmove " << UCI::move(bestThread->rootMoves[0].pv[0], rootPos.is_chess960());
@@ -392,6 +392,19 @@ void Thread::search() {
           if (rootDepth >= 5 * ONE_PLY)
           {
               Value previousScore = rootMoves[pvIdx].previousScore;
+
+              // Shift the score towards the MCTS-like score;
+              // more in the opening, less in the endgame.
+              if (   abs(previousScore) < VALUE_KNOWN_WIN
+                  && rootPos.non_pawn_material() > EndgameLimit)
+              {
+                  Value mctsScore = Value(rootMoves[pvIdx].zScore / rootMoves[pvIdx].visits);
+                  Value npm = std::min(rootPos.non_pawn_material(), MidgameLimit);
+                  int mctsFactor = ((npm - EndgameLimit) * PHASE_MIDGAME) / (MidgameLimit - EndgameLimit);
+
+                  previousScore += mctsFactor * (mctsScore - previousScore) / 256;
+              }
+
               delta = Value(20);
               alpha = std::max(previousScore - delta,-VALUE_INFINITE);
               beta  = std::min(previousScore + delta, VALUE_INFINITE);
