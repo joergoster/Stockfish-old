@@ -115,7 +115,7 @@ namespace {
 
   Value value_to_tt(Value v, int ply);
   Value value_from_tt(Value v, int ply);
-  void update_pv(Move* pv, Move move, Move* childPv);
+  void update_pv(std::vector<Move> &pv, Move move, std::vector<Move> &childPv);
   void update_continuation_histories(Stack* ss, Piece pc, Square to, int bonus);
   void update_quiet_stats(const Position& pos, Stack* ss, Move move, Move* quiets, int quietCount, int bonus);
   void update_capture_stats(const Position& pos, Move move, Move* captures, int captureCount, int bonus);
@@ -290,7 +290,6 @@ void Thread::search() {
   // which accesses its argument at ss-4, also near the root.
   // The latter is needed for statScores and killer initialization.
   Stack stack[MAX_PLY+10], *ss = stack+7;
-  Move  pv[MAX_PLY+1];
   Value bestValue, alpha, beta, delta;
   Move  lastBestMove = MOVE_NONE;
   Depth lastBestMoveDepth = DEPTH_ZERO;
@@ -301,7 +300,6 @@ void Thread::search() {
   std::memset(ss-7, 0, 10 * sizeof(Stack));
   for (int i = 7; i > 0; i--)
      (ss-i)->continuationHistory = &this->continuationHistory[NO_PIECE][0]; // Use as sentinel
-  ss->pv = pv;
 
   bestValue = delta = alpha = -VALUE_INFINITE;
   beta = VALUE_INFINITE;
@@ -547,7 +545,7 @@ namespace {
     assert(!(PvNode && cutNode));
     assert(depth / ONE_PLY * ONE_PLY == depth);
 
-    Move pv[MAX_PLY+1], capturesSearched[32], quietsSearched[64];
+    Move capturesSearched[32], quietsSearched[64];
     StateInfo st;
     TTEntry* tte;
     Key posKey;
@@ -893,8 +891,6 @@ moves_loop: // When in check, search starts from here
           sync_cout << "info depth " << depth / ONE_PLY
                     << " currmove " << UCI::move(move, pos.is_chess960())
                     << " currmovenumber " << moveCount + thisThread->pvIdx << sync_endl;
-      if (PvNode)
-          (ss+1)->pv = nullptr;
 
       extension = DEPTH_ZERO;
       captureOrPromotion = pos.capture_or_promotion(move);
@@ -1072,8 +1068,7 @@ moves_loop: // When in check, search starts from here
       // parent node fail low with value <= alpha and try another move.
       if (PvNode && (moveCount == 1 || (value > alpha && (rootNode || value < beta))))
       {
-          (ss+1)->pv = pv;
-          (ss+1)->pv[0] = MOVE_NONE;
+          ss->pv.clear();
 
           value = -search<PV>(pos, ss+1, -beta, -alpha, newDepth, false);
       }
@@ -1102,10 +1097,8 @@ moves_loop: // When in check, search starts from here
               rm.selDepth = thisThread->selDepth;
               rm.pv.resize(1);
 
-              assert((ss+1)->pv);
-
-              for (Move* m = (ss+1)->pv; *m != MOVE_NONE; ++m)
-                  rm.pv.push_back(*m);
+              for (auto& m : ss->pv)
+                  rm.pv.push_back(m);
 
               // We record how often the best move has been changed in each
               // iteration. This information is used for time management: When
@@ -1129,7 +1122,7 @@ moves_loop: // When in check, search starts from here
               bestMove = move;
 
               if (PvNode && !rootNode) // Update pv even in fail-high case
-                  update_pv(ss->pv, move, (ss+1)->pv);
+                  update_pv((ss-1)->pv, move, ss->pv);
 
               if (PvNode && value < beta) // Update alpha! Always alpha < beta
                   alpha = value;
@@ -1217,7 +1210,6 @@ moves_loop: // When in check, search starts from here
     assert(depth <= DEPTH_ZERO);
     assert(depth / ONE_PLY * ONE_PLY == depth);
 
-    Move pv[MAX_PLY+1];
     StateInfo st;
     TTEntry* tte;
     Key posKey;
@@ -1230,8 +1222,7 @@ moves_loop: // When in check, search starts from here
     if (PvNode)
     {
         oldAlpha = alpha; // To flag BOUND_EXACT when eval above alpha and no available moves
-        (ss+1)->pv = pv;
-        ss->pv[0] = MOVE_NONE;
+        ss->pv.clear();
     }
 
     Thread* thisThread = pos.this_thread();
@@ -1394,7 +1385,7 @@ moves_loop: // When in check, search starts from here
               bestMove = move;
 
               if (PvNode) // Update pv even in fail-high case
-                  update_pv(ss->pv, move, (ss+1)->pv);
+                  update_pv((ss-1)->pv, move, ss->pv);
 
               if (PvNode && value < beta) // Update alpha here!
                   alpha = value;
@@ -1445,13 +1436,15 @@ moves_loop: // When in check, search starts from here
   }
 
 
-  // update_pv() adds current move and appends child pv[]
+  // update_pv() adds current move and appends child pv
 
-  void update_pv(Move* pv, Move move, Move* childPv) {
+  void update_pv(std::vector<Move> &pv, Move move, std::vector<Move> &childPv) {
 
-    for (*pv++ = move; childPv && *childPv != MOVE_NONE; )
-        *pv++ = *childPv++;
-    *pv = MOVE_NONE;
+    pv.clear();
+    pv.push_back(move);
+
+    for (auto& m : childPv)
+        pv.push_back(m);
   }
 
 
