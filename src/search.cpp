@@ -1222,7 +1222,7 @@ moves_loop: // When in check, search starts from here
     if (PvNode)
     {
         oldAlpha = alpha; // To flag BOUND_EXACT when eval above alpha and no available moves
-        ss->pv.clear();
+        (ss-1)->pv.clear();
     }
 
     Thread* thisThread = pos.this_thread();
@@ -1237,7 +1237,7 @@ moves_loop: // When in check, search starts from here
         || ss->ply >= MAX_PLY)
         return (ss->ply >= MAX_PLY && !inCheck) ? evaluate(pos) : VALUE_DRAW;
 
-    assert(0 <= ss->ply && ss->ply < MAX_PLY);
+    assert(1 <= ss->ply && ss->ply < MAX_PLY);
 
     // Decide whether or not to include checks: this fixes also the type of
     // TT entry depth that we are going to use. Note that in qsearch we use
