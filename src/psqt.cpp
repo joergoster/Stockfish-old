@@ -36,7 +36,7 @@ namespace PSQT {
 // and the rank of the square. Tables are defined for files A..H, ranks 1..8 and white side: it is
 // symmetric for black side.
 
-constexpr Score FileBonus[PIECE_NB][FILE_NB] = {
+Score FileBonus[PIECE_NB][FILE_NB] = {
   {},
   { S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), }, // PAWN
   { S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), }, // KNIGHT
@@ -46,7 +46,7 @@ constexpr Score FileBonus[PIECE_NB][FILE_NB] = {
   { S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), }, // KING
 };
 
-constexpr Score RankBonus[PIECE_NB][RANK_NB] = {
+Score RankBonus[PIECE_NB][RANK_NB] = {
   {},
   { S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), }, // PAWN
   { S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), S( 0,  0), }, // KNIGHT
@@ -81,5 +81,8 @@ void init() {
       }
   }
 }
+
+TUNE(SetRange(-1000, 1000), FileBonus, RankBonus, init);
+UPDATE_ON_LAST();
 
 } // namespace PSQT
