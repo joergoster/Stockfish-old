@@ -776,10 +776,49 @@ namespace {
     // If scale is not already specific, scale down the endgame via general heuristics
     if (sf == SCALE_FACTOR_NORMAL)
     {
-        if (   pos.opposite_bishops()
-            && pos.non_pawn_material(WHITE) == BishopValueMg
-            && pos.non_pawn_material(BLACK) == BishopValueMg)
+        // Try to handle (almost) blocked positions with many pawns still
+        // on the board and directly blocked by their counterpart or a bishop,
+        // and all remaining pieces on their respective side.
+        // Test positions:
+        // r7/1b1r4/k1p1p1p1/1p1pPpPp/p1PP1P1P/PP1K4/8/4Q3 w - - bm Qa5+
+        // 5k2/3b4/5p2/p1p1pPp1/PpPpP1Pp/1P1P3P/8/3R1K2 w - - 20 1
+        // 5k2/8/5p2/p1p1pPp1/PbPpP1Pp/3P3P/8/3R1K2 w - - 20 1
+        if (pos.count<PAWN>() >= 12)
+        {
+            Bitboard b, Camp[COLOR_NB];
+            int blockedPawns;
+
+            // Calculate the number of blocked pawns for both sides and take the larger one
+            blockedPawns = std::max(popcount(shift<NORTH>(pos.pieces(WHITE, PAWN))
+                                                        & pos.pieces(BLACK, PAWN, BISHOP)),
+                                    popcount(shift<SOUTH>(pos.pieces(BLACK, PAWN))
+                                                        & pos.pieces(WHITE, PAWN, BISHOP)));
+            sf -= 4 * blockedPawns;
+
+            // Now check for pieces in the enamy camp
+            for (Color c : { WHITE, BLACK })
+            {
+                b = pos.pieces(c, PAWN);
+                Camp[c] = 0;
+
+                while (b)
+                {
+                    Square s = pop_lsb(&b);
+                    Camp[c] |= forward_file_bb(~c, s);
+                }
+            }
+
+            if (!(pos.pieces(WHITE) & Camp[BLACK]))
+                sf -= 16;
+
+            if (!(pos.pieces(BLACK) & Camp[WHITE]))
+                sf -= 16;
+        }
+        // Scale down endgames with opposite bishops only
+        else if (   pos.opposite_bishops()
+                 && pos.non_pawn_material() == 2 * BishopValueMg)
             sf = 16 + 4 * pe->passed_count();
+        // Still some other pieces
         else
             sf = std::min(40 + (pos.opposite_bishops() ? 2 : 7) * pos.count<PAWN>(strongSide), sf);
 
