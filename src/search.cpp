@@ -336,10 +336,6 @@ void Thread::search() {
       for (RootMove& rm : rootMoves)
           rm.previousScore = rm.score;
 
-      // Reset all stat scores
-      for (int i = -7; i < MAX_PLY+3; ++i)
-          (ss+i)->statScore = 0;
-
       size_t pvFirst = 0;
       pvLast = 0;
 
@@ -378,6 +374,10 @@ void Thread::search() {
           int failedHighCnt = 0;
           while (true)
           {
+              // Reset all stat scores
+              for (int i = -7; i < MAX_PLY+3; ++i)
+                  (ss+i)->statScore = 0;
+
               Depth adjustedDepth = std::max(ONE_PLY, rootDepth - failedHighCnt * ONE_PLY);
               bestValue = ::search<PV>(rootPos, ss, alpha, beta, adjustedDepth, false);
 
