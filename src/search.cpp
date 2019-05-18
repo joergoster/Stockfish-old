@@ -875,6 +875,10 @@ moves_loop: // When in check, search starts from here
           if (   thisThread->pvIdx + 1 < thisThread->multiPV
               && move != ttMove)
               continue;
+
+          if (   thisThread->pvIdx + 1 == thisThread->multiPV
+              && move != ttMove)
+              depth = thisThread->rootDepth;
       }
 
       ss->moveCount = ++moveCount;
