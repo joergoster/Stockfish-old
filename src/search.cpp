@@ -372,7 +372,7 @@ void Thread::search() {
               Value bestScore = rootMoves[0].previousScore;
               int diffScore = (bestScore - previousScore) / PawnValueEg;
 
-              pvDepth = std::max(pvDepth - (diffScore + msb(pvIdx + 1)) * ONE_PLY, 5 * ONE_PLY);
+              pvDepth = std::max(pvDepth - ((diffScore + msb(pvIdx + 1)) / 2) * ONE_PLY, 5 * ONE_PLY);
           }
 
           // Start with a small aspiration window and, in the case of a fail
