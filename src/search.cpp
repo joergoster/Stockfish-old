@@ -335,6 +335,8 @@ void Thread::search() {
       for (RootMove& rm : rootMoves)
           rm.previousScore = rm.score;
 
+      Value bestScore = rootMoves[0].previousScore;
+
       size_t pvFirst = 0;
       pvLast = 0;
 
@@ -357,6 +359,7 @@ void Thread::search() {
           if (rootDepth >= 5 * ONE_PLY)
           {
               Value previousScore = rootMoves[pvIdx].previousScore;
+
               delta = Value(20);
               alpha = std::max(previousScore - delta,-VALUE_INFINITE);
               beta  = std::min(previousScore + delta, VALUE_INFINITE);
@@ -369,10 +372,12 @@ void Thread::search() {
 
               // Reduce the search depth for this PV line based on
               // root move's previous score and number of PV line.
-              Value bestScore = rootMoves[0].previousScore;
-              int diffScore = (bestScore - previousScore) / PawnValueEg;
+              int diffScore = (bestScore - previousScore) / (PawnValueEg / 2);
+              pvDepth = std::max(rootDepth - ((3 * diffScore + 2 * msb(pvIdx + 1)) / 2) * ONE_PLY, 5 * ONE_PLY);
 
-              pvDepth = std::max(pvDepth - ((diffScore + msb(pvIdx + 1)) / 2) * ONE_PLY, 5 * ONE_PLY);
+//              std::cout << "Reduction based on score  : " << 3 * diffScore << std::endl;
+//              std::cout << "Reduction based on PV line: " << 2 * msb(pvIdx + 1) << std::endl;
+//              std::cout << "Searching PV line " << pvIdx + 1 << " with depth " << pvDepth << std::endl;
           }
 
           // Start with a small aspiration window and, in the case of a fail
