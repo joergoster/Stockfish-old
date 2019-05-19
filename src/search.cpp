@@ -284,6 +284,7 @@ void Thread::search() {
   Value bestValue, alpha, beta, delta;
   Move  lastBestMove = MOVE_NONE;
   Depth lastBestMoveDepth = DEPTH_ZERO;
+  Depth adjustedDepth, pvDepth;
   MainThread* mainThread = (this == Threads.main() ? Threads.main() : nullptr);
   double timeReduction = 1, totBestMoveChanges = 0;
   Color us = rootPos.side_to_move();
@@ -350,6 +351,7 @@ void Thread::search() {
 
           // Reset UCI info selDepth for each depth and each PV line
           selDepth = 0;
+          pvDepth = rootDepth;
 
           // Reset aspiration window starting size
           if (rootDepth >= 5 * ONE_PLY)
@@ -364,6 +366,13 @@ void Thread::search() {
 
               contempt = (us == WHITE ?  make_score(dct, dct / 2)
                                       : -make_score(dct, dct / 2));
+
+              // Reduce the search depth for this PV line based on
+              // root move's previous score and number of PV line.
+              Value bestScore = rootMoves[0].previousScore;
+              int diffScore = (bestScore - previousScore) / PawnValueEg;
+
+              pvDepth = std::max(pvDepth - (diffScore + msb(pvIdx + 1)) * ONE_PLY, 5 * ONE_PLY);
           }
 
           // Start with a small aspiration window and, in the case of a fail
@@ -372,7 +381,7 @@ void Thread::search() {
           int failedHighCnt = 0;
           while (true)
           {
-              Depth adjustedDepth = std::max(ONE_PLY, rootDepth - failedHighCnt * ONE_PLY);
+              adjustedDepth = std::max(pvDepth - failedHighCnt * ONE_PLY, ONE_PLY);
               bestValue = ::search<PV>(rootPos, ss, alpha, beta, adjustedDepth, false);
 
               // Bring the best move to the front. It is critical that sorting
@@ -872,7 +881,7 @@ moves_loop: // When in check, search starts from here
       ss->moveCount = ++moveCount;
 
       if (rootNode && thisThread == Threads.main() && Time.elapsed() > 3000)
-          sync_cout << "info depth " << depth / ONE_PLY
+          sync_cout << "info depth " << thisThread->rootDepth / ONE_PLY
                     << " currmove " << UCI::move(move, pos.is_chess960())
                     << " currmovenumber " << moveCount + thisThread->pvIdx << sync_endl;
       if (PvNode)
