@@ -24,6 +24,7 @@
 #include <cstring>   // For std::memset
 #include <iostream>
 #include <sstream>
+#include <vector>
 
 #include "evaluate.h"
 #include "misc.h"
@@ -112,8 +113,8 @@ namespace {
   Value value_from_tt(Value v, int ply);
   void update_pv(Move* pv, Move move, Move* childPv);
   void update_continuation_histories(Stack* ss, Piece pc, Square to, int bonus);
-  void update_quiet_stats(const Position& pos, Stack* ss, Move move, Move* quiets, int quietCount, int bonus);
-  void update_capture_stats(const Position& pos, Move move, Move* captures, int captureCount, int bonus);
+  void update_quiet_stats(const Position& pos, Stack* ss, Move move, std::vector<Move>& quiets, int bonus);
+  void update_capture_stats(const Position& pos, Move move, std::vector<Move>& captures, int bonus);
 
   // perft() is our utility to verify move generation. All the leaf nodes up
   // to the given depth are generated and counted, and the sum is returned.
@@ -528,7 +529,8 @@ namespace {
     assert(!(PvNode && cutNode));
     assert(depth / ONE_PLY * ONE_PLY == depth);
 
-    Move pv[MAX_PLY+1], capturesSearched[32], quietsSearched[64];
+    Move pv[MAX_PLY+1];
+    std::vector<Move> capturesSearched, quietsSearched;
     StateInfo st;
     TTEntry* tte;
     Key posKey;
@@ -538,13 +540,13 @@ namespace {
     bool ttHit, ttPv, inCheck, givesCheck, improving;
     bool captureOrPromotion, doFullDepthSearch, moveCountPruning, ttCapture;
     Piece movedPiece;
-    int moveCount, captureCount, quietCount;
+    int moveCount;
 
     // Step 1. Initialize node
     Thread* thisThread = pos.this_thread();
     inCheck = pos.checkers();
     Color us = pos.side_to_move();
-    moveCount = captureCount = quietCount = ss->moveCount = 0;
+    moveCount = ss->moveCount = 0;
     bestValue = -VALUE_INFINITE;
     maxValue = VALUE_INFINITE;
 
@@ -619,7 +621,7 @@ namespace {
             if (ttValue >= beta)
             {
                 if (!pos.capture_or_promotion(ttMove))
-                    update_quiet_stats(pos, ss, ttMove, nullptr, 0, stat_bonus(depth));
+                    update_quiet_stats(pos, ss, ttMove, capturesSearched, stat_bonus(depth));
 
                 // Extra penalty for early quiet moves of the previous ply
                 if ((ss-1)->moveCount <= 2 && !pos.captured_piece())
@@ -1149,11 +1151,11 @@ moves_loop: // When in check, search starts from here
 
       if (move != bestMove)
       {
-          if (captureOrPromotion && captureCount < 32)
-              capturesSearched[captureCount++] = move;
+          if (captureOrPromotion)
+              capturesSearched.push_back(move);
 
-          else if (!captureOrPromotion && quietCount < 64)
-              quietsSearched[quietCount++] = move;
+          else
+              quietsSearched.push_back(move);
       }
     }
 
@@ -1179,10 +1181,10 @@ moves_loop: // When in check, search starts from here
     {
         // Quiet best move: update move sorting heuristics
         if (!pos.capture_or_promotion(bestMove))
-            update_quiet_stats(pos, ss, bestMove, quietsSearched, quietCount,
+            update_quiet_stats(pos, ss, bestMove, quietsSearched,
                                stat_bonus(depth + (bestValue > beta + PawnValueMg ? ONE_PLY : DEPTH_ZERO)));
 
-        update_capture_stats(pos, bestMove, capturesSearched, captureCount, stat_bonus(depth + ONE_PLY));
+        update_capture_stats(pos, bestMove, capturesSearched, stat_bonus(depth + ONE_PLY));
 
         // Extra penalty for a quiet TT or main killer move in previous ply when it gets refuted
         if (   ((ss-1)->moveCount == 1 || ((ss-1)->currentMove == (ss-1)->killers[0]))
@@ -1473,7 +1475,7 @@ moves_loop: // When in check, search starts from here
   // update_capture_stats() updates move sorting heuristics when a new capture best move is found
 
   void update_capture_stats(const Position& pos, Move move,
-                            Move* captures, int captureCount, int bonus) {
+                            std::vector<Move>& captures, int bonus) {
 
       CapturePieceToHistory& captureHistory =  pos.this_thread()->captureHistory;
       Piece moved_piece = pos.moved_piece(move);
@@ -1483,11 +1485,11 @@ moves_loop: // When in check, search starts from here
           captureHistory[moved_piece][to_sq(move)][captured] << bonus;
 
       // Decrease all the other played capture moves
-      for (int i = 0; i < captureCount; ++i)
+      for (auto& m : captures)
       {
-          moved_piece = pos.moved_piece(captures[i]);
-          captured = type_of(pos.piece_on(to_sq(captures[i])));
-          captureHistory[moved_piece][to_sq(captures[i])][captured] << -bonus;
+          moved_piece = pos.moved_piece(m);
+          captured = type_of(pos.piece_on(to_sq(m)));
+          captureHistory[moved_piece][to_sq(m)][captured] << -bonus;
       }
   }
 
@@ -1495,7 +1497,7 @@ moves_loop: // When in check, search starts from here
   // update_quiet_stats() updates move sorting heuristics when a new quiet best move is found
 
   void update_quiet_stats(const Position& pos, Stack* ss, Move move,
-                          Move* quiets, int quietCount, int bonus) {
+                          std::vector<Move>& quiets, int bonus) {
 
     if (ss->killers[0] != move)
     {
@@ -1515,10 +1517,10 @@ moves_loop: // When in check, search starts from here
     }
 
     // Decrease all the other played quiet moves
-    for (int i = 0; i < quietCount; ++i)
+    for (auto& m : quiets)
     {
-        thisThread->mainHistory[us][from_to(quiets[i])] << -bonus;
-        update_continuation_histories(ss, pos.moved_piece(quiets[i]), to_sq(quiets[i]), -bonus);
+        thisThread->mainHistory[us][from_to(m)] << -bonus;
+        update_continuation_histories(ss, pos.moved_piece(m), to_sq(m), -bonus);
     }
   }
 
