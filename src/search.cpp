@@ -528,7 +528,7 @@ namespace {
     assert(!(PvNode && cutNode));
     assert(depth / ONE_PLY * ONE_PLY == depth);
 
-    Move pv[MAX_PLY+1], capturesSearched[32], quietsSearched[64];
+    Move pv[MAX_PLY+1], capturesSearched[16], quietsSearched[64];
     StateInfo st;
     TTEntry* tte;
     Key posKey;
