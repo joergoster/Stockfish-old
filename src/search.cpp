@@ -1002,6 +1002,10 @@ moves_loop: // When in check, search starts from here
       ss->currentMove = move;
       ss->continuationHistory = &thisThread->continuationHistory[movedPiece][to_sq(move)];
 
+      // The first two captures didn't lead to a cutoff
+      if (captureCount > 1)
+          cutNode = false;
+
       // Step 15. Make the move
       pos.do_move(move, st, givesCheck);
 
