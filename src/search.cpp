@@ -1149,7 +1149,7 @@ moves_loop: // When in check, search starts from here
 
       if (move != bestMove)
       {
-          if (captureOrPromotion && captureCount < 32)
+          if (captureOrPromotion && captureCount < 16)
               capturesSearched[captureCount++] = move;
 
           else if (!captureOrPromotion && quietCount < 64)
