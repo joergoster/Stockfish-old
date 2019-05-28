@@ -373,7 +373,8 @@ void Thread::search() {
               // Reduce the search depth for this PV line based on
               // root move's previous score and number of PV line.
               int diffScore = (bestScore - previousScore) / (PawnValueEg / 2);
-              pvDepth = std::max(rootDepth - ((3 * diffScore + 2 * msb(pvIdx + 1)) / 2) * ONE_PLY, 5 * ONE_PLY);
+              pvDepth = std::max(rootDepth - ((3 * diffScore + 2 * msb(pvIdx + 1)) / 2) * ONE_PLY,
+                                               std::max(rootDepth / 2, 5 * ONE_PLY));
 
 //              std::cout << "Reduction based on score  : " << 3 * diffScore << std::endl;
 //              std::cout << "Reduction based on PV line: " << 2 * msb(pvIdx + 1) << std::endl;
