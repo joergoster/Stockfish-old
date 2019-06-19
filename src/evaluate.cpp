@@ -801,7 +801,9 @@ namespace {
     // Try to handle a fully blocked position with all pawns still
     // on the board and directly blocked by their counterpart,
     // and all remaining pieces on their respective side.
-    // Test position r7/1b1r4/k1p1p1p1/1p1pPpPp/p1PP1P1P/PP1K4/8/4Q3 w - - bm Qa5+
+    // Test positions:
+    // r7/1b1r4/k1p1p1p1/1p1pPpPp/p1PP1P1P/PP1K4/8/4Q3 w - - bm Qa5+
+    // 8/1r1rp1k1/1b1pPp2/2pP1Pp1/1pP3Pp/pP5P/P5K1/8 w - - 79 46
     if (   pos.count<PAWN>() == 16
         && popcount(shift<NORTH>(pos.pieces(WHITE, PAWN)) & pos.pieces(BLACK, PAWN)) == 8)
     {

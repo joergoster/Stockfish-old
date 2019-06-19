@@ -1675,4 +1675,11 @@ void Tablebases::rank_root_moves(Position& pos, Search::RootMoves& rootMoves) {
         if (dtz_available || rootMoves[0].TBScore <= VALUE_DRAW)
             Cardinality = 0;
     }
+    else
+    {
+        // Clean up possibly assigned ranks if root_probe() or root_probe_wdl()
+        // could not finish due to missing files.
+        for (auto& m : rootMoves)
+            m.tbRank = 0;
+    }
 }
