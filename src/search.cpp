@@ -284,7 +284,7 @@ void Thread::search() {
   double timeReduction = 1, totBestMoveChanges = 0;
   Color us = rootPos.side_to_move();
   int failedHighCnt;
-  bool reducedDepthSearch, research;
+  bool reducedDepthSearch;
 
   std::memset(ss-7, 0, 10 * sizeof(Stack));
   for (int i = 7; i > 0; i--)
@@ -368,9 +368,8 @@ void Thread::search() {
           // Reset counters/flags to control a reduced fail-high search
           failedHighCnt = 0;
           adjustedDepth = rootDepth;
-          reducedDepthSearch = research = false;
+          reducedDepthSearch = false;
 
-aspiration_loop:
           // Start with a small aspiration window and, in the case of a fail
           // high/low, re-search with a bigger window until we don't fail
           // high/low anymore.
@@ -424,8 +423,7 @@ aspiration_loop:
               {
                   beta = std::min(bestValue + delta, VALUE_INFINITE);
 
-                  if (   !reducedDepthSearch
-                      && !research)
+                  if (!reducedDepthSearch)
                       ++failedHighCnt;
               }
               else
@@ -435,19 +433,6 @@ aspiration_loop:
 
               assert(delta >= VALUE_ZERO);
               assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE);
-          }
-
-          // After the reduced search also do the nominal depth search.
-          // We don't allow a 2nd reduced depth search in this case!
-          if (reducedDepthSearch)
-          {
-              reducedDepthSearch = false;
-              research = true;
-              failedHighCnt = 0;
-              adjustedDepth = rootDepth;
-              delta = Value(40);
-
-              goto aspiration_loop; // re-search with rootDepth
           }
 
           // Sort the PV lines searched so far and update the GUI
