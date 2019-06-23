@@ -925,6 +925,11 @@ moves_loop: // When in check, search starts from here
                && (pos.blockers_for_king(~us) & from_sq(move) || pos.see_ge(move)))
           extension = ONE_PLY;
 
+      // Double checked extension
+      else if (   inCheck
+               && more_than_one(pos.checkers()))
+          extension = ONE_PLY;
+
       // Castling extension
       else if (type_of(move) == CASTLING)
           extension = ONE_PLY;
