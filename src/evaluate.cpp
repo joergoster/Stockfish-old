@@ -73,7 +73,8 @@ using namespace Trace;
 
 namespace {
 
-  // Threshold for space evaluation
+  // Threshold for lazy and space evaluation
+  constexpr Value LazyThreshold  = Value(1400);
   constexpr Value SpaceThreshold = Value(12222);
 
   // KingAttackWeights[PieceType] contains king attack weights by piece type
@@ -827,6 +828,12 @@ namespace {
     pe = Pawns::probe(pos);
     score += pe->pawn_score(WHITE) - pe->pawn_score(BLACK);
 
+    // Early exit if score is high
+    Value v = (mg_value(score) + eg_value(score)) / 2;
+    if (   pos.count<PAWN>() < 14
+        && abs(v) > LazyThreshold + pos.non_pawn_material() / 64)
+       return pos.side_to_move() == WHITE ? v : -v;
+
     // Main evaluation begins here
     initialize<WHITE>();
     initialize<BLACK>();
@@ -848,8 +855,8 @@ namespace {
 
     // Interpolate between a middlegame and a (scaled by 'sf') endgame score
     ScaleFactor sf = scale_factor(eg_value(score));
-    Value v =  mg_value(score) * int(me->game_phase())
-             + eg_value(score) * int(PHASE_MIDGAME - me->game_phase()) * sf / SCALE_FACTOR_NORMAL;
+    v =  mg_value(score) * int(me->game_phase())
+       + eg_value(score) * int(PHASE_MIDGAME - me->game_phase()) * sf / SCALE_FACTOR_NORMAL;
 
     v /= PHASE_MIDGAME;
 
