@@ -73,8 +73,7 @@ using namespace Trace;
 
 namespace {
 
-  // Threshold for lazy and space evaluation
-  constexpr Value LazyThreshold  = Value(1400);
+  // Threshold for space evaluation
   constexpr Value SpaceThreshold = Value(12222);
 
   // KingAttackWeights[PieceType] contains king attack weights by piece type
@@ -762,6 +761,34 @@ namespace {
     // If scale is not already specific, scale down the endgame via general heuristics
     if (sf == SCALE_FACTOR_NORMAL)
     {
+        // Try to handle a fully blocked position with all pawns still
+        // on the board and directly blocked by their counterpart,
+        // and all remaining pieces on their respective side.
+        // Test positions:
+        // r7/1b1r4/k1p1p1p1/1p1pPpPp/p1PP1P1P/PP1K4/8/4Q3 w - - bm Qa5+
+        // 8/1r1rp1k1/1b1pPp2/2pP1Pp1/1pP3Pp/pP5P/P5K1/8 w - - 79 46
+        if (   pos.count<PAWN>() == 16
+            && popcount(shift<NORTH>(pos.pieces(WHITE, PAWN)) & pos.pieces(BLACK, PAWN)) == 8)
+        {
+            Bitboard b, Camp[COLOR_NB];
+
+            for (Color c : { WHITE, BLACK })
+            {
+                b = pos.pieces(c, PAWN);
+                Camp[c] = 0;
+
+                while (b)
+                {
+                    Square s = pop_lsb(&b);
+                    Camp[c] |= forward_file_bb(~c, s);
+                }
+            }
+
+            if (   !(pos.pieces(WHITE) & Camp[BLACK])
+                && !(pos.pieces(BLACK) & Camp[WHITE]))
+                return SCALE_FACTOR_DRAW;
+        }
+
         if (   pos.opposite_bishops()
             && pos.non_pawn_material() == 2 * BishopValueMg)
             sf = 16 + 4 * pe->passed_count();
@@ -800,13 +827,7 @@ namespace {
     pe = Pawns::probe(pos);
     score += pe->pawn_score(WHITE) - pe->pawn_score(BLACK);
 
-    // Early exit if score is high
-    Value v = (mg_value(score) + eg_value(score)) / 2;
-    if (abs(v) > LazyThreshold + pos.non_pawn_material() / 64)
-       return pos.side_to_move() == WHITE ? v : -v;
-
     // Main evaluation begins here
-
     initialize<WHITE>();
     initialize<BLACK>();
 
@@ -827,8 +848,8 @@ namespace {
 
     // Interpolate between a middlegame and a (scaled by 'sf') endgame score
     ScaleFactor sf = scale_factor(eg_value(score));
-    v =  mg_value(score) * int(me->game_phase())
-       + eg_value(score) * int(PHASE_MIDGAME - me->game_phase()) * sf / SCALE_FACTOR_NORMAL;
+    Value v =  mg_value(score) * int(me->game_phase())
+             + eg_value(score) * int(PHASE_MIDGAME - me->game_phase()) * sf / SCALE_FACTOR_NORMAL;
 
     v /= PHASE_MIDGAME;
 
