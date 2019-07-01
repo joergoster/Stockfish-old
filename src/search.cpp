@@ -269,10 +269,22 @@ void MainThread::search() {
   Thread* bestThread = this;
 
   // Check if there are threads with a better score than main thread
-  if (    Options["MultiPV"] == 1
-      && !Limits.depth
-      && !Skill(Options["Skill Level"]).enabled()
-      &&  rootMoves[0].pv[0] != MOVE_NONE)
+  if (Limits.mate)
+  {
+      // In case of a mate search we pick the first thread that found the mate
+      for (Thread* th: Threads)
+      {
+          if (VALUE_MATE - th->rootMoves[0].score <= 2 * Limits.mate)
+          {
+              bestThread = th;
+              break;
+          }
+      }
+  }
+  else if (    Options["MultiPV"] == 1
+           && !Limits.depth
+           && !Skill(Options["Skill Level"]).enabled()
+           &&  rootMoves[0].pv[0] != MOVE_NONE)
   {
       std::map<Move, int64_t> votes;
       Value minScore = this->rootMoves[0].score;
@@ -464,9 +476,16 @@ void Thread::search() {
               assert(alpha >= -VALUE_INFINITE && beta <= VALUE_INFINITE);
           }
 
-          // Sort the PV lines searched so far and update the GUI
+          // Sort the PV lines searched so far
           std::stable_sort(rootMoves.begin() + pvFirst, rootMoves.begin() + pvIdx + 1);
 
+          // Have we found a "mate in x"?
+          if (   Limits.mate
+              && bestValue >= VALUE_MATE_IN_MAX_PLY
+              && VALUE_MATE - bestValue <= 2 * Limits.mate)
+              Threads.stop = true;
+
+          // Update the GUI
           if (    mainThread
               && (Threads.stop || pvIdx + 1 == multiPV || Time.elapsed() > 3000))
               sync_cout << UCI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
@@ -479,12 +498,6 @@ void Thread::search() {
          lastBestMove = rootMoves[0].pv[0];
          lastBestMoveDepth = rootDepth;
       }
-
-      // Have we found a "mate in x"?
-      if (   Limits.mate
-          && bestValue >= VALUE_MATE_IN_MAX_PLY
-          && VALUE_MATE - bestValue <= 2 * Limits.mate)
-          Threads.stop = true;
 
       if (!mainThread)
           continue;
