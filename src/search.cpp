@@ -532,10 +532,20 @@ void Thread::search() {
 
   mainThread->previousTimeReduction = timeReduction;
 
-  // If skill level is enabled, swap best PV line with the sub-optimal one
+  // If skill level is enabled swap best PV line with the sub-optimal one
+  // and send the new PV line.
   if (skill.enabled())
-      std::swap(rootMoves[0], *std::find(rootMoves.begin(), rootMoves.end(),
-                skill.best ? skill.best : skill.pick_best(multiPV)));
+  {
+      // If we haven't already picked a sub-optimal move, do it now
+      if (!skill.best)
+          skill.pick_best(multiPV);
+
+      if (skill.best != rootMoves[0].pv[0])
+      {
+          std::swap(rootMoves[0], *std::find(rootMoves.begin(), rootMoves.end(), skill.best));
+          sync_cout << UCI::pv(rootPos, completedDepth, -VALUE_INFINITE, VALUE_INFINITE) << sync_endl;
+      }
+  }
 }
 
 
