@@ -733,7 +733,7 @@ namespace {
     // Step 6. Static evaluation of the position
     if (inCheck)
     {
-        ss->staticEval = eval = VALUE_NONE;
+        ss->staticEval = eval = qsearch<NT>(pos, ss, alpha, beta);
         improving = false;
         goto moves_loop;  // Skip early pruning when in check
     }
