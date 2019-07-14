@@ -1015,7 +1015,7 @@ moves_loop: // When in check, search starts from here
       {
           // Skip quiet moves if movecount exceeds our FutilityMoveCount threshold
           moveCountPruning =    moveCount >= futility_move_count(improving, depth / ONE_PLY)
-                             && pos.non_pawn_material() <= MidgameLimit;
+                             && pos.non_pawn_material() <= Value(15832);
 
           if (   !captureOrPromotion
               && !givesCheck
