@@ -55,13 +55,13 @@ constexpr Piece Pieces[] = { W_PAWN, W_KNIGHT, W_BISHOP, W_ROOK, W_QUEEN, W_KING
 // valuable attacker for the side to move, remove the attacker we just found
 // from the bitboards and scan for new X-ray attacks behind it.
 
-template<int Pt>
+template<PieceType Pt>
 PieceType min_attacker(const Bitboard* byTypeBB, Square to, Bitboard stmAttackers,
                        Bitboard& occupied, Bitboard& attackers) {
 
   Bitboard b = stmAttackers & byTypeBB[Pt];
   if (!b)
-      return min_attacker<Pt + 1>(byTypeBB, to, stmAttackers, occupied, attackers);
+      return min_attacker<PieceType(Pt + 1)>(byTypeBB, to, stmAttackers, occupied, attackers);
 
   occupied ^= lsb(b); // Remove the attacker from occupied
 
@@ -77,7 +77,7 @@ PieceType min_attacker(const Bitboard* byTypeBB, Square to, Bitboard stmAttacker
   // X-ray may add already processed pieces because byTypeBB[] is constant: in
   // the rook example, now attackers contains _again_ rook in a7, so remove it.
   attackers &= occupied;
-  return (PieceType)Pt;
+  return Pt;
 }
 
 template<>
@@ -1299,8 +1299,8 @@ bool Position::pos_is_ok() const {
               assert(0 && "pos_is_ok: Index");
   }
 
-  for (Color c = WHITE; c <= BLACK; ++c)
-      for (CastlingSide s = KING_SIDE; s <= QUEEN_SIDE; s = CastlingSide(s + 1))
+  for (Color c : { WHITE, BLACK })
+      for (CastlingSide s : {KING_SIDE, QUEEN_SIDE})
       {
           if (!can_castle(c | s))
               continue;

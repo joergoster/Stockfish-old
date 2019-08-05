@@ -291,7 +291,6 @@ inline T& operator--(T& d) { return d = T(int(d) - 1); }
 
 #define ENABLE_FULL_OPERATORS_ON(T)                                \
 ENABLE_BASE_OPERATORS_ON(T)                                        \
-ENABLE_INCR_OPERATORS_ON(T)                                        \
 constexpr T operator*(int i, T d) { return T(i * int(d)); }        \
 constexpr T operator*(T d, int i) { return T(int(d) * i); }        \
 constexpr T operator/(T d, int i) { return T(int(d) / i); }        \
@@ -305,7 +304,6 @@ ENABLE_FULL_OPERATORS_ON(Direction)
 
 ENABLE_INCR_OPERATORS_ON(PieceType)
 ENABLE_INCR_OPERATORS_ON(Piece)
-ENABLE_INCR_OPERATORS_ON(Color)
 ENABLE_INCR_OPERATORS_ON(Square)
 ENABLE_INCR_OPERATORS_ON(File)
 ENABLE_INCR_OPERATORS_ON(Rank)
