@@ -438,7 +438,7 @@ void Thread::search() {
           {
               // Set reduced search depth after the second fail-high
               if (   failedHighCnt == 2
-                  && rootDepth > 8 * ONE_PLY)
+                  && rootDepth > 6 * ONE_PLY)
               {
                   failedHighCnt = 0;
                   adjustedDepth = rootDepth - 2 * ONE_PLY;
