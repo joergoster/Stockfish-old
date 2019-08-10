@@ -512,6 +512,7 @@ void Thread::search() {
           && !Threads.stop
           && !mainThread->stopOnPonderhit)
       {
+          // Increase/reduce time if our score gets worse or better
           double fallingEval = (354 + 10 * (mainThread->previousScore - bestValue)) / 692.0;
           fallingEval = clamp(fallingEval, 0.5, 1.5);
 
@@ -519,7 +520,7 @@ void Thread::search() {
           timeReduction = lastBestMoveDepth + 9 * ONE_PLY < completedDepth ? 1.97 : 0.98;
           double reduction = (1.36 + mainThread->previousTimeReduction) / (2.29 * timeReduction);
 
-          // Use part of the gained time from a previous stable move for the current move
+          // Allocate some more time if the best move changes frequently
           for (Thread* th : Threads)
           {
               totBestMoveChanges += th->bestMoveChanges;
@@ -527,9 +528,19 @@ void Thread::search() {
           }
           double bestMoveInstability = 1 + totBestMoveChanges / Threads.size();
 
-          // Stop the search if we have only one legal move, or if available time elapsed
-          if (   rootMoves.size() == 1
-              || Time.elapsed() > Time.optimum() * fallingEval * reduction * bestMoveInstability)
+          // Now calculate if time is over
+          bool timeOver = Time.elapsed() > Time.optimum() * fallingEval * reduction * bestMoveInstability;
+
+          // Only one legal move, however, we want to search at least this depth
+          bool oneLegalMove = rootMoves.size() == 1 && completedDepth >= 4 * ONE_PLY;
+
+          // Spend much less time in a TB root position and syzygy fast play mode
+          bool syzygyFastPlay =   TB::RootInTB
+                               && Options["SyzygyFastPlay"]
+                               && Time.elapsed() > Time.optimum() / 20;
+
+          // Can we stop searching now?
+          if (timeOver || oneLegalMove || syzygyFastPlay)
           {
               // If we are allowed to ponder do not stop the search now but
               // keep pondering until the GUI sends "ponderhit" or "stop".
