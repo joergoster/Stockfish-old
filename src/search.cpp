@@ -507,7 +507,7 @@ void Thread::search() {
       if (skill.enabled() && skill.time_to_pick(rootDepth))
           skill.pick_best(multiPV);
 
-      // Do we have time for the next iteration? Can we stop searching now?
+      // Do we have time for the next iteration?
       if (    Limits.use_time_management()
           && !Threads.stop
           && !mainThread->stopOnPonderhit)
@@ -522,10 +522,7 @@ void Thread::search() {
 
           // Allocate some more time if the best move changes frequently
           for (Thread* th : Threads)
-          {
-              totBestMoveChanges += th->bestMoveChanges;
-              th->bestMoveChanges = 0;
-          }
+              totBestMoveChanges += th->bestMoveChanges.exchange(0, std::memory_order_relaxed);
           double bestMoveInstability = 1 + totBestMoveChanges / Threads.size();
 
           // Now calculate if time is over
