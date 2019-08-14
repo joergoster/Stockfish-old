@@ -91,6 +91,17 @@ namespace {
                                : VALUE_DRAW + Value(2 * (thisThread->nodes & 1) - 1);
   }
 
+  // Helper used to detect a basic mate config
+  bool is_basic_mate(const Position& pos, Color us) {
+    return   !more_than_one(pos.pieces(~us))
+          && !pos.count<PAWN>(us)
+          && (   pos.non_pawn_material(us) == RookValueMg
+              || pos.non_pawn_material(us) == QueenValueMg
+              || pos.non_pawn_material(us) == BishopValueMg * 2
+              || pos.non_pawn_material(us) == KnightValueMg * 3
+              || pos.non_pawn_material(us) == KnightValueMg + BishopValueMg);
+  }
+
   // Skill structure is used to implement strength limit
   struct Skill {
     explicit Skill(int l) : level(l) {}
@@ -156,6 +167,7 @@ namespace {
   void update_continuation_histories(Stack* ss, Piece pc, Square to, int bonus);
   void update_quiet_stats(const Position& pos, Stack* ss, Move move, Move* quiets, int quietCount, int bonus);
   void update_capture_stats(const Position& pos, Move move, Move* captures, int captureCount, int bonus);
+  Value tb_sequence(Position& pos, int ply);
 
   // perft() is our utility to verify move generation. All the leaf nodes up
   // to the given depth are generated and counted, and the sum is returned.
@@ -231,6 +243,21 @@ void MainThread::search() {
                 << UCI::value(rootPos.checkers() ? -VALUE_MATE : VALUE_DRAW)
                 << sync_endl;
   }
+  else if (   TB::RootInTB
+           && Options["SyzygyFastPlay"]
+           && Options["MultiPV"] == 1
+           && is_basic_mate(rootPos, us)
+           && rootMoves[0].tbRank > 900)
+  {
+      StateInfo st;
+
+      rootMoves[0].pv.resize(1);
+      rootMoves[0].pv.resize(MAX_PLY);
+
+      rootPos.do_move(rootMoves[0].pv[0], st);
+      rootMoves[0].score = -tb_sequence(rootPos, 1);
+      rootPos.undo_move(rootMoves[0].pv[0]);
+  }
   else
   {
       for (Thread* th : Threads)
@@ -302,7 +329,7 @@ void MainThread::search() {
   previousScore = bestThread->rootMoves[0].score;
 
   // Send again PV info if we have a new best thread
-  if (bestThread != this)
+  if (bestThread != this || Options["SyzygyFastPlay"])
       sync_cout << UCI::pv(bestThread->rootPos, bestThread->completedDepth, -VALUE_INFINITE, VALUE_INFINITE) << sync_endl;
 
   sync_cout << "bestmove " << UCI::move(bestThread->rootMoves[0].pv[0], rootPos.is_chess960());
@@ -1610,6 +1637,7 @@ moves_loop: // When in check, search starts from here
     }
   }
 
+
   // When playing with strength handicap, choose best move among a set of RootMoves
   // using a statistical rule dependent on 'level'. Idea by Heinz van Saanen.
 
@@ -1641,6 +1669,52 @@ moves_loop: // When in check, search starts from here
     }
 
     return best;
+  }
+
+
+  // tb_sequence() tries to build a mating sequence if the
+  // root position is a winning TB position. It repeatedly
+  // calls itself until we hit a mate.
+
+  Value tb_sequence(Position& pos, int ply) {
+
+    StateInfo st;
+    Move bestMove;
+    Value bestValue;
+    RootMoves legalMoves;
+
+    bestMove = MOVE_NONE;
+    bestValue = -VALUE_INFINITE;
+
+    if (   Threads.stop.load(std::memory_order_relaxed)
+        || ply >= MAX_PLY)
+        return VALUE_DRAW;
+
+    // No legal moves? Must be mate!
+    if (!MoveList<LEGAL>(pos).size())
+    {
+        pos.this_thread()->rootMoves[0].pv.resize(ply);
+        pos.this_thread()->rootMoves[0].selDepth = ply;
+
+        return mated_in(ply);
+    }
+
+    // Insert legal moves
+    for (const auto& m : MoveList<LEGAL>(pos))
+        legalMoves.emplace_back(m);
+
+    // Rank moves strictly by dtz and pick the best
+    Tablebases::rank_root_moves(pos, legalMoves, true);
+    
+    bestMove = legalMoves[0].pv[0];
+
+    pos.do_move(bestMove, st);
+    bestValue = -tb_sequence(pos, ply+1);
+    pos.undo_move(bestMove);
+
+    pos.this_thread()->rootMoves[0].pv[ply] = bestMove;
+
+    return bestValue;
   }
 
 } // namespace
@@ -1763,7 +1837,7 @@ bool RootMove::extract_ponder_from_tt(Position& pos) {
     return pv.size() > 1;
 }
 
-void Tablebases::rank_root_moves(Position& pos, Search::RootMoves& rootMoves) {
+void Tablebases::rank_root_moves(Position& pos, Search::RootMoves& rootMoves, bool strictly) {
 
     RootInTB = false;
     UseRule50 = bool(Options["Syzygy50MoveRule"]);
@@ -1782,7 +1856,7 @@ void Tablebases::rank_root_moves(Position& pos, Search::RootMoves& rootMoves) {
     if (Cardinality >= popcount(pos.pieces()) && !pos.can_castle(ANY_CASTLING))
     {
         // Rank moves using DTZ tables
-        RootInTB = root_probe(pos, rootMoves);
+        RootInTB = root_probe(pos, rootMoves, strictly);
 
         if (!RootInTB)
         {
@@ -1790,6 +1864,8 @@ void Tablebases::rank_root_moves(Position& pos, Search::RootMoves& rootMoves) {
             dtz_available = false;
             RootInTB = root_probe_wdl(pos, rootMoves);
         }
+
+        pos.this_thread()->tbHits.fetch_add(rootMoves.size(), std::memory_order_relaxed);
     }
 
     if (RootInTB)

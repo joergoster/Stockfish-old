@@ -1500,10 +1500,11 @@ int Tablebases::probe_dtz(Position& pos, ProbeState* result) {
 // Use the DTZ tables to rank root moves.
 //
 // A return value false indicates that not all probes were successful.
-bool Tablebases::root_probe(Position& pos, Search::RootMoves& rootMoves) {
+bool Tablebases::root_probe(Position& pos, Search::RootMoves& rootMoves, bool strictly) {
 
     ProbeState result;
     StateInfo st;
+    int r;
 
     // Obtain 50-move counter for the root position
     int cnt50 = pos.rule50_count();
@@ -1544,9 +1545,13 @@ bool Tablebases::root_probe(Position& pos, Search::RootMoves& rootMoves) {
         if (result == FAIL)
             return false;
 
-        // Better moves are ranked higher. Certain wins are ranked equally.
-        // Losing moves are ranked equally unless a 50-move draw is in sight.
-        int r =  dtz > 0 ? (dtz + cnt50 <= 99 && !rep ? 1000 : 1000 - (dtz + cnt50))
+        if (strictly)
+            // Strictly rank by dtz
+            r = dtz > 0 ? 1000 - dtz : dtz < 0 ? -1000 - dtz : 0;
+        else
+            // Better moves are ranked higher. Certain wins are ranked equally.
+            // Losing moves are ranked equally unless a 50-move draw is in sight.
+            r =  dtz > 0 ? (dtz + cnt50 <= 99 && !rep ? 1000 : 1000 - (dtz + cnt50))
                : dtz < 0 ? (-dtz * 2 + cnt50 < 100 ? -1000 : -1000 + (-dtz + cnt50))
                : 0;
         m.tbRank = r;
