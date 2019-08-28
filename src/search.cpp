@@ -504,8 +504,8 @@ void Thread::search() {
 
       // Have we found a "mate in x"?
       if (   Limits.mate
-          && rootMoves[0],score >= VALUE_MATE_IN_MAX_PLY
-          && VALUE_MATE - rootMoves[0],score <= 2 * Limits.mate)
+          && rootMoves[0].score >= VALUE_MATE_IN_MAX_PLY
+          && VALUE_MATE - rootMoves[0].score <= 2 * Limits.mate)
           Threads.stop = true;
 
       if (!mainThread)
@@ -1708,7 +1708,7 @@ string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
   TimePoint elapsed = Time.elapsed() + 1;
   const RootMoves& rootMoves = pos.this_thread()->rootMoves;
   size_t pvIdx = pos.this_thread()->pvIdx;
-  size_t multiPV = std::min((size_t)Options["MultiPV"], rootMoves.size());
+  size_t multiPV = (size_t)1;
   uint64_t nodesSearched = Threads.nodes_searched();
   uint64_t tbHits = Threads.tb_hits() + (TB::RootInTB ? rootMoves.size() : 0);
 
