@@ -342,7 +342,7 @@ void Thread::search() {
   bestValue = delta = alpha = -VALUE_INFINITE;
   beta = VALUE_INFINITE;
 
-  size_t multiPV = Options["MultiPV"];
+  multiPV = Options["MultiPV"];
 
   // Pick integer skill levels, but non-deterministically round up or down
   // such that the average integer skill corresponds to the input floating point one.
@@ -439,7 +439,8 @@ void Thread::search() {
               // and we want to keep the same order for all the moves except the
               // new PV that goes to the front. Note that in case of MultiPV
               // search the already searched PV lines are preserved.
-              std::stable_sort(rootMoves.begin() + pvIdx, rootMoves.begin() + pvLast);
+              if (pvIdx + 1 == multiPV)
+                  std::stable_sort(rootMoves.begin() + pvIdx, rootMoves.begin() + pvLast);
 
               // If search has been stopped, we break immediately. Sorting is
               // safe because RootMoves is still valid, although it refers to
@@ -463,13 +464,16 @@ void Thread::search() {
                   alpha = std::max(bestValue - delta, -VALUE_INFINITE);
 
                   failedHighCnt = 0;
+
                   if (mainThread)
                       mainThread->stopOnPonderhit = false;
               }
               else if (bestValue >= beta)
               {
                   beta = std::min(bestValue + delta, VALUE_INFINITE);
-                  ++failedHighCnt;
+
+                  if (rootDepth > 6 * ONE_PLY)
+                      ++failedHighCnt;
               }
               else
               {
@@ -500,8 +504,8 @@ void Thread::search() {
 
       // Have we found a "mate in x"?
       if (   Limits.mate
-          && bestValue >= VALUE_MATE_IN_MAX_PLY
-          && VALUE_MATE - bestValue <= 2 * Limits.mate)
+          && rootMoves[0],score >= VALUE_MATE_IN_MAX_PLY
+          && VALUE_MATE - rootMoves[0],score <= 2 * Limits.mate)
           Threads.stop = true;
 
       if (!mainThread)
@@ -575,6 +579,7 @@ namespace {
         && pos.has_game_cycle(ss->ply))
     {
         alpha = value_draw(depth, pos.this_thread());
+
         if (alpha >= beta)
             return alpha;
     }
@@ -634,6 +639,7 @@ namespace {
         // mate. In this case return a fail-high score.
         alpha = std::max(mated_in(ss->ply), alpha);
         beta = std::min(mate_in(ss->ply+1), beta);
+
         if (alpha >= beta)
             return alpha;
     }
@@ -749,7 +755,7 @@ namespace {
     }
 
     // Step 6. Static evaluation of the position
-    if (inCheck)
+    if (inCheck || thisThread->rootDepth <= 6 * ONE_PLY)
     {
         ss->staticEval = eval = VALUE_NONE;
         improving = false;
@@ -925,13 +931,20 @@ moves_loop: // When in check, search starts from here
       if (move == excludedMove)
           continue;
 
-      // At root obey the "searchmoves" option and skip moves not listed in Root
-      // Move List. As a consequence any illegal move is also skipped. In MultiPV
-      // mode we also skip PV moves which have been already searched and those
-      // of lower "TB rank" if we are in a TB root position.
-      if (rootNode && !std::count(thisThread->rootMoves.begin() + thisThread->pvIdx,
-                                  thisThread->rootMoves.begin() + thisThread->pvLast, move))
-          continue;
+      if (rootNode)
+      {
+          // At root obey the "searchmoves" option and skip moves not listed in Root
+          // Move List. As a consequence any illegal move is also skipped.
+          if (!std::count(thisThread->rootMoves.begin() + thisThread->pvIdx,
+                          thisThread->rootMoves.end(), move))
+              continue;
+
+          // In MultiPV mode we not only skip PV moves which have already been searched,
+          // but also any other move until we have reached the last PV line.
+          if (   thisThread->pvIdx + 1 < thisThread->multiPV
+              && move != ttMove)
+              continue;
+      }
 
       ss->moveCount = ++moveCount;
 
@@ -999,11 +1012,11 @@ moves_loop: // When in check, search starts from here
           extension = ONE_PLY;
 
       // Shuffle extension
-      else if (   PvNode
+/*      else if (   PvNode
                && pos.rule50_count() > 18
                && depth < 3 * ONE_PLY
                && ++thisThread->shuffleExts < thisThread->nodes.load(std::memory_order_relaxed) / 4)  // To avoid too many extensions
-          extension = ONE_PLY;
+          extension = ONE_PLY; */
 
       // Passed pawn extension
       else if (   move == ss->killers[0]
@@ -1016,6 +1029,7 @@ moves_loop: // When in check, search starts from here
 
       // Step 14. Pruning at shallow depth (~170 Elo)
       if (  !rootNode
+          && thisThread->rootDepth > 6 * ONE_PLY
           && pos.non_pawn_material(us)
           && bestValue > VALUE_MATED_IN_MAX_PLY)
       {
