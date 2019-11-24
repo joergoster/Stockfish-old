@@ -132,7 +132,7 @@ Entry* probe(const Position& pos) {
   Value npm   = clamp(npm_w + npm_b, EndgameLimit, MidgameLimit);
 
   // Map total non-pawn material into [PHASE_ENDGAME, PHASE_MIDGAME]
-  e->gamePhase = (npm_w < EndgameLimit / 2 || npm_b < EndgameLimit / 2) ? PHASE_ENDGAME :
+  e->gamePhase = (npm_w <= RookValueMg || npm_b <= RookValueMg) ? PHASE_ENDGAME :
                  Phase(((npm - EndgameLimit) * PHASE_MIDGAME) / (MidgameLimit - EndgameLimit));
 
   // Let's look if we have a specialized evaluation function for this particular
