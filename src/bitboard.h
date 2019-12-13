@@ -119,6 +119,12 @@ inline Bitboard  operator^( Bitboard  b, Square s) { return b ^  square_bb(s); }
 inline Bitboard& operator|=(Bitboard& b, Square s) { return b |= square_bb(s); }
 inline Bitboard& operator^=(Bitboard& b, Square s) { return b ^= square_bb(s); }
 
+inline Bitboard  operator&(Square s, Bitboard b) { return b & s; }
+inline Bitboard  operator|(Square s, Bitboard b) { return b | s; }
+inline Bitboard  operator^(Square s, Bitboard b) { return b ^ s; }
+
+inline Bitboard  operator|(Square s, Square s2) { return square_bb(s) | square_bb(s2); }
+
 constexpr bool more_than_one(Bitboard b) {
   return b & (b - 1);
 }
@@ -377,6 +383,8 @@ inline Square pop_lsb(Bitboard* b) {
 
 
 /// frontmost_sq() returns the most advanced square for the given color
-inline Square frontmost_sq(Color c, Bitboard b) { return c == WHITE ? msb(b) : lsb(b); }
+inline Square frontmost_sq(Color c, Bitboard b) {
+  return c == WHITE ? msb(b) : lsb(b);
+}
 
 #endif // #ifndef BITBOARD_H_INCLUDED
