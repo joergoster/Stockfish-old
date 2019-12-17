@@ -717,7 +717,11 @@ namespace {
             }
         }
 
-        if (pos.rule50_count() < 90)
+        // We don't trust values very close to the 50-move rule,
+        // nor questionable mate scores.
+        if (    pos.rule50_count() < 90
+            && (   abs(ttValue) < VALUE_MATE_IN_MAX_PLY
+                || VALUE_MATE - abs(ttValue) < 100 - pos.rule50_count() + ss->ply))
             return ttValue;
     }
 
