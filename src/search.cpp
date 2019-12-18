@@ -1297,7 +1297,7 @@ moves_loop: // When in check, search starts from here
           if (moveCount == 1 || value > alpha)
           {
               // Give a small bias to all scores in the range of -10cp to +10cp
-              if (   abs(value) <= PawnValueEg / 10
+              if (   abs(value) <= PawnValueEg / 2
                   && thisThread->rootDepth > 10)
                   value += (rm.zScore / rm.visits) / 10;
 
