@@ -102,6 +102,13 @@ public:
     if (!fname.empty() && !l.file.is_open())
     {
         l.file.open(fname, ifstream::out);
+
+        if (!l.file.is_open())
+        {
+            cerr << "Unable to open debug log file " << fname << endl;
+            exit(EXIT_FAILURE);
+        }
+
         cin.rdbuf(&l.in);
         cout.rdbuf(&l.out);
     }
@@ -145,7 +152,7 @@ const string engine_info(bool to_uci) {
 
 
 /// Debug functions used mainly to collect run-time statistics
-static int64_t hits[2], means[2];
+static std::atomic<int64_t> hits[2], means[2];
 
 void dbg_hit_on(bool b) { ++hits[0]; if (b) ++hits[1]; }
 void dbg_hit_on(bool c, bool b) { if (c) dbg_hit_on(b); }
@@ -168,7 +175,7 @@ void dbg_print() {
 
 std::ostream& operator<<(std::ostream& os, SyncCout sc) {
 
-  static Mutex m;
+  static std::mutex m;
 
   if (sc == IO_LOCK)
       m.lock();
@@ -209,12 +216,6 @@ void prefetch(void* addr) {
 }
 
 #endif
-
-void prefetch2(void* addr) {
-
-  prefetch(addr);
-  prefetch((uint8_t*)addr + 64);
-}
 
 namespace WinProcGroup {
 
