@@ -436,8 +436,9 @@ void Thread::search() {
               alpha = std::max(previousScore - delta,-VALUE_INFINITE);
               beta  = std::min(previousScore + delta, VALUE_INFINITE);
 
-              // Adjust contempt based on root move's previousScore (dynamic contempt)
-              int dct = ct + (111 - ct / 2) * previousScore / (abs(previousScore) + 176);
+              // Adjust contempt based on root move's MCTS-like score (dynamic contempt)
+              Value mctsScore = Value(rootMoves[pvIdx].zScore / rootMoves[pvIdx].visits);
+              int dct = ct + (111 - ct / 2) * mctsScore / (abs(mctsScore) + 176);
 
               contempt = (us == WHITE ?  make_score(dct, dct / 2)
                                       : -make_score(dct, dct / 2));
@@ -1104,8 +1105,8 @@ moves_loop: // When in check, search starts from here
           // Multi-cut pruning
           // Our ttMove is assumed to fail high, and now we failed high also on a reduced
           // search without the ttMove. So we assume this expected Cut-node is not singular,
-          // that is multiple moves fail high, and we can prune the whole subtree by returning
-          // the hard beta bound.
+          // that multiple moves fail high, and we can prune the whole subtree by returning
+          // a soft bound.
           else if (singularBeta >= beta)
           {
               thisThread->visits++;
@@ -1296,11 +1297,6 @@ moves_loop: // When in check, search starts from here
           // PV move or new best move?
           if (moveCount == 1 || value > alpha)
           {
-              // Give a small bias to all scores in the range of -10cp to +10cp
-              if (   abs(value) <= PawnValueEg / 2
-                  && thisThread->rootDepth > 10)
-                  value += (rm.zScore / rm.visits) / 10;
-
               rm.score = value;
               rm.selDepth = thisThread->selDepth;
               rm.pv.resize(1);
