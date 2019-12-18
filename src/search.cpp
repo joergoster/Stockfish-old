@@ -549,7 +549,14 @@ namespace {
 
     // Dive into quiescence search when the depth reaches zero
     if (depth < ONE_PLY)
-        return qsearch<NT>(pos, ss, alpha, beta);
+    {
+        Value qs = qsearch<NT>(pos, ss, alpha, beta);
+
+        thisThread->visits++;
+        thisThread->allScores += (ss->ply % 2 == 0) ? qs : -qs;
+
+        return qs;
+    }
 
     assert(-VALUE_INFINITE <= alpha && alpha < beta && beta <= VALUE_INFINITE);
     assert(PvNode || (alpha == beta - 1));
@@ -766,7 +773,14 @@ namespace {
     if (   !rootNode // The required rootNode PV handling is not available in qsearch
         &&  depth < 2 * ONE_PLY
         &&  eval <= alpha - RazorMargin)
-        return qsearch<NT>(pos, ss, alpha, beta);
+    {
+        Value razor = qsearch<NT>(pos, ss, alpha, beta);
+
+        thisThread->visits++;
+        thisThread->allScores += (ss->ply % 2 == 0) ? razor : -razor;
+
+        return razor;
+    }
 
     improving =   ss->staticEval >= (ss-2)->staticEval
                || (ss-2)->staticEval == VALUE_NONE;
@@ -833,7 +847,12 @@ namespace {
             thisThread->nmpMinPly = 0;
 
             if (v >= beta)
+            {
+                thisThread->visits++;
+                thisThread->allScores += (ss->ply % 2 == 0) ? nullValue : -nullValue;
+
                 return nullValue;
+            }
         }
     }
 
@@ -1169,12 +1188,6 @@ moves_loop: // When in check, search starts from here
               rm.score = -VALUE_INFINITE;
       }
 
-      if (!rootNode)
-      {
-          thisThread->visits++;
-          thisThread->allScores += (ss->ply % 2 == 0) ? value : -value;
-      }
-
       if (value > bestValue)
       {
           bestValue = value;
@@ -1223,13 +1236,8 @@ moves_loop: // When in check, search starts from here
     assert(moveCount || !inCheck || excludedMove || !MoveList<LEGAL>(pos).size());
 
     if (!moveCount)
-    {
         bestValue = excludedMove ? alpha
                    :     inCheck ? mated_in(ss->ply) : VALUE_DRAW;
-
-        thisThread->visits++;
-        thisThread->allScores += (ss->ply % 2 == 0) ? bestValue : -bestValue;
-    }
     else if (bestMove)
     {
         // Quiet best move: update move sorting heuristics
@@ -1260,6 +1268,9 @@ moves_loop: // When in check, search starts from here
                   depth, bestMove, pureStaticEval);
 
     assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
+
+    thisThread->visits++;
+    thisThread->allScores += (ss->ply % 2 == 0) ? bestValue : -bestValue;
 
     return bestValue;
   }
@@ -1304,12 +1315,7 @@ moves_loop: // When in check, search starts from here
     // Check for an immediate draw or maximum ply reached
     if (   pos.is_draw(ss->ply)
         || ss->ply >= MAX_PLY)
-    {
-        thisThread->visits++;
-        thisThread->allScores += VALUE_DRAW;
-
         return (ss->ply >= MAX_PLY && !inCheck) ? evaluate(pos) : VALUE_DRAW;
-    }
 
     assert(0 <= ss->ply && ss->ply < MAX_PLY);
 
@@ -1331,12 +1337,7 @@ moves_loop: // When in check, search starts from here
         && ttValue != VALUE_NONE // Only in case of TT access race
         && (ttValue >= beta ? (tte->bound() & BOUND_LOWER)
                             : (tte->bound() & BOUND_UPPER)))
-    {
-        thisThread->visits++;
-        thisThread->allScores += (ss->ply % 2 == 0) ? ttValue : -ttValue;
-
         return ttValue;
-    }
 
     // Evaluate the position statically
     if (inCheck)
@@ -1368,9 +1369,6 @@ moves_loop: // When in check, search starts from here
             if (!ttHit)
                 tte->save(posKey, value_to_tt(bestValue, ss->ply), pvHit, BOUND_LOWER,
                           DEPTH_NONE, MOVE_NONE, ss->staticEval);
-
-            thisThread->visits++;
-            thisThread->allScores += (ss->ply % 2 == 0) ? bestValue : -bestValue;
 
             return bestValue;
         }
@@ -1457,9 +1455,6 @@ moves_loop: // When in check, search starts from here
 
       assert(value > -VALUE_INFINITE && value < VALUE_INFINITE);
 
-      thisThread->visits++;
-      thisThread->allScores += (ss->ply % 2 == 0) ? value : -value;
-
       // Check for a new best move
       if (value > bestValue)
       {
@@ -1483,14 +1478,7 @@ moves_loop: // When in check, search starts from here
     // All legal moves have been searched. A special case: If we're in check
     // and no legal moves were found, it is checkmate.
     if (inCheck && bestValue == -VALUE_INFINITE)
-    {
-        bestValue = mated_in(ss->ply); // Plies to mate from the root
-
-        thisThread->visits++;
-        thisThread->allScores += (ss->ply % 2 == 0) ? bestValue : -bestValue;
-
-        return bestValue;
-    }
+        return mated_in(ss->ply); // Plies to mate from the root
 
     tte->save(posKey, value_to_tt(bestValue, ss->ply), pvHit,
               bestValue >= beta ? BOUND_LOWER :
