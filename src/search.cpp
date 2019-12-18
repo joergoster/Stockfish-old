@@ -308,17 +308,6 @@ void MainThread::search() {
   if (bestThread != this)
       sync_cout << UCI::pv(bestThread->rootPos, bestThread->completedDepth, -VALUE_INFINITE, VALUE_INFINITE) << sync_endl;
 
-  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  // Print stats of all root moves
-  sync_cout << "Printing some stats of all root moves!" << sync_endl;
-
-  for (auto& rm : bestThread->rootMoves)
-      if (rm.visits) // avoids a division by zero
-          sync_cout << UCI::move(rm.pv[0], rootPos.is_chess960()) << "      AB score: "        << (rm.score == -VALUE_INFINITE ? "n/a   " : UCI::value(rm.score))
-                                                                  << "      MCTS-like score: " << UCI::value(Value(rm.zScore / rm.visits))
-                                                                  << "      Visits: "          << rm.visits << sync_endl;
-  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
   sync_cout << "bestmove " << UCI::move(bestThread->rootMoves[0].pv[0], rootPos.is_chess960());
 
   if (bestThread->rootMoves[0].pv.size() > 1 || bestThread->rootMoves[0].extract_ponder_from_tt(rootPos))
@@ -1307,6 +1296,11 @@ moves_loop: // When in check, search starts from here
           // PV move or new best move?
           if (moveCount == 1 || value > alpha)
           {
+              // Give a small bias to all scores in the range of -10cp to +10cp
+              if (   abs(value) <= PawnValueEg / 10
+                  && thisThread->rootDepth > 10)
+                  value += (rm.zScore / rm.visits) / 10;
+
               rm.score = value;
               rm.selDepth = thisThread->selDepth;
               rm.pv.resize(1);
