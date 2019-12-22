@@ -676,14 +676,15 @@ namespace {
 
     // Step 4. Transposition table lookup. We don't want the score of a partial
     // search to overwrite a previous full search TT value, so we use a different
-    // position key in case of an excluded move.
+    // and basically unused position key in case of an excluded move.
     excludedMove = ss->excludedMove;
-    posKey = pos.key() ^ Key(excludedMove << 16); // Isn't a very good hash
+    posKey = excludedMove ? 0 : pos.key();
     tte = TT.probe(posKey, ttHit);
     ttValue = ttHit ? value_from_tt(tte->value(), ss->ply, pos.rule50_count()) : VALUE_NONE;
     ttMove =  rootNode ? thisThread->rootMoves[thisThread->pvIdx].pv[0]
             : ttHit    ? tte->move() : MOVE_NONE;
     ttPv = PvNode || (ttHit && tte->is_pv());
+
     // thisThread->ttHitAverage can be used to approximate the running average of ttHit
     thisThread->ttHitAverage =   (ttHitAverageWindow - 1) * thisThread->ttHitAverage / ttHitAverageWindow
                                 + ttHitAverageResolution * ttHit;
@@ -916,7 +917,7 @@ namespace {
     }
 
     // Step 11. Internal iterative deepening (~2 Elo)
-    if (depth >= 7 && !ttMove)
+    if (depth >= 8 && !ttMove)
     {
         search<NT>(pos, ss, alpha, beta, depth - 7, cutNode);
 
