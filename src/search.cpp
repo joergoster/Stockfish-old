@@ -356,7 +356,7 @@ void Thread::search() {
               mainThread->iterValue[i] = mainThread->previousScore;
   }
 
-  size_t multiPV = Options["MultiPV"];
+  size_t pvLines, multiPV = Options["MultiPV"];
 
   // Pick integer skill levels, but non-deterministically round up or down
   // such that the average integer skill corresponds to the input floating point one.
@@ -376,7 +376,7 @@ void Thread::search() {
   if (skill.enabled())
       multiPV = std::max(multiPV, (size_t)4);
 
-  multiPV = std::min(multiPV, rootMoves.size());
+  pvLines = multiPV = std::min(multiPV, rootMoves.size());
   ttHitAverage = ttHitAverageWindow * ttHitAverageResolution / 2;
 
   int ct = int(Options["Contempt"]) * PawnValueEg / 100; // From centipawns
@@ -410,8 +410,15 @@ void Thread::search() {
       size_t pvFirst = 0;
       pvLast = 0;
 
+      // If we have a draw with a very short PV,
+      // increase the number of PV lines to search.
+      if (   multiPV == 1
+          && abs(rootMoves[0].previousScore) <= Value(2)
+          && int(rootMoves[0].pv.size()) < rootDepth / 3)
+          pvLines = std::min(pvLines + 1, rootMoves.size());
+
       // MultiPV loop. We perform a full root search for each PV line
-      for (pvIdx = 0; pvIdx < multiPV && !Threads.stop; ++pvIdx)
+      for (pvIdx = 0; pvIdx < pvLines && !Threads.stop; ++pvIdx)
       {
           if (pvIdx == pvLast)
           {
@@ -506,7 +513,10 @@ void Thread::search() {
       }
 
       if (!Threads.stop)
+      {
           completedDepth = rootDepth;
+          pvLines = multiPV;
+      }
 
       if (rootMoves[0].pv[0] != lastBestMove) {
          lastBestMove = rootMoves[0].pv[0];
