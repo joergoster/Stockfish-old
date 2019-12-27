@@ -1170,7 +1170,7 @@ moves_loop: // When in check, search starts from here
                   r++;
 
               if (thisThread->shortPv)
-                  r--;
+                  r -= 2;
 
               // Decrease/increase reduction for moves with a good/bad history (~30 Elo)
               r -= ss->statScore / 16384;
