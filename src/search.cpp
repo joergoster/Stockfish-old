@@ -421,6 +421,10 @@ void Thread::search() {
                       break;
           }
 
+          shortPv =    rootDepth > 12
+                    && abs(rootMoves[pvIdx].previousScore) <= Value(2)
+                    && int(rootMoves[pvIdx].pv.size()) < rootDepth / 3;
+
           // Reset UCI info selDepth for each depth and each PV line
           selDepth = 0;
 
@@ -1164,6 +1168,9 @@ moves_loop: // When in check, search starts from here
 
               else if ((ss-1)->statScore >= -116 && ss->statScore < -154)
                   r++;
+
+              if (thisThread->shortPv)
+                  r--;
 
               // Decrease/increase reduction for moves with a good/bad history (~30 Elo)
               r -= ss->statScore / 16384;
