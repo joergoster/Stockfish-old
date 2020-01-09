@@ -335,6 +335,7 @@ void Thread::search() {
   MainThread* mainThread = (this == Threads.main() ? Threads.main() : nullptr);
   double timeReduction = 1, totBestMoveChanges = 0;
   Color us = rootPos.side_to_move();
+  int iterRun = 0;
   int iterIdx = 0;
 
   std::memset(ss-7, 0, 10 * sizeof(Stack));
@@ -393,10 +394,12 @@ void Thread::search() {
   contempt = (us == WHITE ?  make_score(ct, ct / 2)
                           : -make_score(ct, ct / 2));
 
-  // Iterative deepening loop until requested to stop or the target depth is reached
-  while (   ++rootDepth < MAX_PLY
-         && !Threads.stop
-         && !(Limits.depth && mainThread && rootDepth > Limits.depth))
+  // Each iteration will be searched this much times
+  int simulatedThreads = Options["Virtual Threads"];
+
+  // Iterative deepening loop until requested to stop
+  // or maximum depth is reached.
+  while (rootDepth < MAX_PLY && !Threads.stop)
   {
       // Age out PV variability metric
       if (mainThread)
@@ -409,6 +412,11 @@ void Thread::search() {
 
       size_t pvFirst = 0;
       pvLast = 0;
+
+      if (simulatedThreads == 1)
+          iterRun = 1;
+      else
+          iterRun = (iterRun + 1) % simulatedThreads;
 
       // MultiPV loop. We perform a full root search for each PV line
       for (pvIdx = 0; pvIdx < multiPV && !Threads.stop; ++pvIdx)
@@ -466,6 +474,7 @@ void Thread::search() {
               // the UI) before a re-search.
               if (   mainThread
                   && multiPV == 1
+                  && iterRun % simulatedThreads == 0
                   && (bestValue <= alpha || bestValue >= beta)
                   && Time.elapsed() > 3000)
                   sync_cout << UCI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
@@ -501,12 +510,15 @@ void Thread::search() {
           std::stable_sort(rootMoves.begin() + pvFirst, rootMoves.begin() + pvIdx + 1);
 
           if (    mainThread
-              && (Threads.stop || pvIdx + 1 == multiPV || Time.elapsed() > 3000))
+              && (Threads.stop || (pvIdx + 1 == multiPV) && (iterRun % simulatedThreads == 0) || Time.elapsed() > 3000))
               sync_cout << UCI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
       }
 
-      if (!Threads.stop)
+      if (!Threads.stop && iterRun % simulatedThreads == 0)
+      {
           completedDepth = rootDepth;
+          rootDepth++;
+      }
 
       if (rootMoves[0].pv[0] != lastBestMove) {
          lastBestMove = rootMoves[0].pv[0];
@@ -521,6 +533,9 @@ void Thread::search() {
 
       if (!mainThread)
           continue;
+
+      if (Limits.depth && completedDepth >= Limits.depth)
+          Threads.stop = true;
 
       // If skill level is enabled and time is up, pick a sub-optimal best move
       if (skill.enabled() && skill.time_to_pick(rootDepth))
