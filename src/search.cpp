@@ -510,7 +510,7 @@ void Thread::search() {
           std::stable_sort(rootMoves.begin() + pvFirst, rootMoves.begin() + pvIdx + 1);
 
           if (    mainThread
-              && (Threads.stop || (pvIdx + 1 == multiPV) && (iterRun % simulatedThreads == 0) || Time.elapsed() > 3000))
+              && (Threads.stop || ((pvIdx + 1 == multiPV) && (iterRun % simulatedThreads == 0)) || Time.elapsed() > 3000))
               sync_cout << UCI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
       }
 
