@@ -474,7 +474,7 @@ void Thread::search() {
               // the UI) before a re-search.
               if (   mainThread
                   && multiPV == 1
-                  && iterRun % simulatedThreads == 0
+                  && iterRun % simulatedThreads == 1
                   && (bestValue <= alpha || bestValue >= beta)
                   && Time.elapsed() > 3000)
                   sync_cout << UCI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
@@ -510,7 +510,8 @@ void Thread::search() {
           std::stable_sort(rootMoves.begin() + pvFirst, rootMoves.begin() + pvIdx + 1);
 
           if (    mainThread
-              && (Threads.stop || ((pvIdx + 1 == multiPV) && (iterRun % simulatedThreads == 0)) || Time.elapsed() > 3000))
+              && (Threads.stop || (   (pvIdx + 1 == multiPV || rootDepth > 12)
+                                   && (iterRun % simulatedThreads == 0 || iterRun % simulatedThreads == 1))))
               sync_cout << UCI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
       }
 
@@ -982,10 +983,14 @@ moves_loop: // When in check, search starts from here
 
       ss->moveCount = ++moveCount;
 
-      if (rootNode && thisThread == Threads.main() && Time.elapsed() > 3000)
-          sync_cout << "info depth " << depth
+      if (   rootNode
+          && thisThread == Threads.main()
+          && Options["Virtual Threads"] == 1
+          && Time.elapsed() > 3000)
+          sync_cout << "info depth " << thisThread->rootDepth
                     << " currmove " << UCI::move(move, pos.is_chess960())
                     << " currmovenumber " << moveCount + thisThread->pvIdx << sync_endl;
+
       if (PvNode)
           (ss+1)->pv = nullptr;
 
