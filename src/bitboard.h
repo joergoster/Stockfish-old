@@ -25,13 +25,6 @@
 
 #include "types.h"
 
-namespace Bitbases {
-
-void init();
-bool probe(Square wksq, Square wpsq, Square bksq, Color us);
-
-}
-
 namespace Bitboards {
 
 void init();

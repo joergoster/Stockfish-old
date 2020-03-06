@@ -36,9 +36,9 @@ BINDIR = $(PREFIX)/bin
 PGOBENCH = ./$(EXE) bench
 
 ### Object files
-OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
-	material.o misc.o movegen.o movepick.o pawns.o position.o psqt.o \
-	search.o thread.o timeman.o tt.o uci.o ucioption.o syzygy/tbprobe.o
+OBJS = benchmark.o bitboard.o evaluate.o main.o material.o misc.o \
+	movegen.o movepick.o pawns.o position.o psqt.o search.o \
+	thread.o timeman.o tt.o uci.o ucioption.o syzygy/tbprobe.o
 
 ### Establish the operating system name
 KERNEL = $(shell uname -s)

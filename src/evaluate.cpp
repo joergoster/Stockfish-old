@@ -745,7 +745,7 @@ namespace {
   ScaleFactor Evaluation<T>::scale_factor(Value eg) const {
 
     Color strongSide = eg > VALUE_DRAW ? WHITE : BLACK;
-    int sf = me->scale_factor(pos, strongSide);
+    int sf = me->scale_factor(strongSide);
 
     // If scale is not already specific, scale down the endgame via general heuristics
     if (sf == SCALE_FACTOR_NORMAL)
@@ -774,11 +774,6 @@ namespace {
 
     // Probe the material hash table
     me = Material::probe(pos);
-
-    // If we have a specialized evaluation function for the current material
-    // configuration, call it and return.
-    if (me->specialized_eval_exists())
-        return me->evaluate(pos);
 
     // Initialize score by reading the incrementally updated scores included in
     // the position object (material + piece square tables) and the material
