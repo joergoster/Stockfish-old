@@ -34,11 +34,9 @@ struct Entry {
 
   Score imbalance() const { return make_score(value, value); }
   Phase game_phase() const { return gamePhase; }
-  ScaleFactor scale_factor(Color c) const { return ScaleFactor(factor[c]); }
 
   Key key;
   int16_t value;
-  uint8_t factor[COLOR_NB];
   Phase gamePhase;
 };
 
