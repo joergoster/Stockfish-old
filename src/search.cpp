@@ -544,9 +544,10 @@ void Thread::search() {
           timeReduction = lastBestMoveDepth + 9 < completedDepth ? 1.94 : 0.91;
           double reduction = (1.41 + mainThread->previousTimeReduction) / (2.27 * timeReduction);
 
-          // Reduce time even more if we capture a queen
+          // Reduce time even more if we recapture a piece of same or greater value
           if (   rootPos.capture(lastBestMove)
-              && type_of(rootPos.piece_on(to_sq(lastBestMove))) == QUEEN)
+              && type_of(rootPos.captured_piece()) > PAWN
+              && type_of(rootPos.piece_on(to_sq(lastBestMove))) >= type_of(rootPos.captured_piece()))
               reduction /= 2;
 
           // Use part of the gained time from a previous stable move for the current move
