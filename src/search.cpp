@@ -546,9 +546,14 @@ void Thread::search() {
 
           // Reduce time even more if we recapture a piece of same or greater value
           if (   rootPos.capture(lastBestMove)
-              && type_of(rootPos.captured_piece()) > PAWN
-              && type_of(rootPos.piece_on(to_sq(lastBestMove))) >= type_of(rootPos.captured_piece()))
-              reduction /= 2;
+              && type_of(rootPos.captured_piece()) > PAWN)
+          {
+              PieceType pt1 = type_of(rootPos.captured_piece());
+              PieceType pt2 = type_of(rootPos.piece_on(to_sq(lastBestMove)));
+
+              double recaptureReduction = 0.95 - 0.05 * (pt2 - pt1);
+              reduction *= recaptureReduction;
+          }
 
           // Use part of the gained time from a previous stable move for the current move
           for (Thread* th : Threads)
