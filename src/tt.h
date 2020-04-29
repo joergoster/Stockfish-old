@@ -78,6 +78,8 @@ public:
  ~TranspositionTable() { free(mem); }
   void new_search() { generation8 += 8; } // Lower 3 bits are used by PV flag and Bound
   TTEntry* probe(const Key key, bool& found) const;
+  Value value_to_tt(Value v, int ply);
+  Value value_from_tt(Value v, int ply, int r50c);
   int hashfull() const;
   void resize(size_t mbSize);
   void clear();
