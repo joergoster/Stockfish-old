@@ -482,13 +482,16 @@ void Thread::search() {
                   alpha = std::max(bestValue - delta, -VALUE_INFINITE);
 
                   failedHighCnt = 0;
+
                   if (mainThread)
                       mainThread->stopOnPonderhit = false;
               }
               else if (bestValue >= beta)
               {
                   beta = std::min(bestValue + delta, VALUE_INFINITE);
-                  ++failedHighCnt;
+
+                  if (beta < VALUE_MATE / 2)
+                      ++failedHighCnt;
               }
               else
               {
@@ -623,7 +626,7 @@ namespace {
     Key posKey;
     Move ttMove, move, excludedMove, bestMove;
     Depth extension, newDepth;
-    Value bestValue, value, ttValue, eval, maxValue;
+    Value bestValue, value, ttValue, eval;
     bool ttHit, ttPv, formerPv, givesCheck, improving, didLMR, priorCapture;
     bool captureOrPromotion, doFullDepthSearch, moveCountPruning, ttCapture, singularLMR;
     Piece movedPiece;
@@ -636,7 +639,6 @@ namespace {
     Color us = pos.side_to_move();
     moveCount = captureCount = quietCount = ss->moveCount = 0;
     bestValue = -VALUE_INFINITE;
-    maxValue = VALUE_INFINITE;
 
     // Check for the available remaining time
     if (thisThread == Threads.main())
@@ -661,8 +663,14 @@ namespace {
         // because we will never beat the current alpha. Same logic but with reversed
         // signs applies also in the opposite condition of being mated instead of giving
         // mate. In this case return a fail-high score.
-        alpha = std::max(mated_in(ss->ply), alpha);
-        beta = std::min(mate_in(ss->ply+1), beta);
+        // Note: Even if the pruning condition doesn't hold, we adjust the upper or lower
+        // bound accordingly, see https://www.chessprogramming.org/Mate_Distance_Pruning.
+        if (alpha > VALUE_MATE_IN_MAX_PLY)
+            beta = std::min(mate_in(ss->ply+1), beta);
+
+        if (beta < VALUE_MATED_IN_MAX_PLY)
+            alpha = std::max(mated_in(ss->ply), alpha);
+
         if (alpha >= beta)
             return alpha;
     }
@@ -737,7 +745,10 @@ namespace {
     }
 
     // Step 5. Tablebases probe
-    if (!rootNode && TB::Cardinality)
+    if (  !rootNode
+        && TB::Cardinality
+        && alpha > VALUE_TB_LOSS_IN_MAX_PLY
+        && beta  < VALUE_TB_WIN_IN_MAX_PLY)
     {
         int piecesCount = pos.count<ALL_PIECES>();
 
@@ -759,30 +770,12 @@ namespace {
 
                 int drawScore = TB::UseRule50 ? 1 : 0;
 
-                // use the range VALUE_MATE_IN_MAX_PLY to VALUE_TB_WIN_IN_MAX_PLY to score
-                value =  wdl < -drawScore ? VALUE_MATED_IN_MAX_PLY + ss->ply + 1
-                       : wdl >  drawScore ? VALUE_MATE_IN_MAX_PLY - ss->ply - 1
-                                          : VALUE_DRAW + 2 * wdl * drawScore;
+                // use the range VALUE_TB_WIN to VALUE_TB_WIN_IN_MAX_PLY to score
+                value =  wdl < -drawScore ? -VALUE_TB_WIN + ss->ply
+                       : wdl >  drawScore ?  VALUE_TB_WIN - ss->ply
+                                          :  VALUE_DRAW + 2 * wdl * drawScore;
 
-                Bound b =  wdl < -drawScore ? BOUND_UPPER
-                         : wdl >  drawScore ? BOUND_LOWER : BOUND_EXACT;
-
-                if (    b == BOUND_EXACT
-                    || (b == BOUND_LOWER ? value >= beta : value <= alpha))
-                {
-                    tte->save(posKey, TT.value_to_tt(value, ss->ply), ttPv, b,
-                              std::min(MAX_PLY - 1, depth + 6), MOVE_NONE, VALUE_NONE);
-
-                    return value;
-                }
-
-                if (PvNode)
-                {
-                    if (b == BOUND_LOWER)
-                        bestValue = value, alpha = std::max(alpha, bestValue);
-                    else
-                        maxValue = value;
-                }
+                return value;
             }
         }
     }
@@ -820,7 +813,7 @@ namespace {
             ss->staticEval = eval = evaluate(pos) + bonus;
         }
         else
-            ss->staticEval = eval = -(ss-1)->staticEval + 2 * Tempo;
+            ss->staticEval = eval = -(ss-1)->staticEval + 2 * VALUE_TEMPO;
 
         tte->save(posKey, VALUE_NONE, ttPv, BOUND_NONE, DEPTH_NONE, MOVE_NONE, eval);
     }
@@ -1377,9 +1370,6 @@ moves_loop: // When in check, search starts from here
              && !priorCapture)
         update_continuation_histories(ss-1, pos.piece_on(prevSq), prevSq, stat_bonus(depth));
 
-    if (PvNode)
-        bestValue = std::min(bestValue, maxValue);
-
     if (!excludedMove && !(rootNode && thisThread->pvIdx))
         tte->save(posKey, TT.value_to_tt(bestValue, ss->ply), ttPv,
                   bestValue >= beta ? BOUND_LOWER :
@@ -1475,7 +1465,7 @@ moves_loop: // When in check, search starts from here
         else
             ss->staticEval = bestValue =
             (ss-1)->currentMove != MOVE_NULL ? evaluate(pos)
-                                             : -(ss-1)->staticEval + 2 * Tempo;
+                                             : -(ss-1)->staticEval + 2 * VALUE_TEMPO;
 
         // Stand pat. Return immediately if static value is at least beta
         if (bestValue >= beta)

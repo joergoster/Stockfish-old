@@ -171,22 +171,23 @@ enum Bound {
 enum Value : int {
   VALUE_ZERO      = 0,
   VALUE_DRAW      = 0,
-  VALUE_KNOWN_WIN = 10000,
+  VALUE_TEMPO     = 28,
+  VALUE_KNOWN_WIN = 20000,
+  VALUE_TB_WIN    = 31000,
   VALUE_MATE      = 32000,
   VALUE_INFINITE  = 32001,
   VALUE_NONE      = 32002,
 
-  VALUE_TB_WIN_IN_MAX_PLY  =  VALUE_MATE - 2 * MAX_PLY,
-  VALUE_TB_LOSS_IN_MAX_PLY = -VALUE_TB_WIN_IN_MAX_PLY,
+  VALUE_TB_WIN_IN_MAX_PLY  =  VALUE_TB_WIN - MAX_PLY,
+  VALUE_TB_LOSS_IN_MAX_PLY = -VALUE_TB_WIN + MAX_PLY,
   VALUE_MATE_IN_MAX_PLY  =  VALUE_MATE - MAX_PLY,
-  VALUE_MATED_IN_MAX_PLY = -VALUE_MATE_IN_MAX_PLY,
+  VALUE_MATED_IN_MAX_PLY = -VALUE_MATE + MAX_PLY,
 
   PawnValueMg   = 128,   PawnValueEg   = 213,
   KnightValueMg = 781,   KnightValueEg = 854,
   BishopValueMg = 825,   BishopValueEg = 915,
   RookValueMg   = 1276,  RookValueEg   = 1380,
   QueenValueMg  = 2538,  QueenValueEg  = 2682,
-  Tempo = 28,
 
   MidgameLimit  = 15258, EndgameLimit  = 3915
 };
