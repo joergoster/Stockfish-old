@@ -150,8 +150,8 @@ Value TranspositionTable::value_to_tt(Value v, int ply) {
 
   assert(v != VALUE_NONE);
 
-  return  v >= VALUE_TB_WIN_IN_MAX_PLY  ? v + ply
-        : v <= VALUE_TB_LOSS_IN_MAX_PLY ? v - ply : v;
+  return  v >= VALUE_TB_WIN_IN_MAX_PLY  ? v + ply :
+          v <= VALUE_TB_LOSS_IN_MAX_PLY ? v - ply : v;
 }
 
 
@@ -161,28 +161,13 @@ Value TranspositionTable::value_to_tt(Value v, int ply) {
 /// for mate scores, to avoid potentially false mate scores related to the 50 moves rule,
 /// and the graph history interaction, return an optimal TB score instead.
 
-Value TranspositionTable::value_from_tt(Value v, int ply, int r50c) {
+Value TranspositionTable::value_from_tt(Value v, int ply) {
 
   if (v == VALUE_NONE)
       return VALUE_NONE;
 
-  if (v >= VALUE_TB_WIN_IN_MAX_PLY)  // TB win or better
-  {
-      if (v >= VALUE_MATE_IN_MAX_PLY && VALUE_MATE - v > 99 - r50c)
-          return VALUE_MATE_IN_MAX_PLY - 1; // do not return a potentially false mate score
-
-      return v - ply;
-  }
-
-  if (v <= VALUE_TB_LOSS_IN_MAX_PLY) // TB loss or worse
-  {
-      if (v <= VALUE_MATED_IN_MAX_PLY && VALUE_MATE + v > 99 - r50c)
-          return VALUE_MATED_IN_MAX_PLY + 1; // do not return a potentially false mated score
-
-      return v + ply;
-  }
-
-  return v;
+  return  v >= VALUE_TB_WIN_IN_MAX_PLY  ? v - ply :
+          v <= VALUE_TB_LOSS_IN_MAX_PLY ? v + ply : v;
 }
 
 
