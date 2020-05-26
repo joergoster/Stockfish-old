@@ -116,39 +116,49 @@ TTEntry* TranspositionTable::probe(const Key key, bool& found) const {
 
 void TranspositionTable::save(Key k, Value v, bool pv, Bound b, Depth d, Move m, Value ev) {
 
+  TTEntry* replace;
   TTEntry* tte = first_entry(k);
+  const uint16_t key16 = k >> 48;
+  bool success = false;
 
-  // First, look for an empty slot, store values and return
+  // First, look for a slot with a matching key
   for (int i = 0; i < ClusterSize; ++i)
-  {
-      if (!tte[i].key16)
+      if (tte[i].key16 == key16)
       {
-          tte[i].key16     = uint16_t(k >> 48);
-          tte[i].move16    = uint16_t(m);
-          tte[i].value16   = int16_t(v);
-          tte[i].eval16    = int16_t(ev);
-          tte[i].genBound8 = uint8_t(generation8 | uint8_t(pv) << 2 | b);
-          tte[i].depth8    = uint8_t(d - DEPTH_OFFSET);
-
-          return;
+          replace = &tte[i];
+          success = true;
       }
+
+  // Second, look for an empty slot
+  if (!success)
+  {
+      for (int i = 0; i < ClusterSize; ++i)
+          if (!tte[i].key16)
+          {
+              replace = &tte[i];
+              success = true;
+          }
   }
 
-  // Now find an entry to be replaced according to the replacement strategy,
-  // no matter if it's an entry with matching key or not!
-  TTEntry* replace = tte;
+  // Last, find an entry to be replaced
+  if (!success)
+  {
+      replace = tte;
+      for (int i = 1; i < ClusterSize; ++i)
+          // Due to our packed storage format for generation and its cyclic
+          // nature we add 263 (256 is the modulus plus 7 to keep the unrelated
+          // lowest three bits from affecting the result) to calculate the entry
+          // age correctly even after generation8 overflows into the next cycle.
+          if (  replace->depth8 - ((263 + generation8 - replace->genBound8) & 0xF8)
+              >   tte[i].depth8 - ((263 + generation8 -   tte[i].genBound8) & 0xF8))
+              replace = &tte[i];
+  }
 
-  for (int i = 1; i < ClusterSize; ++i)
-      // Due to our packed storage format for generation and its cyclic
-      // nature we add 263 (256 is the modulus plus 7 to keep the unrelated
-      // lowest three bits from affecting the result) to calculate the entry
-      // age correctly even after generation8 overflows into the next cycle.
-      if (  replace->depth8 - ((263 + generation8 - replace->genBound8) & 0xF8)
-          >   tte[i].depth8 - ((263 + generation8 -   tte[i].genBound8) & 0xF8))
-          replace = &tte[i];
+  // Preserve any existing move for the same position
+  if (m || replace->key16 != key16)
+      replace->move16 = uint16_t(m);
 
-  replace->key16     = uint16_t(k >> 48);
-  replace->move16    = uint16_t(m);
+  replace->key16     = key16;
   replace->value16   = int16_t(v);
   replace->eval16    = int16_t(ev);
   replace->genBound8 = uint8_t(generation8 | uint8_t(pv) << 2 | b);
