@@ -30,30 +30,6 @@
 
 TranspositionTable TT; // Our global transposition table
 
-/// TTEntry::save populates the TTEntry with a new node's data, possibly
-/// overwriting an old position. Update is not atomic and can be racy.
-
-void TTEntry::save(Key k, Value v, bool pv, Bound b, Depth d, Move m, Value ev) {
-
-  // Preserve any existing move for the same position
-  if (m || (k >> 48) != key16)
-      move16 = (uint16_t)m;
-
-  // Overwrite less valuable entries
-  if (  (k >> 48) != key16
-      || d - DEPTH_OFFSET > depth8 - 4
-      || b == BOUND_EXACT)
-  {
-      assert(d >= DEPTH_OFFSET);
-
-      key16     = (uint16_t)(k >> 48);
-      value16   = (int16_t)v;
-      eval16    = (int16_t)ev;
-      genBound8 = (uint8_t)(TT.generation8 | uint8_t(pv) << 2 | b);
-      depth8    = (uint8_t)(d - DEPTH_OFFSET);
-  }
-}
-
 
 /// TranspositionTable::resize() sets the size of the transposition table,
 /// measured in megabytes. Transposition table consists of a power of 2 number
@@ -109,10 +85,7 @@ void TranspositionTable::clear() {
 
 /// TranspositionTable::probe() looks up the current position in the transposition
 /// table. It returns true and a pointer to the TTEntry if the position is found.
-/// Otherwise, it returns false and a pointer to an empty or least valuable TTEntry
-/// to be replaced later. The replace value of an entry is calculated as its depth
-/// minus 8 times its relative age. TTEntry t1 is considered more valuable than
-/// TTEntry t2 if its replace value is greater than that of t2.
+/// Otherwise, it returns false and a null pointer.
 
 TTEntry* TranspositionTable::probe(const Key key, bool& found) const {
 
@@ -120,15 +93,51 @@ TTEntry* TranspositionTable::probe(const Key key, bool& found) const {
   const uint16_t key16 = key >> 48;  // Use the high 16 bits as key inside the cluster
 
   for (int i = 0; i < ClusterSize; ++i)
-      if (!tte[i].key16 || tte[i].key16 == key16)
+      if (tte[i].key16 == key16)
       {
-          tte[i].genBound8 = uint8_t(generation8 | (tte[i].genBound8 & 0x7)); // Refresh
+          // Refresh the existing entry (makes it a bit harder to replac).
+          // However, we don't know if this entry is useful or not ...
+          tte[i].genBound8 = uint8_t(generation8 | (tte[i].genBound8 & 0x7));
 
-          return found = (bool)tte[i].key16, &tte[i];
+          return found = true, &tte[i];
       }
 
-  // Find an entry to be replaced according to the replacement strategy
+  return found = false, nullptr;
+}
+
+
+/// TranspositionTable::save() populates the hash with a new node's data, possibly
+/// overwriting an old position. Update is not atomic and can be racy.
+/// Currently, we have two passes. First, we look for an empty slot. If there is one,
+/// we store the entry and we're done. Otherwise, we're looking for the least valuable
+/// entry which will be replaced by the new entry. The replace value of an entry
+/// is calculated as its depth minus 8 times its relative age. TTEntry t1 is considered
+/// more valuable than TTEntry t2 if its replace value is greater than that of t2.
+
+void TranspositionTable::save(Key k, Value v, bool pv, Bound b, Depth d, Move m, Value ev) {
+
+  TTEntry* tte = first_entry(k);
+
+  // First, look for an empty slot, store values and return
+  for (int i = 0; i < ClusterSize; ++i)
+  {
+      if (!tte[i].key16)
+      {
+          tte[i].key16     = uint16_t(k >> 48);
+          tte[i].move16    = uint16_t(m);
+          tte[i].value16   = int16_t(v);
+          tte[i].eval16    = int16_t(ev);
+          tte[i].genBound8 = uint8_t(generation8 | uint8_t(pv) << 2 | b);
+          tte[i].depth8    = uint8_t(d - DEPTH_OFFSET);
+
+          return;
+      }
+  }
+
+  // Now find an entry to be replaced according to the replacement strategy,
+  // no matter if it's an entry with matching key or not!
   TTEntry* replace = tte;
+
   for (int i = 1; i < ClusterSize; ++i)
       // Due to our packed storage format for generation and its cyclic
       // nature we add 263 (256 is the modulus plus 7 to keep the unrelated
@@ -138,19 +147,26 @@ TTEntry* TranspositionTable::probe(const Key key, bool& found) const {
           >   tte[i].depth8 - ((263 + generation8 -   tte[i].genBound8) & 0xF8))
           replace = &tte[i];
 
-  return found = false, replace;
+  replace->key16     = uint16_t(k >> 48);
+  replace->move16    = uint16_t(m);
+  replace->value16   = int16_t(v);
+  replace->eval16    = int16_t(ev);
+  replace->genBound8 = uint8_t(generation8 | uint8_t(pv) << 2 | b);
+  replace->depth8    = uint8_t(d - DEPTH_OFFSET);
 }
 
 
-/// TranspositionTable::hashfull() returns an approximation of the hashtable
-/// occupation during a search. The hash is x permill full, as per UCI protocol.
+/// TranspositionTable::hashfull() returns an approximation of the hashtable occupation
+/// during a search. The hash is x permill full, as per UCI protocol. We are checking
+/// the first 1,000 clusters for entries with current age and valid bounds.
 
 int TranspositionTable::hashfull() const {
 
   int cnt = 0;
   for (int i = 0; i < 1000; ++i)
       for (int j = 0; j < ClusterSize; ++j)
-          cnt += (table[i].entry[j].genBound8 & 0xF8) == generation8;
+          cnt +=   (table[i].entry[j].genBound8 & 0xF8) == generation8
+                && (table[i].entry[j].genBound8 & 0x3) != BOUND_NONE;
 
   return cnt / ClusterSize;
 }
