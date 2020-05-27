@@ -127,6 +127,7 @@ void TranspositionTable::save(Key k, Value v, bool pv, Bound b, Depth d, Move m,
       {
           replace = &tte[i];
           success = true;
+          break;
       }
 
   // Second, look for an empty slot
@@ -137,6 +138,7 @@ void TranspositionTable::save(Key k, Value v, bool pv, Bound b, Depth d, Move m,
           {
               replace = &tte[i];
               success = true;
+              break;
           }
   }
 
