@@ -83,29 +83,38 @@ void TranspositionTable::clear() {
       th.join();
 }
 
-/// TranspositionTable::probe() looks up the current position in the transposition
-/// table. It returns true and a pointer to the TTEntry if the position is found.
-/// Otherwise, it returns false and a null pointer.
+/// TranspositionTable::probe() looks up the current position in the
+/// transposition table. It returns true if the position is found.
 
-TTEntry* TranspositionTable::probe(const Key key, bool& found) const {
+bool TranspositionTable::probe(const Key key, Value& ttValue, Value& ttEval, Move& ttMove,
+                                              Depth& ttDepth, Bound& ttBound, bool& ttPv) const {
 
   TTEntry* const tte = first_entry(key);
 
   for (int i = 0; i < ClusterSize; ++i)
   {
       if (!tte[i].key16)
-          return found = false, nullptr;
+          return false;
 
       if (tte[i].key16 == key >> 48)
       {
           // Refresh the existing entry (makes it a bit harder to replace).
           // However, we don't know if this entry is useful or not ...
           tte[i].genBound8 = uint8_t(generation8 | (tte[i].genBound8 & 0x7));
-          return found = true, &tte[i];
+
+          // Copy over values
+          ttValue = Value(tte[i].value16);
+          ttEval  = Value(tte[i].eval16);
+          ttMove  = Move(tte[i].move16);
+          ttDepth = Depth(tte[i].depth8 + DEPTH_OFFSET);
+          ttBound = Bound(tte[i].genBound8 & 0x3);
+          ttPv    = bool(tte[i].genBound8 & 0x4);
+
+          return true;
       }
   }
 
-  return found = false, nullptr;
+  return false;
 }
 
 
