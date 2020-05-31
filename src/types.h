@@ -102,7 +102,7 @@ typedef uint64_t Key;
 typedef uint64_t Bitboard;
 
 constexpr int MAX_MOVES = 256;
-constexpr int MAX_PLY   = 246;
+constexpr int MAX_PLY   = 250;
 
 /// A move needs 16 bits to be stored
 ///
@@ -219,8 +219,7 @@ enum : int {
   DEPTH_QS_NO_CHECKS  = -1,
   DEPTH_QS_RECAPTURES = -5,
 
-  DEPTH_NONE   = -6,
-  DEPTH_OFFSET = DEPTH_NONE
+  DEPTH_NONE   = -6
 };
 
 enum Square : int {
