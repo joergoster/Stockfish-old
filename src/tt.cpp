@@ -43,6 +43,7 @@ void TranspositionTable::resize(size_t mbSize) {
 
   clusterCount = mbSize * 1024 * 1024 / sizeof(Cluster);
   table = static_cast<Cluster*>(aligned_ttmem_alloc(clusterCount * sizeof(Cluster), mem));
+
   if (!mem)
   {
       std::cerr << "Failed to allocate " << mbSize
@@ -81,6 +82,8 @@ void TranspositionTable::clear() {
 
   for (std::thread& th : threads)
       th.join();
+
+  generation16 = 0;
 }
 
 /// TranspositionTable::probe() looks up the current position in the
@@ -96,19 +99,19 @@ bool TranspositionTable::probe(const Key key, Value& ttValue, Value& ttEval, Mov
       if (!tte[i].key32)
           return false;
 
-      if (tte[i].key32 == key >> 32)
+      if (tte[i].key32 == uint32_t(key >> 32))
       {
           // Refresh the existing entry (makes it a bit harder to replace).
           // However, we don't know if this entry is useful or not ...
-          tte[i].genBound32 = uint32_t(generation32 | (tte[i].genBound32 & 0x7));
+          tte[i].age16 = generation16;
 
           // Copy over values
           ttValue = Value(tte[i].value16);
           ttEval  = Value(tte[i].eval16);
           ttMove  = Move(tte[i].move16);
           ttDepth = Depth(tte[i].depth16);
-          ttBound = Bound(tte[i].genBound32 & 0x3);
-          ttPv    = bool(tte[i].genBound32 & 0x4);
+          ttBound = Bound(tte[i].pvbound16 & 0x3);
+          ttPv    = bool(tte[i].pvbound16 & 0x4);
 
           return true;
       }
@@ -123,14 +126,14 @@ bool TranspositionTable::probe(const Key key, Value& ttValue, Value& ttEval, Mov
 /// Currently, we have two passes. First, we're looking for a matching entry
 /// or an empty slot. Otherwise, we're looking for the least valuable
 /// entry which will be replaced by the new entry. The replace value of an entry
-/// is calculated as its depth minus 8 times its relative age. TTEntry t1 is considered
+/// is calculated as its depth minus 4 times its relative age. TTEntry t1 is considered
 /// more valuable than TTEntry t2 if its replace value is greater than that of t2.
 
 void TranspositionTable::save(Key k, Value v, bool pv, Bound b, Depth d, Move m, Value ev) {
 
-  TTEntry* replace;
   TTEntry* tte = first_entry(k);
-  const uint16_t key32 = k >> 32;
+  TTEntry* replace;
+  const uint32_t key32 = k >> 32;
   bool success = false;
 
   // First, look for a slot with a matching key. As soon
@@ -151,12 +154,8 @@ void TranspositionTable::save(Key k, Value v, bool pv, Bound b, Depth d, Move m,
       replace = &tte[0];
 
       for (int i = 1; i < ClusterSize; ++i)
-          // Due to our packed storage format for generation and its cyclic
-          // nature we add 263 (256 is the modulus plus 7 to keep the unrelated
-          // lowest three bits from affecting the result) to calculate the entry
-          // age correctly even after generation8 overflows into the next cycle.
-          if (  replace->depth16 - ((generation32 - replace->genBound32) & 0xFFFFFFF8)
-              >   tte[i].depth16 - ((generation32 -   tte[i].genBound32) & 0xFFFFFFF8))
+          if (  replace->depth16 - 4 * (generation16 - replace->age16)
+              >   tte[i].depth16 - 4 * (generation16 -   tte[i].age16))
               replace = &tte[i];
   }
 
@@ -170,11 +169,12 @@ void TranspositionTable::save(Key k, Value v, bool pv, Bound b, Depth d, Move m,
       || b == BOUND_EXACT
       || d > replace->depth16 - 4)
   {
-      replace->key32      = key32;
-      replace->value16    = int16_t(v);
-      replace->eval16     = int16_t(ev);
-      replace->genBound32 = uint32_t(generation32 | uint32_t(pv) << 2 | b);
-      replace->depth16    = int16_t(d);
+      replace->key32     = key32;
+      replace->age16     = generation16;
+      replace->value16   = int16_t(v);
+      replace->eval16    = int16_t(ev);
+      replace->depth16   = int16_t(d);
+      replace->pvbound16 = int16_t(int16_t(pv) << 2 | b);
   }
 }
 
@@ -188,7 +188,7 @@ int TranspositionTable::hashfull() const {
   int cnt = 0;
   for (int i = 0; i < 1000; ++i)
       for (int j = 0; j < ClusterSize; ++j)
-          cnt += (table[i].entry[j].genBound32 & 0xFFFFFFF8) == generation32;
+          cnt += table[i].entry[j].age16 == generation16;
 
   return cnt / ClusterSize;
 }

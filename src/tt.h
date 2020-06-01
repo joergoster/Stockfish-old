@@ -30,9 +30,8 @@
 /// move       16 bit
 /// value      16 bit
 /// eval value 16 bit
-/// generation 29 bit
-/// pv node     1 bit
-/// bound type  2 bit
+/// age        16 bit
+/// pvbound    16 bit
 /// depth      16 bit
 
 struct TTEntry {
@@ -42,10 +41,11 @@ private:
 
   uint32_t key32;
   uint16_t move16;
+  uint16_t age16;
   int16_t  value16;
   int16_t  eval16;
   int16_t  depth16;
-  uint32_t genBound32;
+  int16_t  pvbound16;
 };
 
 
@@ -57,14 +57,13 @@ private:
 
 class TranspositionTable {
 
-  static constexpr int ClusterSize = 2;
+  static constexpr int ClusterSize = 4;
 
   struct Cluster {
     TTEntry entry[ClusterSize];
-//    char padding[2]; // Pad to 32 bytes
   };
 
-  static_assert(sizeof(Cluster) == 32, "Unexpected Cluster size");
+  static_assert(sizeof(Cluster) == 64, "Unexpected Cluster size");
 
 public:
  ~TranspositionTable() { aligned_ttmem_free(mem); }
@@ -72,7 +71,7 @@ public:
                             Depth& ttDepth, Bound& ttBound, bool& ttPv) const;
   int hashfull() const;
   void clear();
-  void new_search() { generation32 += 8; } // Lower 3 bits are used by PV flag and Bound
+  void new_search() { generation16++; }
   void resize(size_t mbSize);
   void save(Key k, Value v, bool pv, Bound b, Depth d, Move m, Value ev);
 
@@ -87,7 +86,7 @@ private:
   size_t clusterCount;
   Cluster* table;
   void* mem;
-  uint32_t generation32; // Size must be not bigger than TTEntry::genBound32
+  uint16_t generation16;
 };
 
 extern TranspositionTable TT;
