@@ -1877,7 +1877,7 @@ string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
          << " score "    << UCI::value(v);
 
       if (Options["UCI_ShowWDL"])
-          ss << UCI::wdl(v, pos.game_ply());
+          ss << UCI::wdl();
 
       if (!tb && i == pvIdx)
           ss << (v >= beta ? " lowerbound" : v <= alpha ? " upperbound" : "");
