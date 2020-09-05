@@ -577,8 +577,12 @@ namespace {
         && pos.has_game_cycle(ss->ply))
     {
         alpha = value_draw(pos.this_thread());
+
         if (alpha >= beta)
+        {
+            pos.this_thread()->draws.fetch_add(1, std::memory_order_relaxed);
             return alpha;
+        }
     }
 
     // Dive into quiescence search when the depth reaches zero
@@ -626,8 +630,13 @@ namespace {
         if (   Threads.stop.load(std::memory_order_relaxed)
             || pos.is_draw(ss->ply)
             || ss->ply >= MAX_PLY)
+        {
+            // Simply assume we return because of draw
+            thisThread->draws.fetch_add(1, std::memory_order_relaxed);
+
             return (ss->ply >= MAX_PLY && !ss->inCheck) ? evaluate(pos)
                                                         : value_draw(pos.this_thread());
+        }
 
         // Step 3. Mate distance pruning. Even if we mate at the next move our score
         // would be at best mate_in(ss->ply+1), but if alpha is already bigger because
@@ -754,6 +763,9 @@ namespace {
                               std::min(MAX_PLY - 1, depth + 6),
                               MOVE_NONE, VALUE_NONE);
 
+                    if (abs(value) <= PawnValueEg / 2)
+                        thisThread->draws.fetch_add(1, std::memory_order_relaxed);
+
                     return value;
                 }
 
@@ -807,7 +819,14 @@ namespace {
     if (   !rootNode // The required rootNode PV handling is not available in qsearch
         &&  depth == 1
         &&  eval <= alpha - RazorMargin)
-        return qsearch<NT>(pos, ss, alpha, beta);
+    {
+        Value qvalue = qsearch<NT>(pos, ss, alpha, beta);
+
+        if (abs(qvalue) <= Tempo)
+            thisThread->draws.fetch_add(1, std::memory_order_relaxed);
+
+        return qvalue;
+    }
 
     improving =  (ss-2)->staticEval == VALUE_NONE
                ? ss->staticEval > (ss-4)->staticEval || (ss-4)->staticEval == VALUE_NONE
