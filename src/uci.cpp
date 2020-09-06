@@ -294,6 +294,9 @@ string UCI::wdl() {
   uint64_t losses = Threads.losses_found();
   uint64_t sum = wins + draws + losses;
 
+  if (!sum)
+      return " wdl 0 0 0";
+
   assert(sum);
 
   int wdl_w = int(double(wins   / sum) * 1000 + 0.5);
