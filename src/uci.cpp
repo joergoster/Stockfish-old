@@ -299,8 +299,8 @@ string UCI::wdl() {
 
   assert(sum);
 
-  int wdl_w = int(double(wins   / sum) * 1000 + 0.5);
-  int wdl_l = int(double(losses / sum) * 1000 + 0.5);
+  int wdl_w = int(double(wins) / sum * 1000 + 0.5);
+  int wdl_l = int(double(losses) / sum * 1000 + 0.5);
   int wdl_d = 1000 - wdl_w - wdl_l;
 
   ss << " wdl " << wdl_w << " " << wdl_d << " " << wdl_l;
