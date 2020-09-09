@@ -587,14 +587,7 @@ namespace {
 
     // Dive into quiescence search when the depth reaches zero
     if (depth <= 0)
-    {
-        Value qs = qsearch<NT>(pos, ss, alpha, beta);
-
-        if (abs(qs) <= Tempo)
-            pos.this_thread()->draws.fetch_add(1, std::memory_order_relaxed);
-
-        return qs;
-    }
+        return qsearch<NT>(pos, ss, alpha, beta);
 
     assert(-VALUE_INFINITE <= alpha && alpha < beta && beta <= VALUE_INFINITE);
     assert(PvNode || (alpha == beta - 1));
@@ -729,12 +722,7 @@ namespace {
         }
 
         if (pos.rule50_count() < 90)
-        {
-            if (abs(ttValue) <= Tempo)
-                thisThread->draws.fetch_add(1, std::memory_order_relaxed);
-
             return ttValue;
-        }
     }
 
     // Step 5. Tablebases probe
@@ -775,7 +763,7 @@ namespace {
                               std::min(MAX_PLY - 1, depth + 6),
                               MOVE_NONE, VALUE_NONE);
 
-                    if (abs(value) <= PawnValueEg / 2) // Also catch cursed wins
+                    if (abs(value) <= PawnValueEg / 2)
                         thisThread->draws.fetch_add(1, std::memory_order_relaxed);
 
                     return value;
@@ -832,12 +820,12 @@ namespace {
         &&  depth == 1
         &&  eval <= alpha - RazorMargin)
     {
-        Value razor = qsearch<NT>(pos, ss, alpha, beta);
+        Value qvalue = qsearch<NT>(pos, ss, alpha, beta);
 
-        if (abs(razor) <= Tempo)
+        if (abs(qvalue) <= Tempo)
             thisThread->draws.fetch_add(1, std::memory_order_relaxed);
 
-        return razor;
+        return qvalue;
     }
 
     improving =  (ss-2)->staticEval == VALUE_NONE
@@ -849,12 +837,7 @@ namespace {
         &&  depth < 8
         &&  eval - futility_margin(depth, improving) >= beta
         &&  eval < VALUE_KNOWN_WIN) // Do not return unproven wins
-    {
-        if (abs(eval) <= Tempo)
-            thisThread->draws.fetch_add(1, std::memory_order_relaxed);
-
         return eval;
-    }
 
     // Step 9. Null move search with verification search (~40 Elo)
     if (   !PvNode
@@ -888,12 +871,7 @@ namespace {
                 nullValue = beta;
 
             if (thisThread->nmpMinPly || (abs(beta) < VALUE_KNOWN_WIN && depth < 13))
-            {
-                if (abs(nullValue) <= Tempo)
-                    thisThread->draws.fetch_add(1, std::memory_order_relaxed);
-
                 return nullValue;
-            }
 
             assert(!thisThread->nmpMinPly); // Recursive verification is not allowed
 
@@ -907,12 +885,7 @@ namespace {
             thisThread->nmpMinPly = 0;
 
             if (v >= beta)
-            {
-                if (abs(nullValue) <= Tempo)
-                    thisThread->draws.fetch_add(1, std::memory_order_relaxed);
-
                 return nullValue;
-            }
         }
     }
 
@@ -979,19 +952,15 @@ namespace {
                 if (value >= probCutBeta)
                 {
                     // if transposition table doesn't have equal or more deep info write probCut data into it
-                    if (  !(ttHit
-                        && tte->depth() >= depth - 3
-                        && ttValue != VALUE_NONE))
+                    if ( !(ttHit
+                       && tte->depth() >= depth - 3
+                       && ttValue != VALUE_NONE))
                         tte->save(posKey, value_to_tt(value, ss->ply), ttPv,
-                                  BOUND_LOWER, depth - 3, move, ss->staticEval);
-
-                    if (abs(value) <= Tempo)
-                        thisThread->draws.fetch_add(1, std::memory_order_relaxed);
-
+                            BOUND_LOWER,
+                            depth - 3, move, ss->staticEval);
                     return value;
                 }
             }
-
          ss->ttPv = ttPv;
     }
 
@@ -1154,12 +1123,7 @@ moves_loop: // When in check, search starts from here
           // that multiple moves fail high, and we can prune the whole subtree by returning
           // a soft bound.
           else if (singularBeta >= beta)
-          {
-              if (abs(singularBeta) <= Tempo)
-                  thisThread->draws.fetch_add(1, std::memory_order_relaxed);
-
               return singularBeta;
-          }
 
           // If the eval of ttMove is greater than beta we try also if there is another
           // move that pushes it over beta, if so also produce a cutoff.
@@ -1170,12 +1134,7 @@ moves_loop: // When in check, search starts from here
               ss->excludedMove = MOVE_NONE;
 
               if (value >= beta)
-              {
-                  if (abs(beta) <= Tempo)
-                      thisThread->draws.fetch_add(1, std::memory_order_relaxed);
-
                   return beta;
-              }
           }
       }
 
@@ -1460,9 +1419,6 @@ moves_loop: // When in check, search starts from here
                   depth, bestMove, ss->staticEval);
 
     assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
-
-    if (abs(bestValue) <= Tempo)
-        thisThread->draws.fetch_add(1, std::memory_order_relaxed);
 
     return bestValue;
   }
