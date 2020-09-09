@@ -62,6 +62,8 @@ namespace {
   constexpr uint64_t TtHitAverageWindow     = 4096;
   constexpr uint64_t TtHitAverageResolution = 1024;
 
+  constexpr Value DrawThreshold = 4 * PawnValueEg / 10;
+
   // Razor and futility margins
   constexpr int RazorMargin = 510;
   Value futility_margin(Depth d, bool improving) {
@@ -1400,6 +1402,19 @@ moves_loop: // When in check, search starts from here
                   depth, bestMove, ss->staticEval);
 
     assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
+
+    if (bestValue <= -RookValueEg)
+    {
+        ss->ply % 2 == 0 ? thisThread->losses.fetch_add(1, std::memory_order_relaxed)
+                         : thisThread->wins.fetch_add(1, std::memory_order_relaxed);
+    }
+    else if (bestValue >= RookValueEg)
+    {
+        ss->ply % 2 == 0 ? thisThread->wins.fetch_add(1, std::memory_order_relaxed)
+                         : thisThread->losses.fetch_add(1, std::memory_order_relaxed);
+    }
+    else if (abs(bestValue) <= DrawThreshold)
+        thisThread->draws.fetch_add(1, std::memory_order_relaxed);
 
     return bestValue;
   }
