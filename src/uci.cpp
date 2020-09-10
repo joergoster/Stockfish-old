@@ -292,9 +292,7 @@ string UCI::wdl() {
   uint64_t wins = Threads.wins_found();
   uint64_t draws = Threads.draws_found();
   uint64_t losses = Threads.losses_found();
-  uint64_t sum = wins + draws + losses;
-
-  assert(sum);
+  uint64_t sum = wins + draws + losses + 1;
 
   int wdl_w = int(double(wins) / sum * 1000 + 0.5);
   int wdl_l = int(double(losses) / sum * 1000 + 0.5);
