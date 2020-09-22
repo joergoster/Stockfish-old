@@ -194,7 +194,7 @@ namespace {
   constexpr Value NNUEThreshold2 =   Value(150);
 
   // KingAttackWeights[PieceType] contains king attack weights by piece type
-  constexpr int KingAttackWeights[PIECE_TYPE_NB] = { 0, 0, 96, 36, 40, 28 };
+  constexpr int KingAttackWeights[PIECE_TYPE_NB] = { 0, 0, 62, 33, 45, 49 };
 
   // SafeCheck[PieceType][single/multiple] contains safe check bonus by piece type,
   // higher if multiple safe checks are possible for that piece type.
