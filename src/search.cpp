@@ -386,7 +386,7 @@ void Thread::search() {
          searchAgainCounter++;
 
       // MultiPV loop. We perform a full root search for each PV line
-      for (pvIdx = 0; pvIdx < multiPV && !Threads.stop; ++pvIdx)
+      for (pvIdx = 0; pvIdx < (rootDepth <= 2 ? std::max(multiPV, std::min(rootMoves.size(), size_t(2))) : multiPV) && !Threads.stop; ++pvIdx)
       {
           if (pvIdx == pvLast)
           {
@@ -1009,6 +1009,7 @@ moves_loop: // When in check, search starts from here
 
       // Step 13. Pruning at shallow depth (~200 Elo)
       if (  !rootNode
+          && thisThread->rootDepth > 4
           && pos.non_pawn_material(us)
           && bestValue > VALUE_TB_LOSS_IN_MAX_PLY)
       {
