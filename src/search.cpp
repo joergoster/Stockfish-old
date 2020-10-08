@@ -397,7 +397,7 @@ void Thread::search() {
           }
 
           // Reset UCI info selDepth for each depth and each PV line
-          selDepth = 0;
+          selDepth = 1;
 
           // Reset aspiration window starting size
           if (rootDepth >= 4)
@@ -613,9 +613,9 @@ namespace {
     if (thisThread == Threads.main())
         static_cast<MainThread*>(thisThread)->check_time();
 
-    // Used to send selDepth info to GUI (selDepth counts from 1, ply from 0)
-    if (PvNode && thisThread->selDepth < ss->ply + 1)
-        thisThread->selDepth = ss->ply + 1;
+    // Used to send selDepth info to GUI
+    if (PvNode && thisThread->selDepth < ss->ply)
+        thisThread->selDepth = ss->ply;
 
     if (!rootNode)
     {
