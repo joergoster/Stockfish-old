@@ -32,7 +32,7 @@ TimeManagement Time; // Our global time management object
 //      1) x basetime (+ z increment)
 //      2) x moves in y seconds (+ z increment)
 
-void TimeManagement::init(Search::LimitsType& limits, Color us, int ply) {
+void TimeManagement::init(Search::LimitsType& limits, Color us, int ply, bool onlyMove) {
 
   TimePoint moveOverhead    = TimePoint(Options["Move Overhead"]);
   TimePoint slowMover       = TimePoint(Options["Slow Mover"]);
@@ -91,6 +91,9 @@ void TimeManagement::init(Search::LimitsType& limits, Color us, int ply) {
   // Never use more than 80% of the available time for this move
   optimumTime = TimePoint(optScale * timeLeft);
   maximumTime = TimePoint(std::min(0.8 * limits.time[us] - moveOverhead, maxScale * optimumTime));
+
+  if (onlyMove)
+      optimumTime = optimumTime / 8;
 
   if (Options["Ponder"])
       optimumTime += optimumTime / 4;
