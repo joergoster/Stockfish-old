@@ -633,6 +633,7 @@ bool Position::gives_check(Move m) const {
 
   Square from = from_sq(m);
   Square to = to_sq(m);
+  Square ksq = square<KING>(~sideToMove);
 
   // Is there a direct check?
   if (check_squares(type_of(piece_on(from))) & to)
@@ -640,7 +641,7 @@ bool Position::gives_check(Move m) const {
 
   // Is there a discovered check?
   if (   (blockers_for_king(~sideToMove) & from)
-      && !aligned(from, to, square<KING>(~sideToMove)))
+      && !aligned(from, to, ksq))
       return true;
 
   switch (type_of(m))
@@ -649,7 +650,8 @@ bool Position::gives_check(Move m) const {
       return false;
 
   case PROMOTION:
-      return attacks_bb(promotion_type(m), to, pieces() ^ from) & square<KING>(~sideToMove);
+      return    check_squares(promotion_type(m)) & to                               // direct check
+            || (check_squares(promotion_type(m)) & from && aligned(from, to, ksq)); // promoted piece gives check through 'from'
 
   // En passant capture with check? We have already handled the case
   // of direct checks and ordinary discovered check, so the only case we
@@ -660,18 +662,16 @@ bool Position::gives_check(Move m) const {
       Square capsq = make_square(file_of(to), rank_of(from));
       Bitboard b = (pieces() ^ from ^ capsq) | to;
 
-      return  (attacks_bb<  ROOK>(square<KING>(~sideToMove), b) & pieces(sideToMove, QUEEN, ROOK))
-            | (attacks_bb<BISHOP>(square<KING>(~sideToMove), b) & pieces(sideToMove, QUEEN, BISHOP));
+      return  (attacks_bb<  ROOK>(ksq, b) & pieces(sideToMove, QUEEN, ROOK))
+            | (attacks_bb<BISHOP>(ksq, b) & pieces(sideToMove, QUEEN, BISHOP));
   }
   case CASTLING:
   {
-      Square kfrom = from;
-      Square rfrom = to; // Castling is encoded as 'king captures the rook'
-      Square kto = relative_square(sideToMove, rfrom > kfrom ? SQ_G1 : SQ_C1);
-      Square rto = relative_square(sideToMove, rfrom > kfrom ? SQ_F1 : SQ_D1);
+      // Find the square the rook will land after castling
+      Square rto = relative_square(sideToMove, to > from ? SQ_F1 : SQ_D1);
 
-      return   (attacks_bb<ROOK>(rto) & square<KING>(~sideToMove))
-            && (attacks_bb<ROOK>(rto, (pieces() ^ kfrom ^ rfrom) | rto | kto) & square<KING>(~sideToMove));
+      return    check_squares(ROOK) & rto                               // direct check
+            || (check_squares(ROOK) & from && aligned(from, rto, ksq)); // discovered check (was blocked by our king)
   }
   default:
       assert(false);
