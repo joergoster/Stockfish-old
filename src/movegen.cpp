@@ -100,13 +100,13 @@ namespace {
 
         while (b1)
         {
-            Square to = pop_lsb(&b1);
+            Square to = pop_lsb(b1);
             *moveList++ = make_move(to - Up, to);
         }
 
         while (b2)
         {
-            Square to = pop_lsb(&b2);
+            Square to = pop_lsb(b2);
             *moveList++ = make_move(to - Up - Up, to);
         }
     }
@@ -125,13 +125,13 @@ namespace {
         Bitboard b3 = shift<Up     >(pawnsOn7) & emptySquares;
 
         while (b1)
-            moveList = make_promotions<Type, UpRight>(moveList, pop_lsb(&b1), ksq);
+            moveList = make_promotions<Type, UpRight>(moveList, pop_lsb(b1), ksq);
 
         while (b2)
-            moveList = make_promotions<Type, UpLeft >(moveList, pop_lsb(&b2), ksq);
+            moveList = make_promotions<Type, UpLeft >(moveList, pop_lsb(b2), ksq);
 
         while (b3)
-            moveList = make_promotions<Type, Up     >(moveList, pop_lsb(&b3), ksq);
+            moveList = make_promotions<Type, Up     >(moveList, pop_lsb(b3), ksq);
     }
 
     // Standard and en passant captures
@@ -142,13 +142,13 @@ namespace {
 
         while (b1)
         {
-            Square to = pop_lsb(&b1);
+            Square to = pop_lsb(b1);
             *moveList++ = make_move(to - UpRight, to);
         }
 
         while (b2)
         {
-            Square to = pop_lsb(&b2);
+            Square to = pop_lsb(b2);
             *moveList++ = make_move(to - UpLeft, to);
         }
 
@@ -165,7 +165,7 @@ namespace {
             assert(b1);
 
             while (b1)
-                *moveList++ = make<EN_PASSANT>(pop_lsb(&b1), pos.ep_square());
+                *moveList++ = make<EN_PASSANT>(pop_lsb(b1), pos.ep_square());
         }
     }
 
@@ -182,14 +182,14 @@ namespace {
 
     while (bb)
     {
-        Square from = pop_lsb(&bb);
+        Square from = pop_lsb(bb);
         b = attacks_bb<Pt>(from, pos.pieces()) & target;
 
         if constexpr (Checks)
             b &= pos.check_squares(Pt);
 
         while (b)
-            *moveList++ = make_move(from, pop_lsb(&b));
+            *moveList++ = make_move(from, pop_lsb(b));
     }
 
     return moveList;
@@ -236,7 +236,7 @@ namespace {
         Bitboard b = attacks_bb<KING>(ksq) & target;
 
         while (b)
-            *moveList++ = make_move(ksq, pop_lsb(&b));
+            *moveList++ = make_move(ksq, pop_lsb(b));
 
         if ((Type != CAPTURES) && pos.can_castle(Us & ANY_CASTLING))
         {
@@ -288,7 +288,7 @@ ExtMove* generate<QUIET_CHECKS>(const Position& pos, ExtMove* moveList) {
 
   while (dc)
   {
-     Square from = pop_lsb(&dc);
+     Square from = pop_lsb(dc);
      PieceType pt = type_of(pos.piece_on(from));
 
      Bitboard b = attacks_bb(pt, from, pos.pieces()) & ~pos.pieces();
@@ -297,7 +297,7 @@ ExtMove* generate<QUIET_CHECKS>(const Position& pos, ExtMove* moveList) {
          b &= ~attacks_bb<QUEEN>(pos.square<KING>(~us));
 
      while (b)
-         *moveList++ = make_move(from, pop_lsb(&b));
+         *moveList++ = make_move(from, pop_lsb(b));
   }
 
   return us == WHITE ? generate_all<WHITE, QUIET_CHECKS>(pos, moveList)
@@ -321,13 +321,13 @@ ExtMove* generate<EVASIONS>(const Position& pos, ExtMove* moveList) {
   // the king evasions in order to skip known illegal moves, which avoids any
   // useless legality checks later on.
   while (sliders)
-      sliderAttacks |= line_bb(ksq, pop_lsb(&sliders)) & ~pos.checkers();
+      sliderAttacks |= line_bb(ksq, pop_lsb(sliders)) & ~pos.checkers();
 
   // Generate evasions for king, capture and non capture moves
   Bitboard b = attacks_bb<KING>(ksq) & ~pos.pieces(us) & ~sliderAttacks;
 
   while (b)
-      *moveList++ = make_move(ksq, pop_lsb(&b));
+      *moveList++ = make_move(ksq, pop_lsb(b));
 
   if (more_than_one(pos.checkers()))
       return moveList; // Double check, only a king move can save the day
