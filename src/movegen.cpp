@@ -182,18 +182,13 @@ namespace {
 
     Bitboard b, bb = piecesToMove & pos.pieces(Pt);
 
-    if (!bb)
-        return moveList;
-
-    [[maybe_unused]] const Bitboard checkSquares = pos.check_squares(Pt);
-
     while (bb)
     {
         Square from = pop_lsb(&bb);
         b = attacks_bb<Pt>(from, pos.pieces()) & target;
 
         if constexpr (Checks)
-            b &= checkSquares;
+            b &= pos.check_squares(Pt);
 
         while (b)
             *moveList++ = make_move(from, pop_lsb(&b));
