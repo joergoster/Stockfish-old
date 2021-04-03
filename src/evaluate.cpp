@@ -1032,6 +1032,9 @@ make_v:
     // Evaluation grain
     v = (v / 16) * 16;
 
+    // Scale down the evaluation linearly when shuffling
+    v = v * (100 - pos.rule50_count()) / 100;
+
     // Side to move point of view
     v = (pos.side_to_move() == WHITE ? v : -v) + Tempo;
 
@@ -1039,26 +1042,26 @@ make_v:
   }
 
 
-  /// Fisher Random Chess: correction for cornered bishops, to fix chess960 play with NNUE
+  /// Fisher Random Chess: correction for cornered bishops to fix Chess960 play with NNUE
 
   Value fix_FRC(const Position& pos) {
 
-    constexpr Bitboard Corners =  1ULL << SQ_A1 | 1ULL << SQ_H1 | 1ULL << SQ_A8 | 1ULL << SQ_H8;
+    constexpr Bitboard Corners = (FileABB | FileHBB) & (Rank1BB | Rank8BB);
 
     if (!(pos.pieces(BISHOP) & Corners))
         return VALUE_ZERO;
 
-    int correction = 0;
+    Value correction = VALUE_ZERO;
 
     if (   pos.piece_on(SQ_A1) == W_BISHOP
         && pos.piece_on(SQ_B2) == W_PAWN)
-        correction += !pos.empty(SQ_B3) ? -CorneredBishop * 4
-                                        : -CorneredBishop * 3;
+        correction -= !pos.empty(SQ_B3) ? CorneredBishop * 4
+                                        : CorneredBishop * 3;
 
     if (   pos.piece_on(SQ_H1) == W_BISHOP
         && pos.piece_on(SQ_G2) == W_PAWN)
-        correction += !pos.empty(SQ_G3) ? -CorneredBishop * 4
-                                        : -CorneredBishop * 3;
+        correction -= !pos.empty(SQ_G3) ? CorneredBishop * 4
+                                        : CorneredBishop * 3;
 
     if (   pos.piece_on(SQ_A8) == B_BISHOP
         && pos.piece_on(SQ_B7) == B_PAWN)
@@ -1070,8 +1073,8 @@ make_v:
         correction += !pos.empty(SQ_G6) ? CorneredBishop * 4
                                         : CorneredBishop * 3;
 
-    return pos.side_to_move() == WHITE ?  Value(correction)
-                                       : -Value(correction);
+    return pos.side_to_move() == WHITE ?  correction
+                                       : -correction;
   }
 
 } // namespace Eval
@@ -1082,60 +1085,52 @@ make_v:
 
 Value Eval::evaluate(const Position& pos) {
 
-  Value v;
+  if (   !Eval::useNNUE
+      || (pos.non_pawn_material() < 2 * RookValueMg && pos.count<PAWN>() < 2))
+      return Evaluation<NO_TRACE>(pos).value();
 
-  if (!Eval::useNNUE)
-      v = Evaluation<NO_TRACE>(pos).value();
-  else
-  {
-      // Scale and shift NNUE for compatibility with search and classical evaluation
-      auto  adjusted_NNUE = [&]()
-      {
-         int material = pos.non_pawn_material() + 2 * PawnValueMg * pos.count<PAWN>();
-         int scale =  641
-                    + material / 32
-                    - 4 * pos.rule50_count();
+  // Scale and shift NNUE for compatibility with search and classical evaluation
+  auto adjusted_NNUE = [&]() {
 
-         Value nnue = NNUE::evaluate(pos) * scale / 1024 + Tempo;
+      int material = pos.non_pawn_material() + 2 * PawnValueMg * pos.count<PAWN>();
+      int scale = 628 + material / 32;
 
-         if (pos.is_chess960())
-             nnue += fix_FRC(pos);
+      Value nnue = NNUE::evaluate(pos) * scale / 1024;
 
-         return nnue;
-      };
+      if (pos.is_chess960())
+          nnue += fix_FRC(pos);
 
-      // If there is PSQ imbalance use classical eval, with small probability if it is small
-      Value psq = Value(abs(eg_value(pos.psq_score())));
-      int   r50 = 16 + pos.rule50_count();
-      bool  largePsq = psq * 16 > (NNUEThreshold1 + pos.non_pawn_material() / 64) * r50;
-      bool  classical = largePsq || (psq > PawnValueMg / 4 && !(pos.this_thread()->nodes & 0xB));
+      // Sxale down the evaluation linearly when shuffling
+      nnue = nnue * (100 - pos.rule50_count()) / 100;
 
-      // Use classical evaluation for really low piece endgames.
-      // The most critical case is a bishop + A/H file pawn vs naked king draw.
-      bool strongClassical = pos.non_pawn_material() < 2 * RookValueMg && pos.count<PAWN>() < 2;
+      // Make sure evaluation does not hit the tablebase range
+      return std::clamp(nnue + Tempo, VALUE_TB_LOSS_IN_MAX_PLY + 1, VALUE_TB_WIN_IN_MAX_PLY - 1);
+  };
 
-      v = classical || strongClassical ? Evaluation<NO_TRACE>(pos).value() : adjusted_NNUE();
+  // If there is PSQ imbalance use classical eval, with small probability if it is small
+  Value psq = Value(abs(eg_value(pos.psq_score())));
+  int   r50 = 16 + pos.rule50_count();
+  bool  largePsq = psq * 16 > (NNUEThreshold1 + pos.non_pawn_material() / 64) * r50;
+  bool  classical = largePsq || (psq > PawnValueMg / 4 && !(pos.this_thread()->nodes & 0xB));
 
-      // If the classical eval is small and imbalance large, use NNUE nevertheless.
-      // For the case of opposite colored bishops, switch to NNUE eval with
-      // small probability if the classical eval is less than the threshold.
-      if (   largePsq
-          && !strongClassical
-          && (   abs(v) * 16 < NNUEThreshold2 * r50
-              || (   pos.opposite_bishops()
-                  && abs(v) * 16 < (NNUEThreshold1 + pos.non_pawn_material() / 64) * r50
-                  && !(pos.this_thread()->nodes & 0xB))))
-          v = adjusted_NNUE();
-  }
+  if (!classical)
+      return adjusted_NNUE();
 
-  // Damp down the evaluation linearly when shuffling
-  v = v * (100 - pos.rule50_count()) / 100;
+  Value v = Evaluation<NO_TRACE>(pos).value();
 
-  // Guarantee evaluation does not hit the tablebase range
-  v = std::clamp(v, VALUE_TB_LOSS_IN_MAX_PLY + 1, VALUE_TB_WIN_IN_MAX_PLY - 1);
+  // If the classical eval is small and imbalance large, use NNUE nevertheless.
+  // For the case of opposite colored bishops, switch to NNUE eval with
+  // small probability if the classical eval is less than the threshold.
+  if (   largePsq
+      && (     abs(v) * 16 < NNUEThreshold2 * r50
+      || (     pos.opposite_bishops()
+          &&   abs(v) * 16 < (NNUEThreshold1 + pos.non_pawn_material() / 64) * r50
+          && !(pos.this_thread()->nodes & 0xB))))
+      v = adjusted_NNUE();
 
   return v;
 }
+
 
 /// trace() is like evaluate(), but instead of returning a value, it returns
 /// a string (suitable for outputting to stdout) that contains the detailed
