@@ -1071,8 +1071,8 @@ Value Eval::evaluate(const Position& pos) {
   {
       // Scale and shift NNUE for compatibility with search and classical evaluation
       auto  adjusted_NNUE = [&](){
-         int mat = pos.non_pawn_material() + PawnValueMg * pos.count<PAWN>();
-         Value vnnue = NNUE::evaluate(pos) * (679 + mat / 32) / 1024 + Tempo;
+         int mat = pos.non_pawn_material() + 4 * PawnValueMg * pos.count<PAWN>();
+         Value vnnue = NNUE::evaluate(pos) * (580 + mat / 32) / 1024 + Tempo;
 
          // Scale down the evaluation linearly when shuffling
          vnnue = vnnue * (100 - pos.rule50_count()) / 100;
