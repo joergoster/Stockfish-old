@@ -165,15 +165,19 @@ namespace {
   uint64_t perft(Position& pos, Depth depth) {
 
     StateInfo st;
-    ASSERT_ALIGNED(&st, Eval::NNUE::kCacheLineSize);
-
     uint64_t cnt, nodes = 0;
     const bool leaf = (depth == 2);
+    Thread* thisThread = pos.this_thread();
 
     for (const auto& m : MoveList<LEGAL>(pos))
     {
-        if (Root && depth <= 1)
+        if (Root && !std::count(thisThread->rootMoves.begin(),
+                                thisThread->rootMoves.end(), m))
+            continue;
+
+        else if (Root && depth <= 1)
             cnt = 1, nodes++;
+
         else
         {
             pos.do_move(m, st);
@@ -181,9 +185,11 @@ namespace {
             nodes += cnt;
             pos.undo_move(m);
         }
+
         if (Root)
             sync_cout << UCI::move(m, pos.is_chess960()) << ": " << cnt << sync_endl;
     }
+
     return nodes;
   }
 
@@ -219,8 +225,36 @@ void MainThread::search() {
 
   if (Limits.perft)
   {
-      nodes = perft<true>(rootPos, Limits.perft);
-      sync_cout << "\nNodes searched: " << nodes << "\n" << sync_endl;
+      if (Threads.size() > 1) // Multi-threaded perft
+      {
+          // First, clear root moves for all threads
+          for (auto& th : Threads)
+              th->rootMoves.clear();
+
+          std::vector<Move> legalMoves;
+
+          for (const auto& m : MoveList<LEGAL>(rootPos))
+              legalMoves.emplace_back(m);
+
+          // Second, distribute root moves among available threads
+          while (legalMoves.size())
+          {
+              for (auto& th : Threads)
+              {
+                  if (legalMoves.empty())
+                      break;
+
+                  th->rootMoves.emplace_back(legalMoves.front());
+                  legalMoves.erase(legalMoves.begin(), legalMoves.begin() + 1);
+              }
+          }
+      }
+
+      Threads.start_searching();
+      Thread::search();
+      Threads.wait_for_search_finished();
+
+      sync_cout << "\nNodes searched: " << Threads.nodes_searched() << "\n" << sync_endl;
       return;
   }
 
@@ -233,6 +267,7 @@ void MainThread::search() {
   if (rootMoves.empty())
   {
       rootMoves.emplace_back(MOVE_NONE);
+
       sync_cout << "info depth 0 score "
                 << UCI::value(rootPos.checkers() ? -VALUE_MATE : VALUE_DRAW)
                 << sync_endl;
@@ -293,10 +328,18 @@ void MainThread::search() {
 
 void Thread::search() {
 
+  // Each thread runs its own perft
+  if (Limits.perft)
+  {
+      nodes = perft<true>(rootPos, Limits.perft);
+      return;
+  }
+
   // To allow access to (ss-7) up to (ss+2), the stack must be oversized.
   // The former is needed to allow update_continuation_histories(ss-1, ...),
   // which accesses its argument at ss-6, also near the root.
   // The latter is needed for statScores and killer initialization.
+
   Stack stack[MAX_PLY+10], *ss = stack+7;
   Move  pv[MAX_PLY+1];
   Value bestValue, alpha, beta, delta;
