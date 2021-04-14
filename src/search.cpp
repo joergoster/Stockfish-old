@@ -1579,11 +1579,10 @@ moves_loop: // When in check, search starts from here
 
       moveCount++;
 
-      // Futility and moveCount pruning
-      if (   !givesCheck
+      // Futility pruning and moveCount pruning
+      if (    bestValue > VALUE_TB_LOSS_IN_MAX_PLY
+          && !givesCheck
           &&  futilityBase > -VALUE_KNOWN_WIN
-          &&  bestValue > VALUE_TB_LOSS_IN_MAX_PLY
-          &&  pos.non_pawn_material(pos.side_to_move()) > BishopValueMg
           &&  type_of(move) != PROMOTION)
       {
 
@@ -1607,6 +1606,7 @@ moves_loop: // When in check, search starts from here
 
       // Do not search moves with negative SEE values
       if (    bestValue > VALUE_TB_LOSS_IN_MAX_PLY
+          &&  pos.non_pawn_material(pos.side_to_move()) > BishopValueMg
           && !pos.see_ge(move))
           continue;
 
