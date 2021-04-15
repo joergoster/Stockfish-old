@@ -1077,7 +1077,7 @@ moves_loop: // When in check, search starts from here
 
               // SEE based pruning
               if (  !pos.see_ge(move, Value(-218) * depth)
-                  && pos.non_pawn_material(us) > BishopValueMg) // (~25 Elo)
+                  && pos.non_pawn_material(~us) > BishopValueMg) // (~25 Elo)
                   continue;
           }
           else
@@ -1100,7 +1100,7 @@ moves_loop: // When in check, search starts from here
 
               // Prune moves with negative SEE (~20 Elo)
               if (  !pos.see_ge(move, Value(-(30 - std::min(lmrDepth, 18)) * lmrDepth * lmrDepth))
-                  && pos.non_pawn_material(us) > BishopValueMg)
+                  && pos.non_pawn_material(~us) > BishopValueMg)
                   continue;
           }
       }
