@@ -80,25 +80,26 @@ void TranspositionTable::resize(size_t mbSize) {
 }
 
 
-/// TranspositionTable::clear() initializes the entire transposition table to zero,
+/// TranspositionTable::clear() zero-initializes the entire transposition table
 //  in a multi-threaded way.
 
 void TranspositionTable::clear() {
 
   std::vector<std::thread> threads;
+  size_t requested = size_t(Options["Threads"]);
 
-  for (size_t idx = 0; idx < Options["Threads"]; ++idx)
+  for (size_t idx = 0; idx < requested; ++idx)
   {
-      threads.emplace_back([this, idx]() {
+      threads.emplace_back([this, requested, idx]() {
 
           // Thread binding gives faster search on systems with a first-touch policy
-          if (Options["Threads"] > 8)
+          if (requested > 8)
               WinProcGroup::bindThisThread(idx);
 
           // Each thread will zero its part of the hash table
-          const size_t stride = size_t(clusterCount / Options["Threads"]),
+          const size_t stride = size_t(clusterCount / requested),
                        start  = size_t(stride * idx),
-                       len    = idx != Options["Threads"] - 1 ?
+                       len    = idx != requested - 1 ?
                                 stride : clusterCount - start;
 
           std::memset(&table[start], 0, len * sizeof(Cluster));
@@ -107,6 +108,16 @@ void TranspositionTable::clear() {
 
   for (std::thread& th : threads)
       th.join();
+
+  // Reinstate group affinity for the search threads
+  if (requested > 8)
+  {
+      for (Thread* th : Threads)
+      {
+          size_t threadID = size_t(th->id());
+          WinProcGroup::bindThisThread(threadID);
+      }
+  }
 }
 
 

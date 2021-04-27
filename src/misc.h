@@ -78,24 +78,23 @@ T* align_ptr_up(T* ptr)
   return reinterpret_cast<T*>(reinterpret_cast<char*>((ptrint + (Alignment - 1)) / Alignment * Alignment));
 }
 
+
 template <typename T>
 class ValueListInserter {
 public:
   ValueListInserter(T* v, std::size_t& s) :
-    values(v),
-    size(&s)
-  {
-  }
+    values(v), size(&s) {}
 
   void push_back(const T& value) { values[(*size)++] = value; }
+
 private:
   T* values;
   std::size_t* size;
 };
 
+
 template <typename T, std::size_t MaxSize>
 class ValueList {
-
 public:
   std::size_t size() const { return size_; }
   void resize(std::size_t newSize) { size_ = newSize; }
@@ -121,6 +120,7 @@ private:
   std::size_t size_ = 0;
 };
 
+
 /// xorshift64star Pseudo-Random Number Generator
 /// This class is based on original code written and dedicated
 /// to the public domain by Sebastiano Vigna (2014).
@@ -141,14 +141,12 @@ class PRNG {
   uint64_t s;
 
   uint64_t rand64() {
-
     s ^= s >> 12, s ^= s << 25, s ^= s >> 27;
     return s * 2685821657736338717LL;
   }
 
 public:
   PRNG(uint64_t seed) : s(seed) { assert(seed); }
-
   template<typename T> T rand() { return T(rand64()); }
 
   /// Special generator used to fast init magic numbers.
@@ -171,6 +169,7 @@ inline uint64_t mul_hi64(uint64_t a, uint64_t b) {
 #endif
 }
 
+
 /// Under Windows it is not possible for a process to run on more than one
 /// logical processor group. This usually means to be limited to use max 64
 /// cores. To overcome this, some special platform specific API should be
@@ -180,6 +179,7 @@ inline uint64_t mul_hi64(uint64_t a, uint64_t b) {
 namespace WinProcGroup {
   void bindThisThread(size_t idx);
 }
+
 
 namespace CommandLine {
   void init(int argc, char* argv[]);

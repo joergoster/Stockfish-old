@@ -482,7 +482,7 @@ void bindThisThread(size_t) {}
 #else
 
 /// best_group() retrieves logical processor information using Windows specific
-/// API and returns the best group id for the thread with index idx. Original
+/// APIs, and returns the best group id for the thread with index idx. Original
 /// code from Texel by Peter Österlund.
 
 int best_group(size_t idx) {
@@ -490,12 +490,14 @@ int best_group(size_t idx) {
   int threads = 0;
   int nodes = 0;
   int cores = 0;
+
   DWORD returnLength = 0;
   DWORD byteOffset = 0;
 
   // Early exit if the needed API is not available at runtime
   HMODULE k32 = GetModuleHandle("Kernel32.dll");
   auto fun1 = (fun1_t)(void(*)())GetProcAddress(k32, "GetLogicalProcessorInformationEx");
+
   if (!fun1)
       return -1;
 
@@ -552,17 +554,11 @@ int best_group(size_t idx) {
 }
 
 
-/// bindThisThread() set the group affinity of the current thread
+/// bindThisThread() sets the group affinity for the current thread
 
 void bindThisThread(size_t idx) {
 
-  // Use only local variables to be thread-safe
-  int group = best_group(idx);
-
-  if (group == -1)
-      return;
-
-  // Early exit if the needed API are not available at runtime
+  // Early exit if the needed APIs are not available at runtime
   HMODULE k32 = GetModuleHandle("Kernel32.dll");
   auto fun2 = (fun2_t)(void(*)())GetProcAddress(k32, "GetNumaNodeProcessorMaskEx");
   auto fun3 = (fun3_t)(void(*)())GetProcAddress(k32, "SetThreadGroupAffinity");
@@ -570,7 +566,16 @@ void bindThisThread(size_t idx) {
   if (!fun2 || !fun3)
       return;
 
+  // Use a local variable to be thread-safe
+  int group = best_group(idx);
+
+  if (group == -1)
+      return;
+
+  sync_cout << "info string Binding thread " << idx << " to group " group << sync_endl;
+
   GROUP_AFFINITY affinity;
+
   if (fun2(group, &affinity))
       fun3(GetCurrentThread(), &affinity, nullptr);
 }
