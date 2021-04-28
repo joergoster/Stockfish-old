@@ -558,6 +558,12 @@ int best_group(size_t idx) {
 
 void bindThisThread(size_t idx) {
 
+  // Use a local variable to be thread-safe
+  int group = best_group(idx);
+
+  if (group == -1)
+      return;
+
   // Early exit if the needed APIs are not available at runtime
   HMODULE k32 = GetModuleHandle("Kernel32.dll");
   auto fun2 = (fun2_t)(void(*)())GetProcAddress(k32, "GetNumaNodeProcessorMaskEx");
@@ -566,13 +572,7 @@ void bindThisThread(size_t idx) {
   if (!fun2 || !fun3)
       return;
 
-  // Use a local variable to be thread-safe
-  int group = best_group(idx);
-
-  if (group == -1)
-      return;
-
-  sync_cout << "info string Binding thread " << idx << " to group " group << sync_endl;
+  sync_cout << "info string Binding thread " << idx << " to group " << group << sync_endl;
 
   GROUP_AFFINITY affinity;
 
