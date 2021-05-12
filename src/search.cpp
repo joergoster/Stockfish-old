@@ -151,6 +151,8 @@ namespace {
   template <NodeType NT>
   Value qsearch(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth = 0);
 
+  Value negamax(Position& pos, BasicStack* ss, Depth depth);
+
   Value value_to_tt(Value v, int ply);
   Value value_from_tt(Value v, int ply, int r50c);
   void update_pv(Move* pv, Move move, Move* childPv);
@@ -236,6 +238,42 @@ void MainThread::search() {
       sync_cout << "info depth 0 score "
                 << UCI::value(rootPos.checkers() ? -VALUE_MATE : VALUE_DRAW)
                 << sync_endl;
+  } // TODO Limits.movetime
+  else if (!Limits.use_time_management() && Options["Minimax Search"])
+  {
+      BasicStack stack[MAX_PLY+2], *ss = stack+2;
+      Value bestValue = VALUE_ZERO;
+      contempt = SCORE_ZERO;
+
+      while (++rootDepth < MAX_PLY && !Threads.stop)
+      {
+          bestValue = negamax(rootPos, ss, rootDepth);
+
+          std::stable_sort(rootMoves.begin(), rootMoves.end());
+
+          sync_cout << UCI::pv(rootPos, rootDepth, -VALUE_INFINITE, VALUE_INFINITE) << sync_endl;
+
+          if (Threads.stop)
+              break;
+
+          // Have we reached the target depth?
+          if (   Limits.depth
+              && rootDepth == Limits.depth)
+              break;
+
+          // Have we found a "mate in x"?
+          if (   Limits.mate
+              && bestValue >= VALUE_MATE_IN_MAX_PLY
+              && VALUE_MATE - bestValue <= 2 * Limits.mate)
+              break;
+
+          // Check for the number of nodes searched
+          if (   Limits.nodes
+              && Threads.nodes_searched() >= uint64_t(Limits.nodes))
+              break;
+
+          bestValue = VALUE_ZERO;
+      }
   }
   else
   {
@@ -1444,6 +1482,7 @@ moves_loop: // When in check, search starts from here
 
   // qsearch() is the quiescence search function, which is called by the main search
   // function with zero depth, or recursively with further decreasing depth per call.
+
   template <NodeType NT>
   Value qsearch(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth) {
 
@@ -1667,6 +1706,94 @@ moves_loop: // When in check, search starts from here
               ttDepth, bestMove, ss->staticEval);
 
     assert(bestValue > -VALUE_INFINITE && bestValue < VALUE_INFINITE);
+
+    return bestValue;
+  }
+
+
+  // Minimax function in negamax style
+
+  Value negamax(Position& pos, BasicStack* ss, Depth depth) {
+
+    StateInfo st;
+    ASSERT_ALIGNED(&st, Eval::NNUE::CacheLineSize);
+
+    Thread* thisThread = pos.this_thread();
+    Value bestValue, value;
+    bool inCheck = !!pos.checkers();
+
+    // Start with a fresh pv
+    ss->pv.clear();
+    (ss+1)->ply = ss->ply + 1;
+    bestValue = -VALUE_INFINITE;
+
+    thisThread->selDepth = std::max(thisThread->selDepth, ss->ply);
+
+    // If we have no moves left, it must be mate or stalemate!
+    if (!MoveList<LEGAL>(pos).size())
+        return inCheck ? mated_in(ss->ply) : VALUE_DRAW;
+
+    // Have we reached maximum search depth?
+    if (ss->ply >= MAX_PLY)
+        return inCheck ? VALUE_ZERO : evaluate(pos);
+
+    // Check for draw by repetition and 50-move rule
+    if (pos.is_draw(ss->ply))
+        return VALUE_DRAW;
+
+    // We can't call evaluate() when in check
+    if (depth == 0)
+    {
+        if (!inCheck)
+            return evaluate(pos);
+
+        else
+            depth += 1;
+    }
+
+    // Only count nodes we are evaluating
+    if (ss->ply >= 1)
+        thisThread->nodes.fetch_add(-1, std::memory_order_relaxed);
+
+    // Search all legal moves
+    for (auto& move : MoveList<LEGAL>(pos))
+    {
+        pos.do_move(move, st);
+        value = -negamax(pos, ss+1, depth-1);
+        pos.undo_move(move);
+
+        // Do we have a new best value?
+        if (value > bestValue)
+        {
+            bestValue = value;
+
+            // Reset and insert current best move
+            ss->pv.clear();
+            ss->pv.push_back(move);
+
+            // Append child pv
+            for (auto& m : (ss+1)->pv)
+                ss->pv.push_back(m);
+        }
+
+        // At root, assign the search value and the PV
+        // to the corresponding root move.
+        if (ss->ply == 0)
+        {
+            RootMove& rm = *std::find(thisThread->rootMoves.begin(),
+                                      thisThread->rootMoves.end(), move);
+
+            rm.score = value;
+            rm.selDepth = thisThread->selDepth;
+            thisThread->selDepth = 0;
+
+            rm.pv.resize(1);
+
+            // Append child pv
+            for (auto& m : (ss+1)->pv)
+                rm.pv.push_back(m);
+        }
+    }
 
     return bestValue;
   }

@@ -40,6 +40,7 @@ constexpr int CounterMovePruneThreshold = 0;
 /// its own array of Stack objects, indexed by the current ply.
 
 struct Stack {
+
   Move* pv;
   PieceToHistory* continuationHistory;
   int ply;
@@ -52,6 +53,21 @@ struct Stack {
   bool inCheck;
   bool ttPv;
   bool ttHit;
+};
+
+
+/// BasicStack struct is a minimalist version of the
+/// bigger Stack struct, used by the minimax search.
+
+struct BasicStack {
+
+  BasicStack() {
+    pv.reserve(8);
+    ply = 0;
+  }
+
+  std::vector<Move> pv;
+  int ply;
 };
 
 
