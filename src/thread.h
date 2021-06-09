@@ -68,7 +68,7 @@ public:
   Position rootPos;
   StateInfo rootState;
   Search::RootMoves rootMoves;
-  Depth rootDepth, completedDepth;
+  Depth rootDepth, completedDepth, extensionsInEffect;
   CounterMoveHistory counterMoves;
   ButterflyHistory mainHistory;
   LowPlyHistory lowPlyHistory;

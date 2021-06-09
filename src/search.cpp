@@ -1055,9 +1055,10 @@ moves_loop: // When in check, search starts from here
       // a reduced search on all the other moves but the ttMove and if the
       // result is lower than ttValue minus a margin, then we will extend the ttMove.
       if (   !rootNode
+          && !excludedMove // Avoid recursive singular search
           &&  depth >= 7
           &&  move == ttMove
-          && !excludedMove // Avoid recursive singular search
+          &&  thisThread->extensionsInEffect < thisThread->rootDepth * 3 / 4
        /* &&  ttValue != VALUE_NONE Already implicit in the next condition */
           &&  abs(ttValue) < VALUE_KNOWN_WIN
           && (tte->bound() & BOUND_LOWER)
@@ -1074,6 +1075,7 @@ moves_loop: // When in check, search starts from here
           {
               extension = 1;
               singularQuietLMR = !ttCapture;
+
               if (!PvNode && value < singularBeta - 93)
                   extension = 2;
           }
@@ -1105,6 +1107,7 @@ moves_loop: // When in check, search starts from here
 
       // Add extension to new depth
       newDepth += extension;
+      thisThread->extensionsInEffect += extension;
 
       // Speculative prefetch as early as possible
       prefetch(TT.first_entry(pos.key_after(move)));
@@ -1226,6 +1229,7 @@ moves_loop: // When in check, search starts from here
 
       // Step 18. Undo move
       pos.undo_move(move);
+      thisThread->extensionsInEffect -= extension;
 
       assert(value > -VALUE_INFINITE && value < VALUE_INFINITE);
 
@@ -1238,6 +1242,8 @@ moves_loop: // When in check, search starts from here
 
       if (rootNode)
       {
+          assert(thisThread->extensionsInEffect == 0);
+
           RootMove& rm = *std::find(thisThread->rootMoves.begin(),
                                     thisThread->rootMoves.end(), move);
 
