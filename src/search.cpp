@@ -1063,7 +1063,7 @@ moves_loop: // When in check, search starts from here
           && (tte->bound() & BOUND_LOWER)
           &&  tte->depth() >= depth - 3)
       {
-          Value singularBeta = ttValue - 3 * ss->ply;
+          Value singularBeta = ttValue - 4 * ss->ply;
           Depth singularDepth = (depth - 1) / 2;
 
           ss->excludedMove = move;
