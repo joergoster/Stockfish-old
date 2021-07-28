@@ -524,9 +524,9 @@ namespace {
 
     // Check if we have an upcoming move which draws by repetition, or
     // if the opponent had an alternative move earlier to this position.
-    if (   !rootNode
-        && pos.rule50_count() >= 3
+    if (  !rootNode
         && alpha < VALUE_DRAW
+    /*  && pos.rule50_count() >= 3 Already implicit in the next condition */
         && pos.has_game_cycle(ss->ply))
     {
         alpha = value_draw(pos.this_thread());
@@ -547,6 +547,7 @@ namespace {
     StateInfo st;
     ASSERT_ALIGNED(&st, Eval::NNUE::CacheLineSize);
 
+    Thread* thisThread;
     TTEntry* tte;
     Key posKey;
     Move ttMove, move, excludedMove, bestMove;
@@ -559,13 +560,13 @@ namespace {
     int moveCount, captureCount, quietCount;
 
     // Step 1. Initialize node
-    Thread* thisThread = pos.this_thread();
-    ss->inCheck        = pos.checkers();
-    priorCapture       = pos.captured_piece();
-    Color us           = pos.side_to_move();
-    moveCount          = captureCount = quietCount = ss->moveCount = 0;
-    bestValue          = -VALUE_INFINITE;
-    maxValue           = VALUE_INFINITE;
+    thisThread   = pos.this_thread();
+    ss->inCheck  = pos.checkers();
+    priorCapture = pos.captured_piece();
+    Color us     = pos.side_to_move();
+    bestValue    = -VALUE_INFINITE;
+    maxValue     = VALUE_INFINITE;
+    moveCount = captureCount = quietCount = ss->moveCount = 0;
 
     // Check for the available remaining time
     if (thisThread == Threads.main())
@@ -724,8 +725,6 @@ namespace {
         }
     }
 
-    CapturePieceToHistory& captureHistory = thisThread->captureHistory;
-
     // Step 6. Static evaluation of the position
     if (ss->inCheck)
     {
@@ -761,7 +760,7 @@ namespace {
 
         // Save static evaluation into transposition table
         if(!excludedMove)
-        tte->save(posKey, VALUE_NONE, ss->ttPv, BOUND_NONE, DEPTH_NONE, MOVE_NONE, eval);
+            tte->save(posKey, VALUE_NONE, ss->ttPv, BOUND_NONE, DEPTH_NONE, MOVE_NONE, eval);
     }
 
     // Use static evaluation difference to improve quiet move ordering
@@ -787,12 +786,12 @@ namespace {
 
     // Step 8. Null move search with verification search (~40 Elo)
     if (   !PvNode
+        && !excludedMove
         && (ss-1)->currentMove != MOVE_NULL
         && (ss-1)->statScore < 23767
         &&  eval >= beta
         &&  eval >= ss->staticEval
         &&  ss->staticEval >= beta - 20 * depth - 22 * improving + 168 * ss->ttPv + 159
-        && !excludedMove
         &&  pos.non_pawn_material(us)
         && (ss->ply >= thisThread->nmpMinPly || us != thisThread->nmpColor))
     {
@@ -847,14 +846,16 @@ namespace {
         // there and in further interactions with transposition table cutoff depth is set to depth - 3
         // because probCut search has depth set to depth - 4 but we also do a move before it
         // so effective depth is equal to depth - 3
-        && !(   ss->ttHit
-             && tte->depth() >= depth - 3
-             && ttValue != VALUE_NONE
-             && ttValue < probCutBeta))
+        && (  !ss->ttHit
+            || tte->depth() < depth - 3
+            || ttValue == VALUE_NONE
+            || ttValue >= probCutBeta))
     {
         assert(probCutBeta < VALUE_INFINITE);
 
-        MovePicker mp(pos, ttMove, probCutBeta - ss->staticEval, &captureHistory);
+        // Initialize a movepicker opject for the probcut search
+        MovePicker mp(pos, ttMove, probCutBeta - ss->staticEval, &thisThread->captureHistory);
+
         int probCutCount = 0;
         bool ttPv = ss->ttPv;
         ss->ttPv = false;
@@ -874,7 +875,6 @@ namespace {
                                                                           [captureOrPromotion]
                                                                           [pos.moved_piece(move)]
                                                                           [to_sq(move)];
-
                 pos.do_move(move, st);
 
                 // Perform a preliminary qsearch to verify that the move holds
@@ -888,23 +888,25 @@ namespace {
 
                 if (value >= probCutBeta)
                 {
-                    // if transposition table doesn't have equal or more deep info write probCut data into it
-                    if ( !(ss->ttHit
-                       && tte->depth() >= depth - 3
-                       && ttValue != VALUE_NONE))
+                    // If transposition table doesn't have equal or deeper
+                    // info, write probCut data into it.
+                    if (  !ss->ttHit
+                        || tte->depth() < depth - 3
+                        || ttValue == VALUE_NONE)
                         tte->save(posKey, value_to_tt(value, ss->ply), ttPv,
-                            BOUND_LOWER,
-                            depth - 3, move, ss->staticEval);
+                                  BOUND_LOWER, depth - 3, move, ss->staticEval);
+
                     return value;
                 }
             }
-         ss->ttPv = ttPv;
+
+         ss->ttPv = ttPv; // Restore previous state
     }
 
     // Step 10. If the position is not in TT, decrease depth by 2
-    if (   PvNode
-        && depth >= 6
-        && !ttMove)
+    if (    PvNode
+        && !ttMove
+        &&  depth >= 6)
         depth -= 2;
 
 moves_loop: // When in check, search starts from here
@@ -913,32 +915,27 @@ moves_loop: // When in check, search starts from here
 
     // Step 11. A small Probcut idea, when we are in check
     probCutBeta = beta + 409;
-    if (   ss->inCheck
-        && !PvNode
+    if (  !PvNode
+        && ss->inCheck
         && depth >= 4
         && ttCapture
-        && (tte->bound() & BOUND_LOWER)
         && tte->depth() >= depth - 3
+        && (tte->bound() & BOUND_LOWER)
         && ttValue >= probCutBeta
         && abs(ttValue) <= VALUE_KNOWN_WIN
-        && abs(beta) <= VALUE_KNOWN_WIN
-       )
+        && abs(beta) <= VALUE_KNOWN_WIN)
         return probCutBeta;
-
 
     const PieceToHistory* contHist[] = { (ss-1)->continuationHistory, (ss-2)->continuationHistory,
                                           nullptr                   , (ss-4)->continuationHistory,
                                           nullptr                   , (ss-6)->continuationHistory };
 
+    CapturePieceToHistory& captureHistory = thisThread->captureHistory;
     Move countermove = thisThread->counterMoves[pos.piece_on(prevSq)][prevSq];
 
-    MovePicker mp(pos, ttMove, depth, &thisThread->mainHistory,
-                                      &thisThread->lowPlyHistory,
-                                      &captureHistory,
-                                      contHist,
-                                      countermove,
-                                      ss->killers,
-                                      ss->ply);
+    // Initialize a movepicker object for the main search
+    MovePicker mp(pos, ttMove, depth, &thisThread->mainHistory, &thisThread->lowPlyHistory,
+                                      &captureHistory, contHist, countermove, ss->killers, ss->ply);
 
     value = bestValue;
     singularQuietLMR = moveCountPruning = false;
@@ -948,8 +945,8 @@ moves_loop: // When in check, search starts from here
     // at a depth equal or greater than the current depth, and the result of this search was a fail low.
     bool likelyFailLow =    PvNode
                          && ttMove
-                         && (tte->bound() & BOUND_UPPER)
-                         && tte->depth() >= depth;
+                         && tte->depth() >= depth
+                         && (tte->bound() & BOUND_UPPER);
 
     // Step 12. Loop through all pseudo-legal moves until no moves remain
     // or a beta cutoff occurs.
@@ -1044,13 +1041,13 @@ moves_loop: // When in check, search starts from here
       // a reduced search on all the other moves but the ttMove and if the
       // result is lower than ttValue minus a margin, then we will extend the ttMove.
       if (   !rootNode
+          && !excludedMove // Avoid recursive singular search
           &&  depth >= 7
           &&  move == ttMove
-          && !excludedMove // Avoid recursive singular search
        /* &&  ttValue != VALUE_NONE Already implicit in the next condition */
           &&  abs(ttValue) < VALUE_KNOWN_WIN
-          && (tte->bound() & BOUND_LOWER)
-          &&  tte->depth() >= depth - 3)
+          &&  tte->depth() >= depth - 3
+          && (tte->bound() & BOUND_LOWER))
       {
           Value singularBeta = ttValue - 2 * depth;
           Depth singularDepth = (depth - 1) / 2;
@@ -1360,6 +1357,7 @@ moves_loop: // When in check, search starts from here
     StateInfo st;
     ASSERT_ALIGNED(&st, Eval::NNUE::CacheLineSize);
 
+    Thread* thisThread;
     TTEntry* tte;
     Key posKey;
     Move ttMove, move, bestMove;
@@ -1375,7 +1373,7 @@ moves_loop: // When in check, search starts from here
         ss->pv[0] = MOVE_NONE;
     }
 
-    Thread* thisThread = pos.this_thread();
+    thisThread = pos.this_thread();
     bestMove = MOVE_NONE;
     ss->inCheck = pos.checkers();
     moveCount = 0;
@@ -1391,7 +1389,7 @@ moves_loop: // When in check, search starts from here
     // TT entry depth that we are going to use. Note that in qsearch we use
     // only two types of depth in TT: DEPTH_QS_CHECKS or DEPTH_QS_NO_CHECKS.
     ttDepth = ss->inCheck || depth >= DEPTH_QS_CHECKS ? DEPTH_QS_CHECKS
-                                                  : DEPTH_QS_NO_CHECKS;
+                                                      : DEPTH_QS_NO_CHECKS;
     // Transposition table lookup
     posKey = pos.key();
     tte = TT.probe(posKey, ss->ttHit);
@@ -1458,10 +1456,8 @@ moves_loop: // When in check, search starts from here
     // to search the moves. Because the depth is <= 0 here, only captures,
     // queen promotions, and other checks (only if depth >= DEPTH_QS_CHECKS)
     // will be generated.
-    MovePicker mp(pos, ttMove, depth, &thisThread->mainHistory,
-                                      &thisThread->captureHistory,
-                                      contHist,
-                                      to_sq((ss-1)->currentMove));
+    MovePicker mp(pos, ttMove, depth, &thisThread->mainHistory, &thisThread->captureHistory,
+                                      contHist, to_sq((ss-1)->currentMove));
 
     // Loop through the moves until no moves remain or a beta cutoff occurs
     while ((move = mp.next_move()) != MOVE_NONE)
@@ -1515,7 +1511,6 @@ moves_loop: // When in check, search starts from here
                                                                 [captureOrPromotion]
                                                                 [pos.moved_piece(move)]
                                                                 [to_sq(move)];
-
       // Continuation history based pruning
       if (  !captureOrPromotion
           && bestValue > VALUE_TB_LOSS_IN_MAX_PLY
@@ -1547,7 +1542,7 @@ moves_loop: // When in check, search starts from here
               else
                   break; // Fail high
           }
-       }
+      }
     }
 
     // All legal moves have been searched. A special case: if we're in check
