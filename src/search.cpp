@@ -530,6 +530,7 @@ namespace {
         && pos.has_game_cycle(ss->ply))
     {
         alpha = value_draw(pos.this_thread());
+
         if (alpha >= beta)
             return alpha;
     }
@@ -588,11 +589,9 @@ namespace {
         // Step 3. Mate distance pruning. Even if we mate at the next move our score
         // would be at best mate_in(ss->ply+1), but if alpha is already bigger because
         // a shorter mate was found upward in the tree then there is no need to search
-        // because we will never beat the current alpha. Same logic but with reversed
-        // signs applies also in the opposite condition of being mated instead of giving
-        // mate. In this case return a fail-high score.
-        alpha = std::max(mated_in(ss->ply), alpha);
+        // because we will never beat the current alpha.
         beta = std::min(mate_in(ss->ply+1), beta);
+
         if (alpha >= beta)
             return alpha;
     }
@@ -622,6 +621,7 @@ namespace {
     ttValue = ss->ttHit ? value_from_tt(tte->value(), ss->ply, pos.rule50_count()) : VALUE_NONE;
     ttMove =  rootNode ? thisThread->rootMoves[thisThread->pvIdx].pv[0]
             : ss->ttHit    ? tte->move() : MOVE_NONE;
+
     if (!excludedMove)
         ss->ttPv = PvNode || (ss->ttHit && tte->is_pv());
 
@@ -752,7 +752,6 @@ namespace {
     else
     {
         // In case of null move search use previous static eval with a different sign
-        // and addition of two tempos
         if ((ss-1)->currentMove != MOVE_NULL)
             ss->staticEval = eval = evaluate(pos);
         else
@@ -834,47 +833,47 @@ namespace {
         }
     }
 
-    probCutBeta = beta + 209 - 44 * improving;
-
     // Step 9. ProbCut (~4 Elo)
     // If we have a good enough capture and a reduced search returns a value
     // much above beta, we can (almost) safely prune the previous move.
-    if (   !PvNode
-        &&  depth > 4
-        &&  abs(beta) < VALUE_TB_WIN_IN_MAX_PLY
+    if (  !PvNode
+        && depth > 4
+        && abs(beta) < VALUE_TB_WIN_IN_MAX_PLY)
+    {
+        probCutBeta = beta + 209 - 44 * improving;
+
         // if value from transposition table is lower than probCutBeta, don't attempt probCut
         // there and in further interactions with transposition table cutoff depth is set to depth - 3
         // because probCut search has depth set to depth - 4 but we also do a move before it
-        // so effective depth is equal to depth - 3
-        && (  !ss->ttHit
+        // so effective depth is equal to depth - 3.
+        if (  !ss->ttHit
             || tte->depth() < depth - 3
-            || ttValue == VALUE_NONE
-            || ttValue >= probCutBeta))
-    {
-        assert(probCutBeta < VALUE_INFINITE);
+         /* || ttValue == VALUE_NONE Already implicit in the next condition */
+            || ttValue >= probCutBeta)
+        {
+            assert(probCutBeta < VALUE_INFINITE);
 
-        // Initialize a movepicker opject for the probcut search
-        MovePicker mp(pos, ttMove, probCutBeta - ss->staticEval, &thisThread->captureHistory);
+            // Initialize a movepicker opject for the probcut search
+            MovePicker mp(pos, ttMove, probCutBeta - ss->staticEval, &thisThread->captureHistory);
 
-        int probCutCount = 0;
-        bool ttPv = ss->ttPv;
-        ss->ttPv = false;
+            int probCutCount = 0;
+            int maxMovesToSearch = cutNode ? 4 : 2;
+            bool ttPv = ss->ttPv;
+            ss->ttPv = false;
 
-        while (   (move = mp.next_move()) != MOVE_NONE
-               && probCutCount < 2 + 2 * cutNode)
-            if (move != excludedMove && pos.legal(move))
+            while ((move = mp.next_move()) != MOVE_NONE)
             {
+                if (move == excludedMove || !pos.legal(move))
+                    continue;
+
                 assert(pos.capture_or_promotion(move));
                 assert(depth >= 5);
 
-                captureOrPromotion = true;
                 probCutCount++;
 
                 ss->currentMove = move;
-                ss->continuationHistory = &thisThread->continuationHistory[ss->inCheck]
-                                                                          [captureOrPromotion]
-                                                                          [pos.moved_piece(move)]
-                                                                          [to_sq(move)];
+                ss->continuationHistory = &thisThread->continuationHistory[ss->inCheck][true]
+                                                                [pos.moved_piece(move)][to_sq(move)];
                 pos.do_move(move, st);
 
                 // Perform a preliminary qsearch to verify that the move holds
@@ -898,9 +897,13 @@ namespace {
 
                     return value;
                 }
+
+                if (probCutCount == maxMovesToSearch)
+                    break;
             }
 
-         ss->ttPv = ttPv; // Restore previous state
+            ss->ttPv = ttPv; // Restore previous state
+        }
     }
 
     // Step 10. If the position is not in TT, decrease depth by 2
