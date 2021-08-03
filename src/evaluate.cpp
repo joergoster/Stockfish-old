@@ -1031,6 +1031,9 @@ make_v:
     // Evaluation grain
     v = (v / 16) * 16;
 
+    // Scale down the evaluation linearly when shuffling
+    v = v * std::min(100 - pos.rule50_count(), 64) / 64;
+
     // Side to move point of view
     v = (pos.side_to_move() == WHITE ? v : -v);
 
@@ -1099,6 +1102,9 @@ Value Eval::evaluate(const Position& pos) {
          if (pos.is_chess960())
              nnue += fix_FRC(pos);
 
+         // Scale down the evaluation linearly when shuffling
+         nnue = nnue * std::min(100 - pos.rule50_count(), 64) / 64;
+
          return nnue;
       };
 
@@ -1112,10 +1118,7 @@ Value Eval::evaluate(const Position& pos) {
                     : adjusted_NNUE();                   // NNUE
   }
 
-  // Damp down the evaluation linearly when shuffling
-  v = v * (100 - pos.rule50_count()) / 100;
-
-  // Guarantee evaluation does not hit the tablebase range
+  // Make sure evaluation does not hit the tablebase range
   v = std::clamp(v, VALUE_TB_LOSS_IN_MAX_PLY + 1, VALUE_TB_WIN_IN_MAX_PLY - 1);
 
   return v;
