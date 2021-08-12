@@ -51,7 +51,7 @@ typedef bool(*fun3_t)(HANDLE, CONST GROUP_AFFINITY*, PGROUP_AFFINITY);
 #include <sys/mman.h>
 #endif
 
-#if defined(__APPLE__) || defined(__ANDROID__) || defined(__OpenBSD__) || (defined(__GLIBCXX__) && !defined(_GLIBCXX_HAVE_ALIGNED_ALLOC) && !defined(_WIN32))
+#if defined(__APPLE__) || defined(__ANDROID__) || defined(__OpenBSD__) || (defined(__GLIBCXX__) && !defined(_GLIBCXX_HAVE_ALIGNED_ALLOC) && !defined(_WIN32)) || defined(__e2k__)
 #define POSIXALIGNEDALLOC
 #include <stdlib.h>
 #endif
@@ -191,6 +191,18 @@ std::string compiler_info() {
      compiler += "MSVC ";
      compiler += "(version ";
      compiler += stringify(_MSC_FULL_VER) "." stringify(_MSC_BUILD);
+     compiler += ")";
+  #elif defined(__e2k__) && defined(__LCC__)
+    #define dot_ver2(n) \
+      compiler += (char)'.'; \
+      compiler += (char)('0' + (n) / 10); \
+      compiler += (char)('0' + (n) % 10);
+
+     compiler += "MCST LCC ";
+     compiler += "(version ";
+     compiler += std::to_string(__LCC__ / 100);
+     dot_ver2(__LCC__ % 100)
+     dot_ver2(__LCC_MINOR__)
      compiler += ")";
   #elif __GNUC__
      compiler += "g++ (GNUC) ";
@@ -366,6 +378,7 @@ void std_aligned_free(void* ptr) {
 static void* aligned_large_pages_alloc_windows(size_t allocSize) {
 
   #if !defined(_WIN64)
+    (void)allocSize; // suppress unused-parameter compiler warning
     return nullptr;
   #else
 
