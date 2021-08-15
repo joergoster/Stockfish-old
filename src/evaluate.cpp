@@ -972,11 +972,6 @@ namespace {
     // Probe the material hash table
     me = Material::probe(pos);
 
-    // If we have a specialized evaluation function for the current material
-    // configuration, call it and return.
-    if (me->specialized_eval_exists())
-        return me->evaluate(pos);
-
     // Initialize score by reading the incrementally updated scores included in
     // the position object (material + piece square tables) and the material
     // imbalance. Score is computed internally from the white point of view.
@@ -1082,6 +1077,12 @@ make_v:
 /// evaluation of the position from the point of view of the side to move.
 
 Value Eval::evaluate(const Position& pos) {
+
+  // If we have a specialized evaluation function for the current material
+  // configuration, call it and return.
+  Material::Entry* me = Material::probe(pos);
+  if (me->specialized_eval_exists())
+      return me->evaluate(pos);
 
   Value v;
 
