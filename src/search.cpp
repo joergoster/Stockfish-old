@@ -752,16 +752,11 @@ namespace {
     }
     else
     {
-        // In case of null move search use previous static eval with a different sign
-        // and addition of two tempos
-        if ((ss-1)->currentMove != MOVE_NULL)
-            ss->staticEval = eval = evaluate(pos);
-        else
-            ss->staticEval = eval = -(ss-1)->staticEval;
+        // Evaluate current position and save into TT
+        ss->staticEval = eval = evaluate(pos);
 
-        // Save static evaluation into transposition table
-        if(!excludedMove)
-        tte->save(posKey, VALUE_NONE, ss->ttPv, BOUND_NONE, DEPTH_NONE, MOVE_NONE, eval);
+        if (!excludedMove)
+            tte->save(posKey, VALUE_NONE, ss->ttPv, BOUND_NONE, DEPTH_NONE, MOVE_NONE, eval);
     }
 
     // Use static evaluation difference to improve quiet move ordering
@@ -1426,11 +1421,7 @@ moves_loop: // When in check, search starts here
                 bestValue = ttValue;
         }
         else
-            // In case of null move search use previous static eval with a different sign
-            // and addition of two tempos
-            ss->staticEval = bestValue =
-            (ss-1)->currentMove != MOVE_NULL ? evaluate(pos)
-                                             : -(ss-1)->staticEval;
+            ss->staticEval = bestValue = evaluate(pos);
 
         // Stand pat. Return immediately if static value is at least beta
         if (bestValue >= beta)
