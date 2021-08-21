@@ -62,19 +62,25 @@ namespace {
         is >> token; // Consume "moves" token if any
     }
     else if (token == "fen")
+    {
         while (is >> token && token != "moves")
             fen += token + " ";
+    }
     else
         return;
 
     states = StateListPtr(new std::deque<StateInfo>(1)); // Drop old and create a new one
     pos.set(fen, Options["UCI_Chess960"], &states->back(), Threads.main());
 
-    // Parse move list (if any)
+    // Parse move list (if any), also supporting null moves!
     while (is >> token && (m = UCI::to_move(pos, token)) != MOVE_NONE)
     {
         states->emplace_back();
-        pos.do_move(m, states->back());
+
+        if (m == MOVE_NULL)
+            pos.do_null_move(states->back());
+        else
+            pos.do_move(m, states->back());
     }
   }
 
@@ -372,6 +378,9 @@ Move UCI::to_move(const Position& pos, string& str) {
 
   if (str.length() == 5) // Junior could send promotion piece in uppercase
       str[4] = char(tolower(str[4]));
+
+  if (str == "0000")
+      return MOVE_NULL;
 
   for (const auto& m : MoveList<LEGAL>(pos))
       if (str == UCI::move(m, pos.is_chess960()))
