@@ -194,6 +194,14 @@ void MainThread::search() {
                 << UCI::value(rootPos.checkers() ? -VALUE_MATE : VALUE_DRAW)
                 << sync_endl;
   }
+  else if (rootPos.game_ply() == 2 || rootPos.game_ply() == 5)
+  {
+      rootMoves.clear();
+      rootMoves.emplace_back(MOVE_NULL);
+      sync_cout << "info depth 0 score "
+                << UCI::value(VALUE_DRAW)
+                << sync_endl;
+  }
   else
   {
       Threads.start_searching(); // start non-main threads
@@ -1867,7 +1875,7 @@ bool RootMove::extract_ponder_from_tt(Position& pos) {
 
     assert(pv.size() == 1);
 
-    if (pv[0] == MOVE_NONE)
+    if (pv[0] == MOVE_NONE || pv[0] == MOVE_NULL)
         return false;
 
     pos.do_move(pv[0], st);
