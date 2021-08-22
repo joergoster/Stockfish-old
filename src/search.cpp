@@ -965,6 +965,17 @@ moves_loop: // When in check, search starts here
                                   thisThread->rootMoves.begin() + thisThread->pvLast, move))
           continue;
 
+      // Filter out checking moves and captures
+      // for the first double move of white.
+      if (pos.game_ply() == 5)
+      {
+          assert(us == WHITE);
+
+          if (   pos.gives_check(move)
+              || pos.capture(move))
+              continue;
+      }
+
       // Check for legality
       if (!rootNode && !pos.legal(move))
           continue;
