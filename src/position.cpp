@@ -1016,6 +1016,7 @@ void Position::do_null_move(StateInfo& newSt) {
   prefetch(TT.first_entry(key()));
 
   ++st->rule50;
+  ++gamePly;
   st->pliesFromNull = 0;
 
   sideToMove = ~sideToMove;
@@ -1036,6 +1037,7 @@ void Position::undo_null_move() {
 
   st = st->previous;
   sideToMove = ~sideToMove;
+  --gamePly;
 }
 
 

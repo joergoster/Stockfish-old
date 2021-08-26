@@ -40,19 +40,29 @@ constexpr int CounterMovePruneThreshold = 0;
 /// its own array of Stack objects, indexed by the current ply.
 
 struct Stack {
-  Move* pv;
+  Stack() {
+    pv.reserve(8); // To reduce allocations
+    continuationHistory = nullptr;
+    currentMove = excludedMove = MOVE_NONE;
+    killers[0] = killers[1] = MOVE_NONE;
+    staticEval = VALUE_ZERO;
+    doubleExtensions = ply = statScore = moveCount = 0;
+    inCheck = ttPv = ttHit = false;
+  }
+
+  std::vector<Move> pv;
   PieceToHistory* continuationHistory;
-  int ply;
   Move currentMove;
   Move excludedMove;
   Move killers[2];
   Value staticEval;
+  int doubleExtensions;
+  int ply;
   int statScore;
   int moveCount;
   bool inCheck;
   bool ttPv;
   bool ttHit;
-  int doubleExtensions;
 };
 
 
