@@ -155,6 +155,7 @@ public:
   Color side_to_move() const;
   int game_ply() const;
   bool is_chess960() const;
+  bool is_classical() const;
   Thread* this_thread() const;
   bool is_draw(int ply) const;
   bool has_game_cycle(int ply) const;
@@ -350,6 +351,11 @@ inline bool Position::opposite_bishops() const {
 
 inline bool Position::is_chess960() const {
   return chess960;
+}
+
+inline bool Position::is_classical() const {
+  return  Value(abs(eg_value(psq))) * 5
+        > (non_pawn_material() / 64 + 850) * (st->rule50 + 5);
 }
 
 inline bool Position::capture_or_promotion(Move m) const {
