@@ -310,7 +310,7 @@ void Thread::search() {
   std::copy(&lowPlyHistory[2][0], &lowPlyHistory.back().back() + 1, &lowPlyHistory[0][0]);
   std::fill(&lowPlyHistory[MAX_LPH - 2][0], &lowPlyHistory.back().back() + 1, 0);
 
-  size_t multiPV = size_t(Options["MultiPV"]);
+  multiPV = size_t(Options["MultiPV"]);
 
   // Pick integer skill levels, but non-deterministically round up or down
   // such that the average integer skill corresponds to the input floating point one.
@@ -407,7 +407,8 @@ void Thread::search() {
               // and we want to keep the same order for all the moves except the
               // new PV that goes to the front. Note that in case of MultiPV
               // search the already searched PV lines are preserved.
-              std::stable_sort(rootMoves.begin() + pvIdx, rootMoves.begin() + pvLast);
+              if (pvIdx + 1 == multiPV)
+                  std::stable_sort(rootMoves.begin() + pvIdx, rootMoves.begin() + pvLast);
 
               // If search has been stopped, we break immediately. Sorting is
               // safe because RootMoves is still valid, although it refers to
@@ -1005,11 +1006,19 @@ moves_loop: // When in check, search starts here
 
       // At root obey the "searchmoves" option and skip moves not listed in Root
       // Move List. As a consequence any illegal move is also skipped. In MultiPV
-      // mode we also skip PV moves which have been already searched and those
+      // mode we also skip PV moves which have already been searched and those
       // of lower "TB rank" if we are in a TB root position.
-      if (rootNode && !std::count(thisThread->rootMoves.begin() + thisThread->pvIdx,
-                                  thisThread->rootMoves.begin() + thisThread->pvLast, move))
-          continue;
+      // In MultiPV mode, we search all remaining moves only after the last PV move.
+      if (rootNode)
+      {
+          if (!std::count(thisThread->rootMoves.begin() + thisThread->pvIdx,
+                          thisThread->rootMoves.begin() + thisThread->pvLast, move))
+              continue;
+
+          if (   thisThread->pvIdx + 1 < thisThread->multiPV
+              && move != ttMove)
+              continue;
+      }
 
       // Check for legality
       if (!rootNode && !pos.legal(move))
@@ -1317,7 +1326,7 @@ moves_loop: // When in check, search starts here
               // We record how often the best move has been changed in each iteration.
               // This information is used for time management and LMR. In MultiPV mode,
               // we must take care to only do this for the first PV line.
-              if (   moveCount > 1
+              if (    moveCount > 1
                   && !thisThread->pvIdx)
                   ++thisThread->bestMoveChanges;
           }
