@@ -1351,6 +1351,10 @@ moves_loop: // When in check, search starts here
                   break;
               }
           }
+
+          if (   rootNode
+              && moveCount == 1)
+              alpha -= 21;
       }
 
       // If the move is worse than some previously searched move, remember it to update its stats later
