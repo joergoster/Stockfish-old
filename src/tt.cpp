@@ -35,24 +35,32 @@ TranspositionTable TT; // Our global transposition table
 
 void TTEntry::save(Key k, Value v, bool pv, Bound b, Depth d, Move m, Value ev) {
 
+  // New entry
+  if ((uint16_t)k != key16)
+  {
+      key16     = (uint16_t)k;
+      depth8    = (uint8_t)(d - DEPTH_OFFSET);
+      genBound8 = (uint8_t)(TT.generation8 | (uint8_t)pv << 2 | b);
+      move16    = (uint16_t)m;
+      value16   = (int16_t)v;
+      eval16    = (int16_t)ev;
+
+      return;
+  }
+
   // Preserve any existing move for the same position
-  if (m || (uint16_t)k != key16)
+  if (m)
       move16 = (uint16_t)m;
 
-  if (ev != VALUE_NONE || (uint16_t)k != key16)
-      eval16 = (int16_t)ev;
-
-  // Overwrite less valuable entries (cheapest checks first)
+  // Overwrite less valuable entries
   if (   b == BOUND_EXACT
-      || (uint16_t)k != key16
       || d - DEPTH_OFFSET > depth8 - 4)
   {
       assert(d > DEPTH_OFFSET);
       assert(d < 256 + DEPTH_OFFSET);
 
-      key16     = (uint16_t)k;
       depth8    = (uint8_t)(d - DEPTH_OFFSET);
-      genBound8 = (uint8_t)(TT.generation8 | uint8_t(pv) << 2 | b);
+      genBound8 = (uint8_t)(TT.generation8 | (uint8_t)pv << 2 | b);
       value16   = (int16_t)v;
   }
 }
