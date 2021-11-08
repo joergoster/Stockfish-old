@@ -274,10 +274,10 @@ void Thread::search() {
                   break;
           }
 
+          completedDepth = rootDepth;
+
           if (Threads.stop.load(std::memory_order_relaxed))
               break;
-
-          completedDepth = rootDepth;
 
           // Inform the user that we haven't found a mate
           sync_cout << "info string No mate in " << (rootDepth + 1) / 2 << " found" << sync_endl;
