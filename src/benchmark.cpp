@@ -35,15 +35,15 @@ const vector<string> Defaults = {
   "2R5/8/3k4/3N2p1/4K1Q1/8/8/8 w - -",
   "5N2/2n1n3/2p5/4p3/1N1k4/1KR2B2/1Pp5/2r1B1b1 w - -",
   "1BK5/8/2p5/3k4/4bR2/4R3/8/2Q5 w - -",
-  "4k3/8/5K2/8/5Q2/8/8/8 w - -",
-  "4rrk1/1p3pp1/bnp5/4N3/p7/1B3P2/PPP3P1/2KR3R w - -",
-  "3B1n2/KPpq1nN1/3p4/1B1p4/2pkp3/1R1NpR2/2PP3Q/2b2b2 w - -",
-  "2B4r/1Pk1P3/2N5/2P1N1P1/5B2/4p3/1r5p/6bK w - -",
-  "5R2/8/2p3B1/3k1N2/4R3/1K2b3/8/7Q w - -",
-  "1R6/1p1k1p2/1R3P2/3b4/3K4/6B1/8/3Q4 w - -",
-  "3r3r/pbp2pbp/1p5q/8/Q6P/B2B1PPN/1R2P1N1/2k1nK1R w - -",
-  "3q4/3R4/1bn1R3/n7/K1N2N2/B1k1r3/Q7/5b2 w - -",
-  "8/4K3/3N3B/3pk2n/6R1/8/8/4n3 w - -",
+  "7B/3K2N1/5k2/4b2B/8/5P1N/8/8 w - -",
+  "7k/3NPn2/8/4N2K/8/8/q7/8 w - -",
+  "4N2k/1n2N2p/5Kpp/5p2/8/1b6/1B4n1/8 w - -",
+  "8/1PPp1P2/2pPp2P/2p1Pkp1/2K3p1/3P2P1/8/8 w - -",
+  "8/1bp4B/2kbK3/Pp1R1N2/3P4/2n5/4p3/2r5 w - -",
+  "k1r2q2/ppp5/6Qp/2P5/B7/5n2/5P2/1R5K w - -",
+  "8/8/8/8/2Np4/3N4/k1K5/8 w - -",
+  "7K/8/8/5B2/2p2B2/1pp4n/1p6/3k2rr b - -",
+  "4brkn/4bp1p/3q2pP/8/2B3N1/1P4N1/2PP3P/1K2Q3 w - -",
 
   // Mate and stalemate positions
   "6k1/3b3r/1p1p4/p1n2p2/1PPNpP1q/P3Q1p1/1R1RB1P1/5K2 b - - 0 1",
@@ -72,11 +72,11 @@ vector<string> setup_bench(const Position& current, istream& is) {
   // Assign default values to missing arguments
   string ttSize    = (is >> token) ? token : "16";
   string threads   = (is >> token) ? token : "1";
-  string limit     = (is >> token) ? token : "2";
+  string limit     = (is >> token) ? token : "4";
   string fenFile   = (is >> token) ? token : "default";
   string limitType = (is >> token) ? token : "mate";
 
-  go = limitType == "eval" ? "eval" : "go " + limitType + " " + limit;
+  go = "go " + limitType + " " + limit;
 
   if (fenFile == "default")
       fens = Defaults;

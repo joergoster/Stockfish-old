@@ -107,6 +107,7 @@ void Search::clear() {
 
 void MainThread::search() {
 
+  // Special case 1: 'go perft x' 
   if (Limits.perft)
   {
       nodes = perft<true>(rootPos, Limits.perft);
@@ -115,41 +116,30 @@ void MainThread::search() {
       return;
   }
 
-//  Color us = rootPos.side_to_move();
-//  Time.init(Limits, us, rootPos.game_ply());
-  TT.new_search();
-
+  // Special case 2: no move(s) to search
   if (rootMoves.empty())
   {
-      rootMoves.emplace_back(MOVE_NONE);
+      // Must be mate or stalemate
       sync_cout << "info depth 0 score "
                 << UCI::value(rootPos.checkers() ? -VALUE_MATE : VALUE_DRAW)
-                << sync_endl;
-  }
-  else
-  {
-      onlyChecks = Options["Checks Only"];
-      kingMoves  = Options["King Moves"];
+                << std::endl;
+      std::cout << "bestmove " << UCI::move(MOVE_NULL, rootPos.is_chess960()) << sync_endl;
 
-      Time.init(Limits, rootPos.side_to_move(), rootPos.game_ply()); // Still needed?
-
-      for (Thread* th : Threads)
-      {
-          if (th != this)
-              th->start_searching();
-      }
-
-      Thread::search(); // Let's start searching!
+      return;
   }
 
-  // When we reach the maximum depth, we can arrive here without a raise of
-  // Threads.stop. However, if we are pondering or in an infinite search,
-  // the UCI protocol states that we shouldn't print the best move before the
-  // GUI sends a "stop" or "ponderhit" command. We therefore simply wait here
-  // until the GUI sends one of those commands.
+  Time.init(Limits, rootPos.side_to_move(), rootPos.game_ply());
+  TT.new_search();
 
-  while (!Threads.stop && (ponder || Limits.infinite))
-  {} // Busy wait for a stop or a ponder reset
+  // Read UCI options
+  onlyChecks = Options["Checks Only"];
+  kingMoves  = Options["King Moves"];
+
+  for (Thread* th : Threads)
+      if (th != this)
+          th->start_searching();
+
+  Thread::search(); // Let's start searching!
 
   // Stop the threads if not already stopped
   Threads.stop = true;
@@ -185,12 +175,11 @@ void Thread::search() {
   StateInfo rootSt;
   Value alpha, beta, bestValue, value;
 
-  Color us = rootPos.side_to_move();
-  Depth targetDepth = Limits.mate ? 2 * Limits.mate - 1 : MAX_PLY;
-
   for (int i = 0; i <= MAX_PLY; ++i)
       (ss+i)->ply = i;
 
+  Color us = rootPos.side_to_move();
+  Depth targetDepth = Limits.mate ? 2 * Limits.mate - 1 : MAX_PLY;
   size_t multiPV = rootMoves.size();
   rootDepth = 1;
 
@@ -229,63 +218,61 @@ void Thread::search() {
 
       bestValue = -VALUE_INFINITE;
 
-          for (pvIdx = 0; pvIdx < multiPV; ++pvIdx)
+      for (pvIdx = 0; pvIdx < multiPV; ++pvIdx)
+      {
+          if (Time.elapsed() > 2000)
+              sync_cout << "info depth " << rootDepth
+                        << " currmove "  << UCI::move(rootMoves[pvIdx].pv[0], rootPos.is_chess960())
+                        << " currmovenumber " << pvIdx + 1 << sync_endl;
+
+          if (   onlyChecks
+              && rootMoves[pvIdx].tbRank < 1000)
+              continue;
+
+          // Make, search and undo the root move
+          rootPos.do_move(rootMoves[pvIdx].pv[0], rootSt);
+
+          value = -::search(rootPos, ss+1, -beta, -alpha, rootDepth-1);
+
+          rootPos.undo_move(rootMoves[pvIdx].pv[0]);
+
+          if (value > bestValue)
+              bestValue = value;
+
+          // Assign the search value, selective search depth
+          // and the pv to this root move.
+          rootMoves[pvIdx].score = value;
+          rootMoves[pvIdx].selDepth = rootDepth;
+          rootMoves[pvIdx].pv.resize(1);
+
+          // Append child pv
+          for (auto& m : (ss+1)->pv)
+              rootMoves[pvIdx].pv.push_back(m);
+
+          // Sort the PV lines searched so far
+          std::stable_sort(rootMoves.begin(), rootMoves.begin() + pvIdx + 1);
+
+          // Have we found a "mate in x"?
+          if (bestValue >= alpha)
           {
-              if (Time.elapsed() > 2000)
-                  sync_cout << "info depth " << rootDepth
-                            << " currmove "  << UCI::move(rootMoves[pvIdx].pv[0], rootPos.is_chess960())
-                            << " currmovenumber " << pvIdx + 1 << sync_endl;
-
-              if (   onlyChecks
-                  && rootMoves[pvIdx].tbRank < 1000)
-                  continue;
-
-              // Make, search and undo the root move
-              rootPos.do_move(rootMoves[pvIdx].pv[0], rootSt);
-
-              value = -::search(rootPos, ss+1, -beta, -alpha, rootDepth-1);
-
-              rootPos.undo_move(rootMoves[pvIdx].pv[0]);
-
-              if (value > bestValue)
-                  bestValue = value;
-
-              // Assign the search value, selective search depth
-              // and the pv to this root move.
-              rootMoves[pvIdx].score = value;
-              rootMoves[pvIdx].selDepth = rootDepth;
-              rootMoves[pvIdx].pv.resize(1);
-
-              // Append child pv
-              for (auto& m : (ss+1)->pv)
-                  rootMoves[pvIdx].pv.push_back(m);
-
-              // Sort the PV lines searched so far
-              std::stable_sort(rootMoves.begin(), rootMoves.begin() + pvIdx + 1);
-
-              // Have we found a "mate in x"?
-              if (bestValue >= alpha)
-              {
-                  Threads.stop = true;
-                  sync_cout << "info string Success! Mate in " << (rootDepth + 1) / 2 << " found!" << sync_endl;
-              }
-
-              if (Threads.stop.load(std::memory_order_relaxed))
-                  break;
+              Threads.stop = true;
+              sync_cout << "info string Success! Mate in " << (rootDepth + 1) / 2 << " found!" << sync_endl;
           }
-
-          completedDepth = rootDepth;
 
           if (Threads.stop.load(std::memory_order_relaxed))
               break;
-
-          // Inform the user that we haven't found a mate
-          sync_cout << "info string No mate in " << (rootDepth + 1) / 2 << " found" << sync_endl;
-
-          rootDepth += 2;
       }
 
-      return;
+      completedDepth = rootDepth;
+
+      if (Threads.stop.load(std::memory_order_relaxed))
+          break;
+
+      // Inform the user that we haven't found a mate
+      sync_cout << "info string No mate in " << (completedDepth + 1) / 2 << " found" << sync_endl;
+
+      rootDepth += 2;
+  }
 }
 
 
@@ -508,35 +495,6 @@ string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
   return ss.str();
 }
 
-
-/// RootMove::extract_ponder_from_tt() is called in case we have no ponder move
-/// before exiting the search, for instance, in case we stop the search during a
-/// fail high at root. We try hard to have a ponder move to return to the GUI,
-/// otherwise in case of 'ponder on' we have nothing to think on.
-
-bool RootMove::extract_ponder_from_tt(Position& pos) {
-
-    StateInfo st;
-    bool ttHit;
-
-    assert(pv.size() == 1);
-
-    if (pv[0] == MOVE_NONE)
-        return false;
-
-    pos.do_move(pv[0], st);
-    TTEntry* tte = TT.probe(pos.key(), ttHit);
-
-    if (ttHit)
-    {
-        Move m = tte->move(); // Local copy to be SMP safe
-        if (MoveList<LEGAL>(pos).contains(m))
-            pv.push_back(m);
-    }
-
-    pos.undo_move(pv[0]);
-    return pv.size() > 1;
-}
 
 void Tablebases::rank_root_moves(Position& pos, Search::RootMoves& rootMoves) {
 
