@@ -131,6 +131,11 @@ namespace {
         else if (token == "infinite")  limits.infinite = 1;
         else if (token == "ponder")    ponderMode = true;
 
+    // If the user or the GUI didn't specify a mate limit,
+    // e. g. by starting an infinite analysis, set it for them!
+    if (limits.mate == 0)
+        limits.mate = 50;
+
     Threads.start_thinking(pos, states, limits, ponderMode);
   }
 
