@@ -138,7 +138,6 @@ void ThreadPool::set(size_t requested) {
 void ThreadPool::clear() {
 
   main()->callsCnt = 0;
-  main()->previousTimeReduction = 1.0;
 }
 
 
@@ -151,7 +150,6 @@ void ThreadPool::start_thinking(Position& pos, StateListPtr& states,
   main()->wait_for_search_finished();
 
   main()->stopOnPonderhit = stop = false;
-  increaseDepth = true;
   main()->ponder = ponderMode;
   Search::Limits = limits;
   Search::RootMoves rootMoves;

@@ -72,8 +72,6 @@ struct MainThread : public Thread {
   void search() override;
   void check_time();
 
-  double previousTimeReduction;
-  Value iterValue[4];
   int callsCnt;
   bool stopOnPonderhit;
   std::atomic_bool ponder;
@@ -94,7 +92,7 @@ struct ThreadPool : public std::vector<Thread*> {
   uint64_t nodes_searched() const { return accumulate(&Thread::nodes); }
   uint64_t tb_hits()        const { return accumulate(&Thread::tbHits); }
 
-  std::atomic_bool stop, increaseDepth;
+  std::atomic_bool stop;
 
 private:
   StateListPtr setupStates;
