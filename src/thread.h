@@ -53,8 +53,7 @@ public:
   void start_searching();
   void wait_for_search_finished();
 
-  size_t pvIdx, pvLast;
-  uint64_t ttHitAverage;
+  size_t pvIdx;
   int selDepth;
   std::atomic<uint64_t> nodes, tbHits;
 
