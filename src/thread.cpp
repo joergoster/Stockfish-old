@@ -18,16 +18,15 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <cassert>
-
 #include <algorithm> // For std::count
+#include <cassert>
 
 #include "movegen.h"
 #include "search.h"
 #include "thread.h"
+#include "tt.h"
 #include "uci.h"
 #include "syzygy/tbprobe.h"
-#include "tt.h"
 
 ThreadPool Threads; // Global object
 

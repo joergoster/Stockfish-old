@@ -21,7 +21,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
-#include <cstring>   // For std::memset
 #include <iostream>
 #include <sstream>
 
@@ -58,7 +57,7 @@ namespace {
   bool onlyChecks;
   int kingMoves;
 
-  Value search(Position& pos, BasicStack* ss, Value alpha, Value beta, Depth depth);
+  Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth);
 
   // perft() is our utility to verify move generation. All the leaf nodes up
   // to the given depth are generated and counted, and the sum is returned.
@@ -171,7 +170,7 @@ void MainThread::search() {
 
 void Thread::search() {
 
-  BasicStack stack[MAX_PLY+2], *ss = stack+2;
+  Stack stack[MAX_PLY+2], *ss = stack+2;
   StateInfo rootSt;
   Value alpha, beta, bestValue, value;
 
@@ -280,7 +279,7 @@ namespace {
 
   // search<>() is the main search function
 
-  Value search(Position& pos, BasicStack* ss, Value alpha, Value beta, Depth depth) {
+  Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth) {
 
     StateInfo st;
     Value bestValue, value;

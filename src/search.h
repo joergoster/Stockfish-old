@@ -35,25 +35,9 @@ namespace Search {
 /// shallower and deeper in the tree during the search. Each search thread has
 /// its own array of Stack objects, indexed by the current ply.
 
-/*struct Stack {
-  Move* pv;
-  PieceToHistory* continuationHistory;
-  int ply;
-  Move currentMove;
-  Move excludedMove;
-  Move killers[2];
-  Value staticEval;
-  int statScore;
-  int moveCount;
-};
-*/
+struct Stack {
 
-/// BasicStack struct is a minimalist version of the
-/// bigger Stack struct, used by the mate search.
-
-struct BasicStack {
-
-  BasicStack() {
+  Stack() {
     pv.reserve(16);
     ply = 0;
   }
