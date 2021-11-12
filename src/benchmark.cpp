@@ -30,23 +30,31 @@ using namespace std;
 namespace {
 
 const vector<string> Defaults = {
-  "setoption name UCI_Chess960 value false",
+  // Mate in 2
   "3R3K/4ppp1/2p5/1nN1kpQN/8/r7/b4rP1/3R2n1 w - -",
   "2R5/8/3k4/3N2p1/4K1Q1/8/8/8 w - -",
   "5N2/2n1n3/2p5/4p3/1N1k4/1KR2B2/1Pp5/2r1B1b1 w - -",
   "1BK5/8/2p5/3k4/4bR2/4R3/8/2Q5 w - -",
+
+  // Mate in 3
   "7B/3K2N1/5k2/4b2B/8/5P1N/8/8 w - -",
   "7k/3NPn2/8/4N2K/8/8/q7/8 w - -",
   "4N2k/1n2N2p/5Kpp/5p2/8/1b6/1B4n1/8 w - -",
   "8/1PPp1P2/2pPp2P/2p1Pkp1/2K3p1/3P2P1/8/8 w - -",
+
+  // Mate in 4
   "8/1bp4B/2kbK3/Pp1R1N2/3P4/2n5/4p3/2r5 w - -",
   "k1r2q2/ppp5/6Qp/2P5/B7/5n2/5P2/1R5K w - -",
   "8/8/8/8/2Np4/3N4/k1K5/8 w - -",
   "7K/8/8/5B2/2p2B2/1pp4n/1p6/3k2rr b - -",
   "4brkn/4bp1p/3q2pP/8/2B3N1/1P4N1/2PP3P/1K2Q3 w - -",
 
+  // Mate in 5
+  "n1rb4/1p3p1p/1p6/1R5K/8/p3p1PN/1PP1R3/N6k w - - 0 1",
+  "1r3n2/2pB1pq1/1bR3p1/N2NR2b/KP1kpp1r/1p2p3/1PP2Q1n/8 w - - 0 1",
+
   // Mate and stalemate positions
-  "6k1/3b3r/1p1p4/p1n2p2/1PPNpP1q/P3Q1p1/1R1RB1P1/5K2 b - - 0 1",
+  "7k/7P/6K1/8/3B4/8/8/8 b - -",
   "8/8/8/8/8/6k1/6p1/6K1 w - -"
 };
 
@@ -72,7 +80,7 @@ vector<string> setup_bench(const Position& current, istream& is) {
   // Assign default values to missing arguments
   string ttSize    = (is >> token) ? token : "16";
   string threads   = (is >> token) ? token : "1";
-  string limit     = (is >> token) ? token : "4";
+  string limit     = (is >> token) ? token : "5";
   string fenFile   = (is >> token) ? token : "default";
   string limitType = (is >> token) ? token : "mate";
 
