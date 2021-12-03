@@ -549,7 +549,7 @@ namespace {
     Thread* thisThread = pos.this_thread();
 
     // Step 0. Limit search explosion
-    if (   ss->ply > thisThread->rootDepth * 4 / 3
+    if (   ss->ply > thisThread->rootDepth * 3 / 2
         && search_explosion(thisThread) == MUST_CALM_DOWN
         && depth > (ss-1)->depth)
         depth = (ss-1)->depth;
