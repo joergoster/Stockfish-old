@@ -191,6 +191,11 @@ void Thread::search() {
   // Now we rank the root moves for the mate search.
   for (auto& rm : rootMoves)
   {
+      // R-Mobility (kind of ?)
+      rootPos.do_move(rm.pv[0], rootSt);
+      rm.tbRank -= (rootPos.checkers() ? 20 : 16) * int(MoveList<LEGAL>(rootPos).size());
+      rootPos.undo_move(rm.pv[0]);
+
       if (rootPos.gives_check(rm.pv[0]))
           rm.tbRank += 2000 - 10 * distance(king, to_sq(rm.pv[0])); // Top priority!
 
