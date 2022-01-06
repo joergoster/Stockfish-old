@@ -194,11 +194,11 @@ namespace {
     constexpr CastlingRights OO  = Us & KING_SIDE;
     constexpr CastlingRights OOO = Us & QUEEN_SIDE;
 
-    moveList = generate_pawn_moves<Us, Type>(pos, moveList, target);
     moveList = generate_moves<KNIGHT>(pos, moveList, Us, target);
-    moveList = generate_moves<BISHOP>(pos, moveList, Us, target);
-    moveList = generate_moves<  ROOK>(pos, moveList, Us, target);
     moveList = generate_moves< QUEEN>(pos, moveList, Us, target);
+    moveList = generate_moves<  ROOK>(pos, moveList, Us, target);
+    moveList = generate_moves<BISHOP>(pos, moveList, Us, target);
+    moveList = generate_pawn_moves<Us, Type>(pos, moveList, target);
 
     if (Type != EVASIONS)
     {
