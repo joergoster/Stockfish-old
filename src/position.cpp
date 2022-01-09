@@ -30,7 +30,6 @@
 #include "movegen.h"
 #include "position.h"
 #include "thread.h"
-#include "tt.h"
 #include "uci.h"
 #include "syzygy/tbprobe.h"
 

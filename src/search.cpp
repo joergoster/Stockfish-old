@@ -30,7 +30,6 @@
 #include "search.h"
 #include "thread.h"
 #include "timeman.h"
-#include "tt.h"
 #include "uci.h"
 #include "syzygy/tbprobe.h"
 
@@ -95,7 +94,6 @@ void Search::clear() {
 
   Threads.main()->wait_for_search_finished();
 
-  TT.clear();
   Threads.clear();
   Tablebases::init(Options["SyzygyPath"]); // Free mapped files
 }
@@ -128,7 +126,6 @@ void MainThread::search() {
   }
 
   Time.init(Limits, rootPos.side_to_move(), rootPos.game_ply());
-  TT.new_search();
 
   // Read UCI options
   onlyChecks = Options["Checks Only"];
@@ -484,9 +481,6 @@ string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
 
       ss << " nodes "    << nodesSearched
          << " nps "      << nodesSearched * 1000 / elapsed;
-
-      if (elapsed > 1000) // Earlier makes little sense
-          ss << " hashfull " << TT.hashfull();
 
       ss << " tbhits "   << tbHits
          << " time "     << elapsed

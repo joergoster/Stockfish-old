@@ -154,13 +154,6 @@ enum Phase {
   MG = 0, EG = 1, PHASE_NB = 2
 };
 
-enum Bound {
-  BOUND_NONE,
-  BOUND_UPPER,
-  BOUND_LOWER,
-  BOUND_EXACT = BOUND_UPPER | BOUND_LOWER
-};
-
 enum Value : int {
   VALUE_ZERO      = 0,
   VALUE_DRAW      = 0,
