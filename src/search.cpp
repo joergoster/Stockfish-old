@@ -1031,8 +1031,6 @@ moves_loop: // When in check, search starts here
       }
 
       // Step 14. Extensions (~66 Elo)
-      if (ss->ply < thisThread->rootDepth * 2)
-      {
       // Singular extension search (~58 Elo). If all moves but one fail low on a
       // search of (alpha-s, beta-s), and just one fails high on (alpha, beta),
       // then that move is singular and should be extended. To verify this we do
@@ -1061,7 +1059,8 @@ moves_loop: // When in check, search starts here
               // Avoid search explosion by limiting the number of double extensions
               if (   !PvNode
                   && value < singularBeta - 75
-                  && ss->doubleExtensions <= 6)
+                  && ss->doubleExtensions <= 6
+                  && pos.non_pawn_material(us) > BishopValueMg)
                   extension = 2;
           }
 
@@ -1090,7 +1089,6 @@ moves_loop: // When in check, search starts here
                && move == ss->killers[0]
                && (*contHist[0])[movedPiece][to_sq(move)] >= 10000)
           extension = 1;
-      }
 
       // Add extension to new depth
       newDepth += extension;
