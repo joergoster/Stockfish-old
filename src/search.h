@@ -40,6 +40,7 @@ constexpr int CounterMovePruneThreshold = 0;
 /// its own array of Stack objects, indexed by the current ply.
 
 struct Stack {
+
   Move* pv;
   PieceToHistory* continuationHistory;
   int ply;
@@ -81,6 +82,15 @@ struct RootMove {
 };
 
 typedef std::vector<RootMove> RootMoves;
+
+
+/// A small stack for the MCTS search
+
+struct MctsStack {
+
+  StateInfo st;
+  int ply;
+};
 
 
 /// LimitsType struct stores information sent by GUI about available time to
