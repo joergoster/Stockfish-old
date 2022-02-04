@@ -93,6 +93,44 @@ struct MctsStack {
 };
 
 
+/// MctsNode struct holds all the info needed, like the place in the
+/// HashTable, the number of visits and the total reward etc.
+
+struct MctsNode {
+
+  MctsNode(size_t idx, size_t pidx, Move m, bool exp, bool term, uint64_t v, double tv) :
+    index(idx), parentIndex(pidx), move(m), isExpanded(exp), isTerminal(term), visits(v), totalValue(tv) {
+  }
+
+  size_t id()       const { return index; }
+  size_t parentId() const { return parentIndex; }
+
+  double   Q() const { return totalValue; }
+  uint64_t N() const { return visits; }
+
+  Move action()   const { return move; }
+  bool expanded() const { return isExpanded; }
+  bool terminal() const { return isTerminal; }
+
+  void update(double reward) { totalValue += reward; visits++; }
+
+  void is_expanded() { isExpanded = true; }
+  void is_terminal() { isTerminal = true; }
+
+  size_t index;                 // Index of this node in the table
+  size_t parentIndex;           // Index of the parent node
+  Move move;                    // Move which led to this position
+  bool isExpanded;              // True if all child nodes have been generated
+  bool isTerminal;              // Terminal node or not?
+  uint64_t visits;              // Number of visits
+  double totalValue;            // Sum of all backpropagated rewards through this node
+  std::vector<size_t> children; // Holds the indices of all child nodes
+  std::vector<Move> legalMoves; // All legal moves of this position
+};
+
+typedef std::vector<MctsNode> MctsHash;
+
+
 /// LimitsType struct stores information sent by GUI about available time to
 /// search the current move, maximum depth/time, or if we are in analysis mode.
 
