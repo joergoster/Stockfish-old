@@ -81,6 +81,7 @@ void init(OptionsMap& o) {
   o["SyzygyProbeLimit"]      << Option(7, 0, 7);
   o["Use NNUE"]              << Option(true, on_use_NNUE);
   o["EvalFile"]              << Option(EvalFileDefaultName, on_eval_file);
+  o["MCTS"]                  << Option(false);
 }
 
 

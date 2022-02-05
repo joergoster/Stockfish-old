@@ -525,7 +525,7 @@ namespace {
 
     // Check if we have an upcoming move which draws by repetition, or
     // if the opponent had an alternative move earlier to this position.
-    if (   !rootNode
+    if (  !rootNode
         && pos.rule50_count() >= 3
         && alpha < VALUE_DRAW
         && pos.has_game_cycle(ss->ply))
@@ -625,6 +625,7 @@ namespace {
     ttMove =  rootNode ? thisThread->rootMoves[thisThread->pvIdx].pv[0]
             : ss->ttHit    ? tte->move() : MOVE_NONE;
     ttCapture = ttMove && pos.capture_or_promotion(ttMove);
+
     if (!excludedMove)
         ss->ttPv = PvNode || (ss->ttHit && tte->is_pv());
 
@@ -892,13 +893,13 @@ namespace {
 
                 if (value >= probCutBeta)
                 {
-                    // if transposition table doesn't have equal or more deep info write probCut data into it
-                    if ( !(ss->ttHit
-                       && tte->depth() >= depth - 3
-                       && ttValue != VALUE_NONE))
+                    // if transposition table doesn't have equal or deeper info write probCut data into it
+                    if (  !(ss->ttHit
+                        && tte->depth() >= depth - 3
+                        && ttValue != VALUE_NONE))
                         tte->save(posKey, value_to_tt(value, ss->ply), ttPv,
-                            BOUND_LOWER,
-                            depth - 3, move, ss->staticEval);
+                                  BOUND_LOWER, depth - 3, move, ss->staticEval);
+
                     return value;
                 }
             }
@@ -920,16 +921,15 @@ moves_loop: // When in check, search starts here
 
     // Step 12. A small Probcut idea, when we are in check (~0 Elo)
     probCutBeta = beta + 409;
-    if (   ss->inCheck
-        && !PvNode
-        && depth >= 4
+    if (  !PvNode
+        && ss->inCheck
         && ttCapture
+        && depth >= 4
         && (tte->bound() & BOUND_LOWER)
         && tte->depth() >= depth - 3
         && ttValue >= probCutBeta
         && abs(ttValue) <= VALUE_KNOWN_WIN
-        && abs(beta) <= VALUE_KNOWN_WIN
-       )
+        && abs(beta) <= VALUE_KNOWN_WIN)
         return probCutBeta;
 
 
@@ -1361,7 +1361,7 @@ moves_loop: // When in check, search starts here
     // Write gathered information in transposition table
     if (!excludedMove && !(rootNode && thisThread->pvIdx))
         tte->save(posKey, value_to_tt(bestValue, ss->ply), ss->ttPv,
-                  bestValue >= beta ? BOUND_LOWER :
+                  bestValue >= beta  ? BOUND_LOWER :
                   PvNode && bestMove ? BOUND_EXACT : BOUND_UPPER,
                   depth, bestMove, ss->staticEval);
 
@@ -1553,10 +1553,10 @@ moves_loop: // When in check, search starts here
           continue;
 
       // movecount pruning for quiet check evasions
-      if (  bestValue > VALUE_TB_LOSS_IN_MAX_PLY
-          && quietCheckEvasions > 1
+      if (    ss->inCheck
           && !captureOrPromotion
-          && ss->inCheck)
+          &&  quietCheckEvasions > 1
+          &&  bestValue > VALUE_TB_LOSS_IN_MAX_PLY)
           continue;
 
       quietCheckEvasions += !captureOrPromotion && ss->inCheck;
