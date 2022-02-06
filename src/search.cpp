@@ -120,6 +120,7 @@ namespace {
   void update_quiet_stats(const Position& pos, Stack* ss, Move move, int bonus);
   void update_all_stats(const Position& pos, Stack* ss, Move bestMove, Value bestValue, Value beta, Square prevSq,
                         Move* quietsSearched, int quietCount, Move* capturesSearched, int captureCount, Depth depth);
+  void uct_search(Position& pos);
 
   // perft() is our utility to verify move generation. All the leaf nodes up
   // to the given depth are generated and counted, and the sum is returned.
@@ -198,6 +199,12 @@ void MainThread::search() {
       sync_cout << "info depth 0 score "
                 << UCI::value(rootPos.checkers() ? -VALUE_MATE : VALUE_DRAW)
                 << sync_endl;
+  }
+  else if (Options["MCTS"])
+  {
+      TT.resize(size_t(1)); // Resize to 1 MB
+
+      uct_search(rootPos);
   }
   else
   {
@@ -1324,9 +1331,8 @@ moves_loop: // When in check, search starts here
     assert(moveCount || !ss->inCheck || excludedMove || !MoveList<LEGAL>(pos).size());
 
     if (!moveCount)
-        bestValue = excludedMove ? alpha :
-                    ss->inCheck  ? mated_in(ss->ply)
-                                 : VALUE_DRAW;
+        bestValue = excludedMove ? alpha             :
+                    ss->inCheck  ? mated_in(ss->ply) : VALUE_DRAW;
 
     // If there is a move which produces search value greater than alpha we update stats of searched moves
     else if (bestMove)
@@ -1781,6 +1787,53 @@ moves_loop: // When in check, search starts here
     }
 
     return best;
+  }
+
+  // uct_search() is the main MCTS search.
+  // To be more precise, it's a UCT search, which stands for Upper Confidence Bound applied to Trees.
+  //
+  // See for example https://int8.io/monte-carlo-tree-search-beginners-guide/#Policy_network_training_in_Alpha_Go_and_Alpha_Zero
+  // and http://mcts.ai/pubs/mcts-survey-master.pdf
+
+  void uct_search(Position& pos) {
+
+    // Prepare our MCTS Hash Table where we store all nodes
+    MctsHash uctTable;
+    uctTable.reserve(4194304); // About 256 MB hash size
+
+    // Our small stack
+    MctsStack stack[128], *ss = stack;
+
+    for (int i = 0; i < 128; i++)
+        (ss+i)->ply = i;
+
+    int iteration;
+    int selDepth;
+    uint64_t depth, nodes;
+    size_t bestIndex, currentIndex, nextIndex, rootIndex;
+    double bestUCB1, UCB1;
+    double reward;
+    uint64_t maxVisits;
+
+    Thread* thisThread = pos.this_thread();
+
+    // Create the root node
+    uctTable.push_back(MctsNode(0, 0, MOVE_NONE, false, false, 0, 0.0));
+
+    // Generate all moves for the root node
+    for (const auto& rm : thisThread->rootMoves)
+        uctTable[rootIndex].legalMoves.push_back(rm.pv[0]);
+
+    thisThread->nodes.fetch_add(1, std::memory_order_relaxed); // For the root node
+
+    rootIndex = 0; // Index of the root node (fix!)
+    nextIndex = rootIndex + 1; // The next node will have this index
+
+    iteration = 0;
+    currentIndex = rootIndex;
+
+    // Now we can start the main MCTS loop, which consists of 4 steps:
+    // Selection, Expansion, Simulation (Rollout), and Backpropagation.
   }
 
 } // namespace
