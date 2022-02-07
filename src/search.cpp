@@ -784,9 +784,7 @@ namespace {
     // Step 7. Razoring.
     // If eval is really low check with qsearch if it can exceed alpha, if it can't,
     // return a fail low.
-    if (   !PvNode
-        && depth <= 6
-        && eval < alpha - 400 - 300 * depth * depth)
+    if (!PvNode && depth <= 6 && eval < alpha - 400 - 300 * depth * depth)
     {
         value = qsearch<NonPV>(pos, ss, alpha - 1, alpha);
         if (value < alpha)
@@ -815,8 +813,8 @@ namespace {
     {
         assert(eval - beta >= 0);
 
-        // Null move dynamic reduction based on depth, eval and complexity of position
-        Depth R = std::min(int(eval - beta) / 205, 3) + depth / 3 + 4 - (complexity > 500);
+        // Null move dynamic reduction based on depth and value
+        Depth R = std::min(int(eval - beta) / 205, 3) + depth / 3 + 4;
 
         ss->currentMove = MOVE_NULL;
         ss->continuationHistory = &thisThread->continuationHistory[0][0][NO_PIECE][0];
@@ -1836,6 +1834,55 @@ moves_loop: // When in check, search starts here
 
     // Now we can start the main MCTS loop, which consists of 4 steps:
     // Selection, Expansion, Simulation (Rollout), and Backpropagation.
+    while (!Threads.stop.load(std::memory_order_relaxed))
+    {
+        ////////////////////////////
+        //   Step 1: SELECTION    //
+        ////////////////////////////
+
+        // Reset the best index
+        bestIndex = 0;
+
+        // Using the default UCB1 formula to determine the most promising
+        // node for further expansion.
+        while (uctTable[currentIndex].expanded())
+        {
+            assert(!uctTable[currentIndex].legalMoves.size());
+
+            bestUCB1 = REWARD_LOSS;
+
+            for (auto& idx : uctTable[currentIndex].children)
+            {
+                assert(uctTable[idx].N());
+                assert(uctTable[currentIndex].N());
+
+                UCB1 =  uctTable[idx].Q() / uctTable[idx].N()
+                      + rootC * std::sqrt(std::log(uctTable[currentIndex].N()) / uctTable[idx].N());
+
+                assert(UCB1 >= REWARD_LOSS);
+
+                // New best child?
+                if (UCB1 > bestUCB1)
+                {
+                    bestUCB1 = UCB1;
+                    bestIndex = idx;
+                }
+            }
+
+            assert(bestIndex);
+
+            // Reset the StateInfo object
+            std::memset(&ss->st, 0, sizeof(StateInfo));
+
+            // Make the move
+            pos.do_move(uctTable[bestIndex].action(), ss->st);
+
+            // Increment the stack level
+            ss++;
+
+            currentIndex = bestIndex;
+        }
+    }
   }
 
 } // namespace
