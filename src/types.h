@@ -173,6 +173,12 @@ enum Bound {
   BOUND_EXACT = BOUND_UPPER | BOUND_LOWER
 };
 
+enum Reward : double {
+  REWARD_LOSS = 0.0,
+  REWARD_DRAW = 0.5,
+  REWARD_WIN  = 1.0
+};
+
 enum Value : int {
   VALUE_ZERO      = 0,
   VALUE_DRAW      = 0,

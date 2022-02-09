@@ -189,7 +189,6 @@ void MainThread::search() {
 
   Color us = rootPos.side_to_move();
   Time.init(Limits, us, rootPos.game_ply());
-  TT.new_search();
 
   Eval::NNUE::verify();
 
@@ -202,12 +201,14 @@ void MainThread::search() {
   }
   else if (Options["MCTS"])
   {
-      TT.resize(size_t(1)); // Resize to 1 MB
+//      TT.resize(size_t(1)); // Resize to 1 MB
 
       uct_search(rootPos);
   }
   else
   {
+      TT.new_search();
+
       Threads.start_searching(); // start non-main threads
       Thread::search();          // main thread start searching
   }
@@ -1809,15 +1810,17 @@ moves_loop: // When in check, search starts here
     for (int i = 0; i < 128; i++)
         (ss+i)->ply = i;
 
-    int iteration;
+    bool giveOutput;
+    uint64_t iteration;
     int selDepth;
     uint64_t depth, nodes;
     size_t bestIndex, currentIndex, nextIndex, rootIndex;
     double bestUCB1, UCB1;
-    double reward;
+    Reward reward;
     uint64_t maxVisits;
 
     Thread* thisThread = pos.this_thread();
+    TimePoint elapsed, lastOutputTime;
 
     // Create the root node
     uctTable.push_back(MctsNode(0, 0, MOVE_NONE, false, false, 0, 0.0));
@@ -1825,8 +1828,6 @@ moves_loop: // When in check, search starts here
     // Generate all moves for the root node
     for (const auto& rm : thisThread->rootMoves)
         uctTable[rootIndex].legalMoves.push_back(rm.pv[0]);
-
-    thisThread->nodes.fetch_add(1, std::memory_order_relaxed); // For the root node
 
     rootIndex = 0; // Index of the root node (fix!)
     nextIndex = rootIndex + 1; // The next node will have this index
@@ -1838,12 +1839,11 @@ moves_loop: // When in check, search starts here
     // Selection, Expansion, Simulation (Rollout), and Backpropagation.
     while (!Threads.stop.load(std::memory_order_relaxed))
     {
-        ////////////////////////////
-        //   Step 1: SELECTION    //
-        ////////////////////////////
-
-        // Reset the best index
-        bestIndex = 0;
+        //////////////////////////////////////
+        //                                  //
+        //   Step 1: SELECTION              //
+        //                                  //
+        //////////////////////////////////////
 
         // Using the default UCB1 formula to determine the most promising
         // node for further expansion.
@@ -1882,9 +1882,164 @@ moves_loop: // When in check, search starts here
             // Increment the stack level
             ss++;
 
+            // Only count new nodes created
+            thisThread->nodes.fetch_sub(1, std::memory_order_relaxed);
+
             currentIndex = bestIndex;
         }
+
+
+        //////////////////////////////////////
+        //                                  //
+        //   Step 2: EXPANSION              //
+        //                                  //
+        //////////////////////////////////////
+
+        selDepth = std::max(ss->ply, selDepth);
+
+
+        //////////////////////////////////////
+        //                                  //
+        //   Step 3: SIMULATION / ROLLOUT   //
+        //                                  //
+        //////////////////////////////////////
+
+        // No rollouts, just simply call eval.
+        // Hint: some kind of qsearch should help here!
+
+        // Already terminal node?
+        if (uctTable[currentIndex].terminal())
+            reward = pos.checkers() ? REWARD_LOSS : REWARD_DRAW;
+
+        // Check for draw by repetition, 50-move rule or
+        // maximum ply reached.
+        else if (pos.is_draw(ss->ply) || ss->ply >= 127)
+        {
+            uctTable[currentIndex].is_terminal();
+            reward = REWARD_DRAW;
+        }
+
+        // else call eval
+        else
+          reward = value_to_reward(evaluate(pos));
+
+
+        //////////////////////////////////////
+        //                                  //
+        //   Step 4: BACKPROPAGATION        //
+        //                                  //
+        //////////////////////////////////////
+
+        // Now we have to unwind all made moves
+        // to get back to the root position and we're
+        // updating every single node on this way.
+        while (currentIndex != rootIndex)
+        {
+            reward = REWARD_WIN - reward; // Switch side
+
+            // Update the current node
+            uctTable[currentIndex].update(reward);
+
+            // Go back to the parent node
+            pos.undo_move(uctTable[currentIndex].action());
+            ss--;
+
+            currentIndex = uctTable[currentIndex].parentId();
+        }
+
+        // We are back at the root!
+        assert(currentIndex == rootIndex);
+
+        // Iteration finished
+        iteration++;
+        thisThread->nodes.fetch_add(1, std::memory_order_relaxed);
+        bestIndex = 0;
+
+        // Now check for some stop conditions
+        if (iteration >= 4194256)
+            Threads.stop = true;
+
+        if (   Limits.nodes
+            && iteration >= Limits.nodes)
+            Threads.stop = true;
+            
+        if (   Limits.movetime
+            && Time.elapsed() >= Limits.movetime)
+            Threads.stop = true;
+
+        // Basic time management
+        elapsed = now();
+
+        if (elapsed > Time.optimum() - 10)
+            Threads.stop = true;
+
+        // Time for another GUI update?
+        giveOutput =  Time.elapsed() <  2100 ? elapsed - lastOutputTime >= 250
+                    : Time.elapsed() < 10100 ? elapsed - lastOutputTime >= 1000
+                    : Time.elapsed() < 60100 ? elapsed - lastOutputTime >= 3000
+                                             : elapsed - lastOutputTime >= 10000;
+        if (giveOutput)
+            lastOutputTime = now();
+
+        // Update the root moves stats and send info
+        if (   Threads.stop.load(std::memory_order_relaxed)
+            || giveOutput)
+        {
+
+        }
+
     }
+
+    // If requested by the user provide some detailed info
+    // about the root moves.
+
+
+  }
+
+  // value_to_reward() transforms an internal Stockfish value
+  // to a reward in the interval [0..1].
+
+  double value_to_reward(Value v) {
+
+    if (v >= VALUE_TB_WIN_IN_MAX_PLY)
+        return REWARD_WIN;
+
+    if (v <= VALUE_TB_LOSS_IN_MAX_PLY)
+        return REWARD_LOSS;
+
+    const auto pi = 3.14159265;
+    const auto k  = 1.0 / 10000000;
+
+    auto m = std::pow(double(v) / 2.0, 3.0);
+    auto r = 0.5 + std::atan(k * m) / pi;
+
+    assert(REWARD_LOSS <= r && r <= REWARD_WIN);
+
+    return r;
+  }
+
+
+  // reward_to_value() transforms a reward in [0..1] to a Stockfish value.
+  // The scale is such that a reward of 0.95 corresponds to about 5 pawns.
+
+  Value reward_to_value(double r) {
+
+    if (r == REWARD_DRAW)
+        return VALUE_DRAW;
+
+    if (r == REWARD_LOSS)
+        return VALUE_TB_LOSS_IN_MAX_PLY;
+
+    if (r == REWARD_WIN)
+        return VALUE_TB_WIN_IN_MAX_PLY;
+
+    const auto pi = 3.14159265;
+    const auto l  = 10000000;
+
+    double n = std::tan(pi * (r - 0.5));
+    double v = 2 * std::cbrt(l * n);
+
+    return std::clamp(Value(std::round(v)), VALUE_TB_LOSS_IN_MAX_PLY, VALUE_TB_WIN_IN_MAX_PLY);
   }
 
 } // namespace
