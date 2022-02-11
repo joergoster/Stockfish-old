@@ -61,6 +61,10 @@ namespace {
   // Different node types, used as a template parameter
   enum NodeType { NonPV, PV, Root };
 
+  constexpr double REWARD_LOSS = 0.0;
+  constexpr double REWARD_DRAW = 0.5;
+  constexpr double REWARD_WIN  = 1.0;
+
   // Futility margin
   Value futility_margin(Depth d, bool improving) {
     return Value(171 * (d - improving));
@@ -120,7 +124,11 @@ namespace {
   void update_quiet_stats(const Position& pos, Stack* ss, Move move, int bonus);
   void update_all_stats(const Position& pos, Stack* ss, Move bestMove, Value bestValue, Value beta, Square prevSq,
                         Move* quietsSearched, int quietCount, Move* capturesSearched, int captureCount, Depth depth);
+  // for MCTS
   void uct_search(Position& pos);
+  double ucb1(const double& Q, const uint64_t& N, const uint64_t& parentN);
+  double value_to_reward(Value v);
+  Value reward_to_value(double r);
 
   // perft() is our utility to verify move generation. All the leaf nodes up
   // to the given depth are generated and counted, and the sum is returned.
@@ -1758,6 +1766,7 @@ moves_loop: // When in check, search starts here
     }
   }
 
+
   // When playing with strength handicap, choose best move among a set of RootMoves
   // using a statistical rule dependent on 'level'. Idea by Heinz van Saanen.
 
@@ -1791,6 +1800,7 @@ moves_loop: // When in check, search starts here
     return best;
   }
 
+
   // uct_search() is the main MCTS search.
   // To be more precise, it's a UCT search, which stands for Upper Confidence Bound applied to Trees.
   //
@@ -1814,8 +1824,7 @@ moves_loop: // When in check, search starts here
     int selDepth;
     uint64_t depth, nodes;
     size_t bestIndex, currentIndex, nextIndex, rootIndex;
-    double bestUCB1, UCB1;
-    Reward reward;
+    double bestUCB1, UCB1, reward;
     uint64_t maxVisits;
 
     Thread* thisThread = pos.this_thread();
@@ -1824,7 +1833,7 @@ moves_loop: // When in check, search starts here
     // Create the root node
     uctTable.push_back(MctsNode(0, 0, MOVE_NONE, false, false, 0, 0.0));
 
-    // Generate all moves for the root node
+    // Get moves from rootMoves
     for (const auto& rm : thisThread->rootMoves)
         uctTable[rootIndex].legalMoves.push_back(rm.pv[0]);
 
@@ -1857,8 +1866,8 @@ moves_loop: // When in check, search starts here
                 assert(uctTable[idx].N());
                 assert(uctTable[currentIndex].N());
 
-                UCB1 =  uctTable[idx].Q() / uctTable[idx].N()
-                      + rootC * std::sqrt(std::log(uctTable[currentIndex].N()) / uctTable[idx].N());
+                // Calculate the UCB! value for each child node
+                UCB1 = ucb1(uctTable[idx].Q(), uctTable[idx].N(), uctTable[currentIndex].N());
 
                 assert(UCB1 >= REWARD_LOSS);
 
@@ -1894,7 +1903,50 @@ moves_loop: // When in check, search starts here
         //                                  //
         //////////////////////////////////////
 
-        selDepth = std::max(ss->ply, selDepth);
+        // We determined the most promising node with unexpanded children.
+        // Simply expand the next one in the list. Afterwards, delete
+        // this move from the list so that next time we arrive here, we
+        // do not expand the same move again. If there are no more moves
+        // left then, we mark this node as fully expanded.
+        // Hint: At least as important as in a AB-search,
+        // good move-ordering looks crucial here!
+
+        if (!uctTable[currentIndex].terminal())
+        {
+            auto move = uctTable[currentIndex].legalMoves.front();
+
+            std::memset(&ss->st, 0, sizeof(StateInfo));
+            pos.do_move(move, ss->st);
+            ss++;
+
+            thisThread->nodes.fetch_sub(1, std::memory_order_relaxed);
+//            selDepth = std::max(ss->ply, selDepth);
+
+            // Create the new node
+            uctTable.push_back(MctsNode(nextIndex, currentIndex, move, false, false, 0, 0.0));
+
+            // Add this node as child node to the parent node
+            uctTable[currentIndex].children.push_back(nextIndex);
+
+            // Delete the move from the list
+            uctTable[currentIndex].legalMoves.erase(uctTable[currentIndex].legalMoves.begin());
+
+            // If there are no moves left, mark the node as fully expanded
+            if (uctTable[currentIndex].legalMoves.empty())
+                uctTable[currentIndex].is_expanded();
+
+            currentIndex = nextIndex;
+            nextIndex++;
+
+            // Now generate the legal moves for this new node.
+            // Again, sorting the moves is very likely of big help!
+            for (const auto& m : MoveList<LEGAL>(pos))
+                uctTable[currentIndex].legalMoves.push_back(m);
+
+            // If there were no legal moves, mark the node as terminal
+            if (uctTable[currentIndex].legalMoves.empty())
+                uctTable[currentIndex].is_terminal();
+        }
 
 
         //////////////////////////////////////
@@ -1905,20 +1957,21 @@ moves_loop: // When in check, search starts here
 
         // No rollouts, just simply call eval.
         // Hint: some kind of qsearch should help here!
-
-        // Already terminal node?
-        if (uctTable[currentIndex].terminal())
-            reward = pos.checkers() ? REWARD_LOSS : REWARD_DRAW;
+        // Add TB probing here.
 
         // Check for draw by repetition, 50-move rule or
         // maximum ply reached.
-        else if (pos.is_draw(ss->ply) || ss->ply >= 127)
+        if (pos.is_draw(ss->ply) || ss->ply >= 127)
         {
             uctTable[currentIndex].is_terminal();
             reward = REWARD_DRAW;
         }
 
-        // else call eval
+        // Already terminal node?
+        else if (uctTable[currentIndex].terminal())
+            reward = pos.checkers() ? REWARD_LOSS : REWARD_DRAW;
+
+        // call eval
         else
           reward = value_to_reward(evaluate(pos));
 
@@ -1948,6 +2001,7 @@ moves_loop: // When in check, search starts here
 
         // We are back at the root!
         assert(currentIndex == rootIndex);
+        assert(ss->ply == 0);
 
         // Iteration finished
         iteration++;
@@ -1955,7 +2009,7 @@ moves_loop: // When in check, search starts here
         bestIndex = 0;
 
         // Now check for some stop conditions
-        if (iteration >= 4194256)
+        if (iteration >= 4194300)
             Threads.stop = true;
 
         if (   Limits.nodes
@@ -1994,6 +2048,23 @@ moves_loop: // When in check, search starts here
 
 
   }
+
+
+  // ucb1() calculates the UCB1 value
+
+  double ucb1(const double& Q, const uint64_t& N, const uint64_t& parentN) {
+
+    // Our exploration constant.
+    // Lower values lead to more exploitation,
+    // higher values to more exploration.
+    constexpr double C = 2.12 * std::sqrt(2);
+
+    double X = Q / N;
+    double Y = std::sqrt(std::log(parentN) / N);
+
+    return X + C * Y;
+  }
+
 
   // value_to_reward() transforms an internal Stockfish value
   // to a reward in the interval [0..1].
