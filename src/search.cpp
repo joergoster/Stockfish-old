@@ -1820,12 +1820,10 @@ moves_loop: // When in check, search starts here
         (ss+i)->ply = i;
 
     bool giveOutput;
-    uint64_t iteration;
     int selDepth;
-    uint64_t depth, nodes;
+    uint64_t iteration, maxVisits;
     size_t bestIndex, currentIndex, nextIndex, rootIndex;
     double bestUCB1, UCB1, reward;
-    uint64_t maxVisits;
 
     Thread* thisThread = pos.this_thread();
     TimePoint elapsed, lastOutputTime;
@@ -1840,7 +1838,11 @@ moves_loop: // When in check, search starts here
     rootIndex = 0; // Index of the root node (fix!)
     nextIndex = rootIndex + 1; // The next node will have this index
 
+    lastOutputTime = now();
+    giveOutput = false;
+
     iteration = 0;
+    selDepth = 0;
     currentIndex = rootIndex;
 
     // Now we can start the main MCTS loop, which consists of 4 steps:
@@ -1857,7 +1859,7 @@ moves_loop: // When in check, search starts here
         // node for further expansion.
         while (uctTable[currentIndex].expanded())
         {
-            assert(!uctTable[currentIndex].legalMoves.size());
+            assert(uctTable[currentIndex].legalMoves.empty());
 
             bestUCB1 = REWARD_LOSS;
 
@@ -1920,7 +1922,7 @@ moves_loop: // When in check, search starts here
             ss++;
 
             thisThread->nodes.fetch_sub(1, std::memory_order_relaxed);
-//            selDepth = std::max(ss->ply, selDepth);
+            selDepth = std::max(ss->ply, selDepth);
 
             // Create the new node
             uctTable.push_back(MctsNode(nextIndex, currentIndex, move, false, false, 0, 0.0));
@@ -1973,7 +1975,8 @@ moves_loop: // When in check, search starts here
 
         // call eval
         else
-          reward = value_to_reward(evaluate(pos));
+          reward = pos.checkers() ? value_to_reward(-4 * PawnValueEg)
+                                  : value_to_reward(evaluate(pos));
 
 
         //////////////////////////////////////
@@ -1990,7 +1993,8 @@ moves_loop: // When in check, search starts here
             reward = REWARD_WIN - reward; // Switch side
 
             // Update the current node
-            uctTable[currentIndex].update(reward);
+            uctTable[currentIndex].updateQ(reward);
+            uctTable[currentIndex].updateN();
 
             // Go back to the parent node
             pos.undo_move(uctTable[currentIndex].action());
@@ -1998,6 +2002,9 @@ moves_loop: // When in check, search starts here
 
             currentIndex = uctTable[currentIndex].parentId();
         }
+
+        // We must increase the visits for the root node
+        uctTable[currentIndex].updateN();
 
         // We are back at the root!
         assert(currentIndex == rootIndex);
@@ -2012,33 +2019,54 @@ moves_loop: // When in check, search starts here
         if (iteration >= 4194300)
             Threads.stop = true;
 
-        if (   Limits.nodes
-            && iteration >= Limits.nodes)
+        else if (   Limits.nodes
+                 && iteration >= uint64_t(Limits.nodes))
             Threads.stop = true;
             
-        if (   Limits.movetime
-            && Time.elapsed() >= Limits.movetime)
+        else if (   Limits.movetime
+                 && Time.elapsed() >= Limits.movetime)
             Threads.stop = true;
 
-        // Basic time management
-        elapsed = now();
-
-        if (elapsed > Time.optimum() - 10)
-            Threads.stop = true;
+        if (   Limits.use_time_management()
+            && !Threads.stop.load(std::memory_order_relaxed))
+        {
+            // Basic time management
+            if (Time.elapsed() > Time.optimum() - 10)
+                Threads.stop = true;
+        }
 
         // Time for another GUI update?
-        giveOutput =  Time.elapsed() <  2100 ? elapsed - lastOutputTime >= 250
-                    : Time.elapsed() < 10100 ? elapsed - lastOutputTime >= 1000
-                    : Time.elapsed() < 60100 ? elapsed - lastOutputTime >= 3000
-                                             : elapsed - lastOutputTime >= 10000;
-        if (giveOutput)
-            lastOutputTime = now();
+        if (!Threads.stop.load(std::memory_order_relaxed))
+        {
+            elapsed = now();
+
+            giveOutput =  Time.elapsed() <  2100 ? elapsed - lastOutputTime >= 250
+                        : Time.elapsed() < 10100 ? elapsed - lastOutputTime >= 1000
+                        : Time.elapsed() < 60100 ? elapsed - lastOutputTime >= 3000
+                                                 : elapsed - lastOutputTime >= 10000;
+            if (giveOutput)
+                lastOutputTime = now();
+        }
 
         // Update the root moves stats and send info
         if (   Threads.stop.load(std::memory_order_relaxed)
             || giveOutput)
         {
+            for (auto& idx : uctTable[rootIndex].children)
+            {
+                auto move = uctTable[idx].action();
 
+                RootMove& rm = *std::find(thisThread->rootMoves.begin(),
+                                          thisThread->rootMoves.end(), move);
+
+                rm.score = reward_to_value(uctTable[idx].Q() / uctTable[idx].N());
+                rm.selDepth = selDepth;
+            }
+
+            // Sort the root moves and update the GUI
+            std::stable_sort(thisThread->rootMoves.begin(), thisThread->rootMoves.end());
+
+            sync_cout << UCI::pv(pos, 1, -VALUE_INFINITE, VALUE_INFINITE) << sync_endl;
         }
 
     }
@@ -2046,7 +2074,7 @@ moves_loop: // When in check, search starts here
     // If requested by the user provide some detailed info
     // about the root moves.
 
-
+    uctTable.clear();
   }
 
 

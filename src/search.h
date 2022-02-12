@@ -112,7 +112,8 @@ struct MctsNode {
   bool expanded() const { return isExpanded; }
   bool terminal() const { return isTerminal; }
 
-  void update(double reward) { totalReward += reward; visits++; }
+  void updateQ(double reward) { totalReward += reward; }
+  void updateN() { visits++; }
 
   void is_expanded() { isExpanded = true; }
   void is_terminal() { isTerminal = true; }
