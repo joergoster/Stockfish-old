@@ -68,8 +68,9 @@ struct RootMove {
   bool extract_ponder_from_tt(Position& pos);
   bool operator==(const Move& m) const { return pv[0] == m; }
   bool operator<(const RootMove& m) const { // Sort in descending order
-    return m.score != score ? m.score < score
-                            : m.previousScore < previousScore;
+    return m.visits != visits ? m.visits < visits
+           : m.score != score ? m.score < score
+                              : m.previousScore < previousScore;
   }
 
   Value score = -VALUE_INFINITE;
@@ -77,6 +78,7 @@ struct RootMove {
   Value averageScore = -VALUE_INFINITE;
   int selDepth = 0;
   int tbRank = 0;
+  int visits = 0;
   Value tbScore;
   std::vector<Move> pv;
 };

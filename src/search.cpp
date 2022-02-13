@@ -1810,10 +1810,10 @@ moves_loop: // When in check, search starts here
   void uct_search(Position& pos) {
 
     // Prepare our MCTS Hash Table where we store all nodes
-    MctsHash uctTable;
-    uctTable.reserve(4194304); // About 256 MB hash size
+    MctsHash mcts;
+    mcts.reserve(8388608); // About 256 MB hash size
 
-    // Our small stack
+    // A small stack
     MctsStack stack[128], *ss = stack;
 
     for (int i = 0; i < 128; i++)
@@ -1821,7 +1821,7 @@ moves_loop: // When in check, search starts here
 
     bool giveOutput;
     int selDepth;
-    uint64_t iteration, maxVisits;
+    uint64_t iteration;
     size_t bestIndex, currentIndex, nextIndex, rootIndex;
     double bestUCB1, UCB1, reward;
 
@@ -1829,11 +1829,11 @@ moves_loop: // When in check, search starts here
     TimePoint elapsed, lastOutputTime;
 
     // Create the root node
-    uctTable.push_back(MctsNode(0, 0, MOVE_NONE, false, false, 0, 0.0));
+    mcts.push_back(MctsNode(0, 0, MOVE_NONE, false, false, 0, 0.0));
 
     // Get moves from rootMoves
     for (const auto& rm : thisThread->rootMoves)
-        uctTable[rootIndex].legalMoves.push_back(rm.pv[0]);
+        mcts[rootIndex].legalMoves.push_back(rm.pv[0]);
 
     rootIndex = 0; // Index of the root node (fix!)
     nextIndex = rootIndex + 1; // The next node will have this index
@@ -1844,6 +1844,7 @@ moves_loop: // When in check, search starts here
     iteration = 0;
     selDepth = 0;
     currentIndex = rootIndex;
+
 
     // Now we can start the main MCTS loop, which consists of 4 steps:
     // Selection, Expansion, Simulation (Rollout), and Backpropagation.
@@ -1857,19 +1858,19 @@ moves_loop: // When in check, search starts here
 
         // Using the default UCB1 formula to determine the most promising
         // node for further expansion.
-        while (uctTable[currentIndex].expanded())
+        while (mcts[currentIndex].expanded())
         {
-            assert(uctTable[currentIndex].legalMoves.empty());
+            assert(mcts[currentIndex].legalMoves.empty());
 
             bestUCB1 = REWARD_LOSS;
 
-            for (auto& idx : uctTable[currentIndex].children)
+            for (auto& idx : mcts[currentIndex].children)
             {
-                assert(uctTable[idx].N());
-                assert(uctTable[currentIndex].N());
+                assert(mcts[idx].N());
+                assert(mcts[currentIndex].N());
 
-                // Calculate the UCB! value for each child node
-                UCB1 = ucb1(uctTable[idx].Q(), uctTable[idx].N(), uctTable[currentIndex].N());
+                // Calculate the UCB! value for this child node
+                UCB1 = ucb1(mcts[idx].Q(), mcts[idx].N(), mcts[currentIndex].N());
 
                 assert(UCB1 >= REWARD_LOSS);
 
@@ -1887,7 +1888,7 @@ moves_loop: // When in check, search starts here
             std::memset(&ss->st, 0, sizeof(StateInfo));
 
             // Make the move
-            pos.do_move(uctTable[bestIndex].action(), ss->st);
+            pos.do_move(mcts[bestIndex].action(), ss->st);
 
             // Increment the stack level
             ss++;
@@ -1913,9 +1914,9 @@ moves_loop: // When in check, search starts here
         // Hint: At least as important as in a AB-search,
         // good move-ordering looks crucial here!
 
-        if (!uctTable[currentIndex].terminal())
+        if (!mcts[currentIndex].terminal()) // Don't try to expand terminal nodes!
         {
-            auto move = uctTable[currentIndex].legalMoves.front();
+            auto move = mcts[currentIndex].legalMoves.front();
 
             std::memset(&ss->st, 0, sizeof(StateInfo));
             pos.do_move(move, ss->st);
@@ -1925,17 +1926,17 @@ moves_loop: // When in check, search starts here
             selDepth = std::max(ss->ply, selDepth);
 
             // Create the new node
-            uctTable.push_back(MctsNode(nextIndex, currentIndex, move, false, false, 0, 0.0));
+            mcts.push_back(MctsNode(nextIndex, currentIndex, move, false, false, 0, 0.0));
 
-            // Add this node as child node to the parent node
-            uctTable[currentIndex].children.push_back(nextIndex);
+            // Add index of this node as child node to the parent node
+            mcts[currentIndex].children.push_back(nextIndex);
 
             // Delete the move from the list
-            uctTable[currentIndex].legalMoves.erase(uctTable[currentIndex].legalMoves.begin());
+            mcts[currentIndex].legalMoves.erase(mcts[currentIndex].legalMoves.begin());
 
             // If there are no moves left, mark the node as fully expanded
-            if (uctTable[currentIndex].legalMoves.empty())
-                uctTable[currentIndex].is_expanded();
+            if (mcts[currentIndex].legalMoves.empty())
+                mcts[currentIndex].is_expanded();
 
             currentIndex = nextIndex;
             nextIndex++;
@@ -1943,11 +1944,11 @@ moves_loop: // When in check, search starts here
             // Now generate the legal moves for this new node.
             // Again, sorting the moves is very likely of big help!
             for (const auto& m : MoveList<LEGAL>(pos))
-                uctTable[currentIndex].legalMoves.push_back(m);
+                mcts[currentIndex].legalMoves.emplace_back(m);
 
             // If there were no legal moves, mark the node as terminal
-            if (uctTable[currentIndex].legalMoves.empty())
-                uctTable[currentIndex].is_terminal();
+            if (mcts[currentIndex].legalMoves.empty())
+                mcts[currentIndex].is_terminal();
         }
 
 
@@ -1965,17 +1966,17 @@ moves_loop: // When in check, search starts here
         // maximum ply reached.
         if (pos.is_draw(ss->ply) || ss->ply >= 127)
         {
-            uctTable[currentIndex].is_terminal();
+            mcts[currentIndex].is_terminal();
             reward = REWARD_DRAW;
         }
 
         // Already terminal node?
-        else if (uctTable[currentIndex].terminal())
+        else if (mcts[currentIndex].terminal())
             reward = pos.checkers() ? REWARD_LOSS : REWARD_DRAW;
 
         // call eval
         else
-          reward = pos.checkers() ? value_to_reward(-4 * PawnValueEg)
+          reward = pos.checkers() ? value_to_reward(-4 * PawnValueEg) // A workaround
                                   : value_to_reward(evaluate(pos));
 
 
@@ -1993,18 +1994,19 @@ moves_loop: // When in check, search starts here
             reward = REWARD_WIN - reward; // Switch side
 
             // Update the current node
-            uctTable[currentIndex].updateQ(reward);
-            uctTable[currentIndex].updateN();
+            mcts[currentIndex].updateQ(reward);
+            mcts[currentIndex].updateN();
 
             // Go back to the parent node
-            pos.undo_move(uctTable[currentIndex].action());
+            pos.undo_move(mcts[currentIndex].action());
             ss--;
 
-            currentIndex = uctTable[currentIndex].parentId();
+            currentIndex = mcts[currentIndex].parentId();
         }
 
-        // We must increase the visits for the root node
-        uctTable[currentIndex].updateN();
+        // We must increase the visits for the root node.
+        // Needed by the UCB1 formula!
+        mcts[currentIndex].updateN();
 
         // We are back at the root!
         assert(currentIndex == rootIndex);
@@ -2016,7 +2018,7 @@ moves_loop: // When in check, search starts here
         bestIndex = 0;
 
         // Now check for some stop conditions
-        if (iteration >= 4194300)
+        if (iteration >= 8388600)
             Threads.stop = true;
 
         else if (   Limits.nodes
@@ -2052,15 +2054,31 @@ moves_loop: // When in check, search starts here
         if (   Threads.stop.load(std::memory_order_relaxed)
             || giveOutput)
         {
-            for (auto& idx : uctTable[rootIndex].children)
+            // Assign the score and the PV to all root moves
+            for (auto& idx : mcts[rootIndex].children)
             {
-                auto move = uctTable[idx].action();
+                auto move = mcts[idx].action();
 
                 RootMove& rm = *std::find(thisThread->rootMoves.begin(),
                                           thisThread->rootMoves.end(), move);
 
-                rm.score = reward_to_value(uctTable[idx].Q() / uctTable[idx].N());
+                rm.score = reward_to_value(mcts[idx].Q() / mcts[idx].N());
+                rm.visits = int(mcts[idx].N());
                 rm.selDepth = selDepth;
+
+                // Collect the PV
+                rm.pv.resize(1);
+                size_t maxVisitsIndex = idx;
+
+                while (!mcts[maxVisitsIndex].children.empty())
+                {
+                    maxVisitsIndex = *std::max_element(mcts[maxVisitsIndex].children.begin(),
+                                                       mcts[maxVisitsIndex].children.end(),
+                                                       [&](size_t a, size_t b) { return mcts[b].N() > mcts[a].N(); });
+
+                    rm.pv.push_back(mcts[maxVisitsIndex].action());
+                }
+
             }
 
             // Sort the root moves and update the GUI
@@ -2074,7 +2092,7 @@ moves_loop: // When in check, search starts here
     // If requested by the user provide some detailed info
     // about the root moves.
 
-    uctTable.clear();
+    mcts.clear();
   }
 
 
@@ -2085,7 +2103,7 @@ moves_loop: // When in check, search starts here
     // Our exploration constant.
     // Lower values lead to more exploitation,
     // higher values to more exploration.
-    constexpr double C = 2.12 * std::sqrt(2);
+    constexpr double C = 1.6 * std::sqrt(2);
 
     double X = Q / N;
     double Y = std::sqrt(std::log(parentN) / N);
