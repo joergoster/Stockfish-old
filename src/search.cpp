@@ -2089,8 +2089,12 @@ moves_loop: // When in check, search starts here
 
     }
 
-    // If requested by the user provide some detailed info
-    // about the root moves.
+    // Show some detailed info about all root moves
+    for (auto& rm : thisThread->rootMoves)
+        std::cout << "info string Root move: " << std::setw(6) << UCI::move(rm.pv[0], pos.is_chess960())
+                  << "     Visits: "           << std::setw(8) << rm.visits
+                  << "     P: "                << std::setw(6) << std::setprecision(4) << value_to_reward(rm.score)
+                  << " (" << UCI::value(rm.score) << ")" << std::endl;
 
     mcts.clear();
   }
