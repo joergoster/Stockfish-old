@@ -340,8 +340,6 @@ namespace {
 
         else
             rankThisMove += 20 * relative_rank(us, to_sq(m));
-//            rankThisMove += 20 * (relative_rank(us, to_sq(m)) - relative_rank(us, from_sq(m)));
-//            rankThisMove -= 10 * distance(king, to_sq(m));
 
         // Add this ranked move
         legalMoves.emplace_back(RankedMove(m, rankThisMove));
@@ -349,26 +347,28 @@ namespace {
         rankThisMove = 0; // Reset for the next move
     }
 
-    std::stable_sort(legalMoves.begin(), legalMoves.end());
-
     // Search all legal moves
-    for (auto& rm : legalMoves)
+    while (!legalMoves.empty())
     {
         moveCount++;
 
+        // Pick the next best move
+        auto rm = std::max_element(legalMoves.begin(), legalMoves.end(),
+                                [](const RankedMove& a, const RankedMove& b) { return b.rank > a.rank; });
+
         // At frontier nodes we can skip all non-checking moves
         if (   depth == 1
-            && rm.rank < 1000)
+            && (*rm).rank < 1000)
             break;
 
         if (   onlyChecks
             && !(ss->ply & 1)
-            && rm.rank < 1000)
+            && (*rm).rank < 1000)
             break;
 
-        pos.do_move(rm.move, st);
+        pos.do_move((*rm).move, st);
         value = -search(pos, ss+1, -beta, -alpha, depth-1);
-        pos.undo_move(rm.move);
+        pos.undo_move((*rm).move);
 
         // Do we have a new best value?
         if (value > bestValue)
@@ -386,13 +386,16 @@ namespace {
 
                 // Reset PV and insert current best move
                 ss->pv.clear();
-                ss->pv.push_back(rm.move);
+                ss->pv.push_back((*rm).move);
 
                 // Append child pv
                 for (auto& m : (ss+1)->pv)
                     ss->pv.push_back(m);
             }
         }
+
+        // Delete this move from the list
+        legalMoves.erase(rm);
     }
 
     // No moves? Must be Mate or Stalemate!
