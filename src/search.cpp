@@ -20,6 +20,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstring>   // For std::memset
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 
