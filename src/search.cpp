@@ -137,6 +137,9 @@ void MainThread::search() {
 
   Thread::search(); // Let's start searching!
 
+//  while (!Threads.stop && Limits.infinite)
+//  {} // Busy wait for a stop
+
   // Stop the threads if not already stopped
   Threads.stop = true;
 
@@ -148,7 +151,7 @@ void MainThread::search() {
   Thread* bestThread = this;
 
   // Send PV info
-  sync_cout << UCI::pv(bestThread->rootPos, bestThread->completedDepth, -VALUE_INFINITE, VALUE_INFINITE) << sync_endl;
+//  sync_cout << UCI::pv(bestThread->rootPos, bestThread->completedDepth, -VALUE_INFINITE, VALUE_INFINITE) << sync_endl;
 
   // Send best move and ponder move (if available)
   sync_cout << "bestmove " << UCI::move(bestThread->rootMoves[0].pv[0], rootPos.is_chess960());
@@ -258,15 +261,16 @@ void Thread::search() {
           {
               Threads.stop = true;
               sync_cout << "info string Success! Mate in " << (rootDepth + 1) / 2 << " found!" << sync_endl;
+              sync_cout << UCI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
           }
 
-          if (Threads.stop.load(std::memory_order_relaxed))
+          if (Threads.stop)
               break;
       }
 
       completedDepth = rootDepth;
 
-      if (Threads.stop.load(std::memory_order_relaxed))
+      if (Threads.stop)
           break;
 
       // Inform the user that we haven't found a mate
@@ -274,6 +278,7 @@ void Thread::search() {
 
       rootDepth += 2;
   }
+
 }
 
 
@@ -294,8 +299,9 @@ namespace {
     // Start with a fresh pv
     ss->pv.clear();
 
-    // Check for aborted search
-    if (Threads.stop.load(std::memory_order_relaxed))
+    // Check for aborted search or maximum ply reached
+    if (   Threads.stop.load(std::memory_order_relaxed)
+        || ss->ply == MAX_PLY)
         return VALUE_ZERO;
 
     // At the leafs, we simply either return a mate score
@@ -433,11 +439,7 @@ void MainThread::check_time() {
       dbg_print();
   }
 
-  // We should not stop pondering until told so by the GUI
-  if (ponder)
-      return;
-
-  if (   (Limits.use_time_management() && (elapsed > Time.maximum() - 10 || stopOnPonderhit))
+  if (   (Limits.use_time_management() && elapsed > Time.maximum() - 10)
       || (Limits.movetime && elapsed >= Limits.movetime)
       || (Limits.nodes && Threads.nodes_searched() >= (uint64_t)Limits.nodes))
       Threads.stop = true;
@@ -500,9 +502,9 @@ string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
 void Tablebases::rank_root_moves(Position& pos, Search::RootMoves& rootMoves) {
 
     RootInTB = false;
-    UseRule50 = bool(Options["Syzygy50MoveRule"]);
-    ProbeDepth = int(Options["SyzygyProbeDepth"]);
-    Cardinality = int(Options["SyzygyProbeLimit"]);
+    UseRule50 = Options["Syzygy50MoveRule"];
+    ProbeDepth = Options["SyzygyProbeDepth"];
+    Cardinality = Options["SyzygyProbeLimit"];
     bool dtz_available = true;
 
     // Tables with fewer pieces than SyzygyProbeLimit are searched with

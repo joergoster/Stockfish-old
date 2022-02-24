@@ -108,11 +108,11 @@ namespace {
 
     Search::LimitsType limits;
     string token;
-    bool ponderMode = false;
 
     limits.startTime = now(); // As early as possible!
 
     while (is >> token)
+    {
         if (token == "searchmoves")
             while (is >> token)
                 limits.searchmoves.push_back(UCI::to_move(pos, token));
@@ -128,14 +128,14 @@ namespace {
         else if (token == "mate")      is >> limits.mate;
         else if (token == "perft")     is >> limits.perft;
         else if (token == "infinite")  limits.infinite = 1;
-        else if (token == "ponder")    ponderMode = true;
+    }
 
     // If the user or the GUI didn't specify a mate limit,
     // e. g. by starting an infinite analysis, set it for them!
     if (limits.mate == 0)
         limits.mate = 50;
 
-    Threads.start_thinking(pos, states, limits, ponderMode);
+    Threads.start_thinking(pos, states, limits);
   }
 
 
@@ -218,13 +218,6 @@ void UCI::loop(int argc, char* argv[]) {
       if (    token == "quit"
           ||  token == "stop")
           Threads.stop = true;
-
-      // The GUI sends 'ponderhit' to tell us the user has played the expected move.
-      // So 'ponderhit' will be sent if we were told to ponder on the same move the
-      // user has played. We should continue searching but switch from pondering to
-      // normal search.
-      else if (token == "ponderhit")
-          Threads.main()->ponder = false; // Switch to normal search
 
       else if (token == "uci")
           sync_cout << "id name " << engine_info(true)

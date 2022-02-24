@@ -36,6 +36,7 @@ UCI::OptionsMap Options; // Global object
 namespace UCI {
 
 /// 'On change' actions, triggered by an option's value change
+void on_hash_size(const Option& o) { (void)o; }
 void on_logger(const Option& o) { start_logger(o); }
 void on_threads(const Option& o) { Threads.set(o); }
 void on_tb_path(const Option& o) { Tablebases::init(o); }
@@ -55,7 +56,7 @@ void init(OptionsMap& o) {
 
   o["Debug Log File"]        << Option("", on_logger);
   o["Threads"]               << Option(1, 1, 1, on_threads);
-  o["Ponder"]                << Option(false);
+  o["Hash"]                  << Option(16, 1, 64, on_hash_size);
   o["MultiPV"]               << Option(1, 1, 500);
   o["Move Overhead"]         << Option(30, 0, 5000);
   o["Minimum Thinking Time"] << Option(20, 0, 5000);
@@ -83,12 +84,11 @@ std::ostream& operator<<(std::ostream& os, const OptionsMap& om) {
               const Option& o = it.second;
               os << "\noption name " << it.first << " type " << o.type;
 
-              if (o.type == "string" || o.type == "check" || o.type == "combo")
+              if (o.type != "button")
                   os << " default " << o.defaultValue;
 
               if (o.type == "spin")
-                  os << " default " << int(stof(o.defaultValue))
-                     << " min "     << o.min
+                  os << " min "     << o.min
                      << " max "     << o.max;
 
               break;
@@ -109,15 +109,15 @@ Option::Option(bool v, OnChange f) : type("check"), min(0), max(0), on_change(f)
 Option::Option(OnChange f) : type("button"), min(0), max(0), on_change(f)
 {}
 
-Option::Option(double v, int minv, int maxv, OnChange f) : type("spin"), min(minv), max(maxv), on_change(f)
+Option::Option(int v, int minv, int maxv, OnChange f) : type("spin"), min(minv), max(maxv), on_change(f)
 { defaultValue = currentValue = std::to_string(v); }
 
 Option::Option(const char* v, const char* cur, OnChange f) : type("combo"), min(0), max(0), on_change(f)
 { defaultValue = v; currentValue = cur; }
 
-Option::operator double() const {
-  assert(type == "check" || type == "spin");
-  return (type == "spin" ? stof(currentValue) : currentValue == "true");
+Option::operator int() const {
+  assert(type == "check" || type == "spin" || type == "button");
+  return (type == "spin" ? stoi(currentValue) : currentValue == "true");
 }
 
 Option::operator std::string() const {
@@ -153,7 +153,7 @@ Option& Option::operator=(const string& v) {
 
   if (   (type != "button" && v.empty())
       || (type == "check" && v != "true" && v != "false")
-      || (type == "spin" && (stof(v) < min || stof(v) > max)))
+      || (type == "spin" && (stoi(v) < min || stoi(v) > max)))
       return *this;
 
   if (type == "combo")
@@ -161,8 +161,10 @@ Option& Option::operator=(const string& v) {
       OptionsMap comboMap; // To have case insensitive compare
       string token;
       std::istringstream ss(defaultValue);
+
       while (ss >> token)
           comboMap[token] << Option();
+
       if (!comboMap.count(v) || v == "var")
           return *this;
   }
