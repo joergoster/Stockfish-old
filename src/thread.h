@@ -52,12 +52,14 @@ public:
   void idle_loop();
   void start_searching();
   void wait_for_search_finished();
+  size_t id() const { return idx; }
 
   size_t pvIdx;
   int selDepth;
   std::atomic<uint64_t> nodes, tbHits;
 
   Position rootPos;
+  StateInfo rootState;
   Search::RootMoves rootMoves;
   Depth rootDepth, completedDepth;
 };

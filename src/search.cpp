@@ -54,7 +54,7 @@ using namespace Search;
 namespace {
 
   bool onlyChecks;
-  int kingMoves;
+  int allMoves, kingMoves;
 
   Value search(Position& pos, Stack* ss, Value alpha, Value beta, Depth depth);
 
@@ -128,8 +128,9 @@ void MainThread::search() {
   Time.init(Limits, rootPos.side_to_move(), rootPos.game_ply());
 
   // Read UCI options
-  onlyChecks = Options["Checks Only"];
-  kingMoves  = Options["King Moves"];
+  onlyChecks = Options["ChecksOnly"];
+  kingMoves  = Options["KingMoves"];
+  allMoves   = Options["AllMoves"];
 
   for (Thread* th : Threads)
       if (th != this)
@@ -137,30 +138,35 @@ void MainThread::search() {
 
   Thread::search(); // Let's start searching!
 
-//  while (!Threads.stop && Limits.infinite)
-//  {} // Busy wait for a stop
-
-  // Stop the threads if not already stopped
-  Threads.stop = true;
+  while (!Threads.stop && Limits.infinite)
+  {} // Busy wait for a stop
 
   // Wait until all threads have finished
   for (Thread* th : Threads)
       if (th != this)
           th->wait_for_search_finished();
 
+  // Stop the threads if not already stopped
+  Threads.stop = true;
+
+  sync_cout << "info string All threads finished!" << sync_endl;
+
   Thread* bestThread = this;
+
+  for (Thread* th : Threads)
+      if (th->rootMoves[0].score > bestThread->rootMoves[0].score)
+          bestThread = th;
 
   // Send PV info
 //  sync_cout << UCI::pv(bestThread->rootPos, bestThread->completedDepth, -VALUE_INFINITE, VALUE_INFINITE) << sync_endl;
 
   // Send best move and ponder move (if available)
-  sync_cout << "bestmove " << UCI::move(bestThread->rootMoves[0].pv[0], rootPos.is_chess960());
+  sync_cout << "bestmove " << UCI::move(bestThread->rootMoves[0].pv[0], bestThread->rootPos.is_chess960());
 
   if (bestThread->rootMoves[0].pv.size() > 1)
-      std::cout << " ponder " << UCI::move(bestThread->rootMoves[0].pv[1], rootPos.is_chess960());
+      std::cout << " ponder " << UCI::move(bestThread->rootMoves[0].pv[1], bestThread->rootPos.is_chess960());
 
   std::cout << sync_endl;
-
 }
 
 
@@ -170,12 +176,13 @@ void MainThread::search() {
 
 void Thread::search() {
 
-  Stack stack[MAX_PLY+2], *ss = stack+2;
+  Stack stack[MAX_PLY+1], *ss = stack;
   StateInfo rootSt;
   Value alpha, beta, bestValue, value;
 
   for (int i = 0; i <= MAX_PLY; ++i)
       (ss+i)->ply = i;
+  ss->pv.clear();
 
   Color us = rootPos.side_to_move();
   Depth targetDepth = Limits.mate ? 2 * Limits.mate - 1 : MAX_PLY;
@@ -260,21 +267,21 @@ void Thread::search() {
           if (bestValue >= alpha)
           {
               Threads.stop = true;
-              sync_cout << "info string Success! Mate in " << (rootDepth + 1) / 2 << " found!" << sync_endl;
+              sync_cout << "info string Thread " << id() + 1 << ": Success! Mate in " << (rootDepth + 1) / 2 << " found!" << sync_endl;
               sync_cout << UCI::pv(rootPos, rootDepth, alpha, beta) << sync_endl;
           }
 
-          if (Threads.stop)
+          if (Threads.stop.load())
               break;
       }
 
       completedDepth = rootDepth;
 
-      if (Threads.stop)
+      if (Threads.stop.load())
           break;
 
       // Inform the user that we haven't found a mate
-      sync_cout << "info string No mate in " << (completedDepth + 1) / 2 << " found" << sync_endl;
+      sync_cout << "info string Thread " << id() + 1 << ": No mate in " << (completedDepth + 1) / 2 << " found" << sync_endl;
 
       rootDepth += 2;
   }
@@ -300,7 +307,7 @@ namespace {
     ss->pv.clear();
 
     // Check for aborted search or maximum ply reached
-    if (   Threads.stop.load(std::memory_order_relaxed)
+    if (   Threads.stop.load()
         || ss->ply == MAX_PLY)
         return VALUE_ZERO;
 
@@ -314,10 +321,16 @@ namespace {
             return VALUE_DRAW;
     }
 
-    if (   kingMoves < 8
-        && ss->ply & 1
-        && int(MoveList<LEGAL, KING>(pos).size()) > kingMoves)
-        return VALUE_DRAW;
+    if (ss->ply & 1)
+    {
+        if (   kingMoves < 8
+            && int(MoveList<LEGAL, KING>(pos).size()) > kingMoves)
+            return VALUE_DRAW;
+
+        if (   allMoves < 250
+            && int(MoveList<LEGAL>(pos).size()) > allMoves)
+            return VALUE_DRAW;
+    }
 
     // Check for draw by repetition and 50-move rule
     if (pos.is_draw(ss->ply))
@@ -498,7 +511,7 @@ string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
   return ss.str();
 }
 
-
+/*
 void Tablebases::rank_root_moves(Position& pos, Search::RootMoves& rootMoves) {
 
     RootInTB = false;
@@ -544,4 +557,4 @@ void Tablebases::rank_root_moves(Position& pos, Search::RootMoves& rootMoves) {
         for (auto& m : rootMoves)
             m.tbRank = 0;
     }
-}
+}*/

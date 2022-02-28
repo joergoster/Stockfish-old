@@ -55,14 +55,15 @@ bool CaseInsensitiveLess::operator() (const string& s1, const string& s2) const 
 void init(OptionsMap& o) {
 
   o["Debug Log File"]        << Option("", on_logger);
-  o["Threads"]               << Option(1, 1, 1, on_threads);
+  o["Threads"]               << Option(1, 1, 64, on_threads);
   o["Hash"]                  << Option(16, 1, 64, on_hash_size);
   o["MultiPV"]               << Option(1, 1, 500);
   o["Move Overhead"]         << Option(30, 0, 5000);
   o["Minimum Thinking Time"] << Option(20, 0, 5000);
   o["Slow Mover"]            << Option(84, 10, 1000);
-  o["Checks Only"]           << Option(false);
-  o["King Moves"]            << Option(8, 0, 8);
+  o["ChecksOnly"]            << Option(false);
+  o["KingMoves"]             << Option(8, 0, 8);
+  o["AllMoves"]              << Option(250, 0, 250);
   o["UCI_Chess960"]          << Option(false);
   o["UCI_AnalyseMode"]       << Option(false);
   o["SyzygyPath"]            << Option("<empty>", on_tb_path);
@@ -88,7 +89,8 @@ std::ostream& operator<<(std::ostream& os, const OptionsMap& om) {
                   os << " default " << o.defaultValue;
 
               if (o.type == "spin")
-                  os << " min "     << o.min
+                  os << " default " << int(stoi(o.defaultValue))
+                     << " min "     << o.min
                      << " max "     << o.max;
 
               break;
@@ -151,7 +153,7 @@ Option& Option::operator=(const string& v) {
 
   assert(!type.empty());
 
-  if (   (type != "button" && v.empty())
+  if (   (type != "button" && type != "string" && v.empty())
       || (type == "check" && v != "true" && v != "false")
       || (type == "spin" && (stoi(v) < min || stoi(v) > max)))
       return *this;
