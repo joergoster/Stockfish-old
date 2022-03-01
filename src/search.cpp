@@ -154,7 +154,8 @@ void MainThread::search() {
   Thread* bestThread = this;
 
   for (Thread* th : Threads)
-      if (th->rootMoves[0].score > bestThread->rootMoves[0].score)
+      if (  !th->rootMoves.empty()
+          && th->rootMoves[0].score > bestThread->rootMoves[0].score)
           bestThread = th;
 
   // Send PV info
