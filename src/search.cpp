@@ -53,6 +53,8 @@ using namespace Search;
 
 namespace {
 
+  constexpr int MVVLVA[PIECE_TYPE_NB] = { 0, 100, 300, 305, 500, 900, 0, 0 };
+
   bool onlyChecks;
   int allMoves, kingMoves;
 
@@ -208,7 +210,7 @@ void Thread::search() {
           rm.tbRank += 2000 - 10 * distance(king, to_sq(rm.pv[0])); // Top priority!
 
       else if (rootPos.capture(rm.pv[0]))
-          rm.tbRank += 200; // TODO MVV/LVA
+          rm.tbRank += MVVLVA[type_of(rootPos.piece_on(to_sq(rm.pv[0])))];
 
       else
           rm.tbRank += 20 * relative_rank(us, to_sq(rm.pv[0]));
@@ -356,7 +358,7 @@ namespace {
             rankThisMove += 2000 - 100 * distance(king, to_sq(m)); // Top priority!
 
         else if (pos.capture(m))
-            rankThisMove += 200; // TODO MVV/LVA
+            rankThisMove += MVVLVA[type_of(pos.piece_on(to_sq(m)))];
 
         else
             rankThisMove += 20 * relative_rank(us, to_sq(m));
