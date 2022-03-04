@@ -108,6 +108,7 @@ struct LimitsType {
 
 extern LimitsType Limits;
 
+void init(Position& pos);
 void clear();
 
 } // namespace Search

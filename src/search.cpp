@@ -90,6 +90,70 @@ namespace {
 } // namespace
 
 
+/// Search::init() is called just before a new search is started,
+/// and reads in some UCI options and prepares the root moves for
+/// each thread.
+
+void Search::init(Position& pos) {
+
+  // Read UCI options
+  onlyChecks = Options["ChecksOnly"];
+  kingMoves  = Options["KingMoves"];
+  allMoves   = Options["AllMoves"];
+
+  // Prepare the root moves
+  RootMoves searchMoves;
+  StateInfo rootSt;
+
+  for (const auto& m : MoveList<LEGAL>(pos))
+      if (   Limits.searchmoves.empty()
+          || std::count(Limits.searchmoves.begin(), Limits.searchmoves.end(), m))
+          searchMoves.emplace_back(m);
+
+  const auto king = pos.square<KING>(~pos.side_to_move());
+
+  // Now we rank the root moves for the mate search.
+  for (auto& rm : searchMoves)
+  {
+      // R-Mobility (kind of ?)
+      pos.do_move(rm.pv[0], rootSt);
+      rm.tbRank -= (pos.checkers() ? 20 : 16) * int(MoveList<LEGAL>(pos).size());
+      pos.undo_move(rm.pv[0]);
+
+      pos.this_thread()->nodes--; // Don't count nodes here!
+
+      if (pos.gives_check(rm.pv[0]))
+          rm.tbRank += 2000 - 10 * distance(king, to_sq(rm.pv[0])); // Top priority!
+
+      if (pos.capture(rm.pv[0]))
+          rm.tbRank += MVVLVA[type_of(pos.piece_on(to_sq(rm.pv[0])))];
+
+      else
+          rm.tbRank += 20 * relative_rank(pos.side_to_move(), to_sq(rm.pv[0]));
+  }
+
+  std::stable_sort(searchMoves.begin(), searchMoves.end(),
+     [](const RootMove &rm1, const RootMove &rm2) { return rm1.tbRank > rm2.tbRank; });
+
+  // Finally, distribute the ranked root moves among all available threads
+  auto it = searchMoves.begin();
+
+  while (it < searchMoves.end())
+  {
+      for (Thread* th : Threads)
+      {
+          th->rootMoves.push_back(*it);
+          it++;
+
+          if (it == searchMoves.end())
+              break;
+      }
+  }
+
+  assert(Threads.nodes_searched() == 0);
+}
+
+
 /// Search::clear() resets search state to its initial value
 
 void Search::clear() {
@@ -128,11 +192,6 @@ void MainThread::search() {
   }
 
   Time.init(Limits, rootPos.side_to_move(), rootPos.game_ply());
-
-  // Read UCI options
-  onlyChecks = Options["ChecksOnly"];
-  kingMoves  = Options["KingMoves"];
-  allMoves   = Options["AllMoves"];
 
   for (Thread* th : Threads)
       if (th != this)
@@ -185,9 +244,9 @@ void Thread::search() {
 
   for (int i = 0; i <= MAX_PLY; ++i)
       (ss+i)->ply = i;
+
   ss->pv.clear();
 
-  Color us = rootPos.side_to_move();
   Depth targetDepth = Limits.mate ? 2 * Limits.mate - 1 : MAX_PLY;
   size_t multiPV = rootMoves.size();
   rootDepth = 1;
@@ -195,30 +254,6 @@ void Thread::search() {
   // 
   alpha = VALUE_MATE - 2 * Limits.mate;
   beta  = VALUE_INFINITE;
-
-  const auto king = rootPos.square<KING>(~us);
-
-  // Now we rank the root moves for the mate search.
-  for (auto& rm : rootMoves)
-  {
-      // R-Mobility (kind of ?)
-      rootPos.do_move(rm.pv[0], rootSt);
-      rm.tbRank -= (rootPos.checkers() ? 20 : 16) * int(MoveList<LEGAL>(rootPos).size());
-      rootPos.undo_move(rm.pv[0]);
-
-      if (rootPos.gives_check(rm.pv[0]))
-          rm.tbRank += 2000 - 10 * distance(king, to_sq(rm.pv[0])); // Top priority!
-
-      else if (rootPos.capture(rm.pv[0]))
-          rm.tbRank += MVVLVA[type_of(rootPos.piece_on(to_sq(rm.pv[0])))];
-
-      else
-          rm.tbRank += 20 * relative_rank(us, to_sq(rm.pv[0]));
-  }
-
-  std::stable_sort(rootMoves.begin(), rootMoves.end(),
-     [](const RootMove &rm1, const RootMove &rm2) { return rm1.tbRank > rm2.tbRank; });
-
 
   while (rootDepth <= targetDepth)
   {
@@ -357,7 +392,7 @@ namespace {
         if (pos.gives_check(m))
             rankThisMove += 2000 - 100 * distance(king, to_sq(m)); // Top priority!
 
-        else if (pos.capture(m))
+        if (pos.capture(m))
             rankThisMove += MVVLVA[type_of(pos.piece_on(to_sq(m)))];
 
         else

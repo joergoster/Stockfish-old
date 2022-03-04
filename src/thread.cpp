@@ -25,7 +25,6 @@
 #include "search.h"
 #include "thread.h"
 #include "uci.h"
-#include "syzygy/tbprobe.h"
 
 ThreadPool Threads; // Global object
 
@@ -146,31 +145,6 @@ void ThreadPool::start_thinking(Position& pos, StateListPtr& states,
 
   stop = false;
   Search::Limits = limits;
-//  Search::RootMoves rootMoves;
-  std::vector<Move> legalMoves;
-
-  for (const auto& m : MoveList<LEGAL>(pos))
-      if (   limits.searchmoves.empty()
-          || std::count(limits.searchmoves.begin(), limits.searchmoves.end(), m))
-          legalMoves.emplace_back(m);
-
-  for (Thread* th : *this)
-      th->rootMoves.clear();
-
-  while (!legalMoves.empty())
-  {
-      for (Thread* th : *this)
-      {
-          th->rootMoves.emplace_back(legalMoves.front());
-          legalMoves.erase(legalMoves.begin());
-
-          if (legalMoves.empty())
-              break;
-      }
-  }
-
-//  if (!rootMoves.empty())
-//      Tablebases::rank_root_moves(pos, rootMoves);
 
   // After ownership transfer 'states' becomes empty, so if we stop the search
   // and call 'go' again without setting a new position states.get() == NULL.
@@ -190,12 +164,13 @@ void ThreadPool::start_thinking(Position& pos, StateListPtr& states,
   {
       th->nodes = th->tbHits = 0;
       th->rootDepth = th->completedDepth = 0;
-//      th->rootMoves = rootMoves;
+      th->rootMoves.clear();
       th->rootPos.set(pos.fen(), pos.is_chess960(), &th->rootState, th);
       th->rootState = setupStates->back();
   }
 
   setupStates->back() = tmp;
 
+  Search::init(pos);
   main()->start_searching();
 }
