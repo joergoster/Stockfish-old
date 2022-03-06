@@ -453,6 +453,12 @@ namespace {
 
         // Delete this move from the list
         legalMoves.erase(rm);
+
+        // If we have found a mate within the specified limit,
+        // we can immediately break from the moves loop.
+        // Note: this can only happen for the root color!
+        if (bestValue >= VALUE_MATE - pos.this_thread()->rootDepth)
+            break;
     }
 
     // No moves? Must be Mate or Stalemate!
