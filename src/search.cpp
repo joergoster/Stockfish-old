@@ -123,10 +123,11 @@ void Search::init(Position& pos) {
       pos.this_thread()->nodes--; // Don't count nodes here!
 
       if (pos.gives_check(rm.pv[0]))
-          rm.tbRank += 2000 - 10 * distance(king, to_sq(rm.pv[0])); // Top priority!
+          rm.tbRank += 6000 - 100 * distance(king, to_sq(rm.pv[0])); // Top priority!
 
       if (pos.capture(rm.pv[0]))
-          rm.tbRank += MVVLVA[type_of(pos.piece_on(to_sq(rm.pv[0])))];
+          rm.tbRank +=  MVVLVA[type_of(pos.piece_on(to_sq(rm.pv[0])))]
+                      + 800 * (pos.checkers() & to_sq(rm.pv[0]));
 
       else
           rm.tbRank += 20 * relative_rank(pos.side_to_move(), to_sq(rm.pv[0]));
@@ -275,7 +276,7 @@ void Thread::search() {
                         << " currmovenumber " << pvIdx + 1 << sync_endl;
 
           if (   onlyChecks
-              && rootMoves[pvIdx].tbRank < 1000)
+              && rootMoves[pvIdx].tbRank < 3000)
               continue;
 
           // Make, search and undo the root move
@@ -390,10 +391,11 @@ namespace {
     for (const auto& m : MoveList<LEGAL>(pos))
     {
         if (pos.gives_check(m))
-            rankThisMove += 2000 - 100 * distance(king, to_sq(m)); // Top priority!
+            rankThisMove += 4000 - 100 * distance(king, to_sq(m)); // Top priority!
 
         if (pos.capture(m))
-            rankThisMove += MVVLVA[type_of(pos.piece_on(to_sq(m)))];
+            rankThisMove +=  MVVLVA[type_of(pos.piece_on(to_sq(m)))]
+                           + 800 * (pos.checkers() & to_sq(m));
 
         else
             rankThisMove += 20 * relative_rank(us, to_sq(m));
@@ -415,12 +417,12 @@ namespace {
 
         // At frontier nodes we can skip all non-checking moves
         if (   depth == 1
-            && (*rm).rank < 1000)
+            && (*rm).rank < 3000)
             break;
 
         if (   onlyChecks
             && !(ss->ply & 1)
-            && (*rm).rank < 1000)
+            && (*rm).rank < 3000)
             break;
 
         pos.do_move((*rm).move, st);
