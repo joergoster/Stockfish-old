@@ -89,8 +89,7 @@ std::ostream& operator<<(std::ostream& os, const OptionsMap& om) {
                   os << " default " << o.defaultValue;
 
               if (o.type == "spin")
-                  os << " default " << int(stoi(o.defaultValue))
-                     << " min "     << o.min
+                  os << " min "     << o.min
                      << " max "     << o.max;
 
               break;
