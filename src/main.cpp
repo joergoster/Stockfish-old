@@ -21,6 +21,7 @@
 #include <iostream>
 
 #include "bitboard.h"
+#include "misc.h"
 #include "position.h"
 #include "search.h"
 #include "thread.h"
@@ -30,13 +31,15 @@
 
 int main(int argc, char* argv[]) {
 
-  std::cout << engine_info() << std::endl;
-
   UCI::init(Options);
   Bitboards::init();
   Position::init();
   Threads.set(Options["Threads"]);
   Search::clear(); // After threads are up
+
+  // Announce to the GUI after setting up everything
+  // and just before we start the UCI loop.
+  std::cout << engine_info() << std::endl;
 
   UCI::loop(argc, argv);
 
