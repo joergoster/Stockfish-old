@@ -1812,7 +1812,7 @@ moves_loop: // When in check, search starts here
 
     // Prepare our MCTS Hash Table where we store all nodes
     MctsHash mcts;
-    mcts.reserve(8388608); // About 256 MB hash size
+    mcts.reserve(8388608); // About 512 MB hash size
 
     // A small stack
     MctsStack stack[128], *ss = stack;
@@ -1823,28 +1823,30 @@ moves_loop: // When in check, search starts here
     bool giveOutput;
     int selDepth;
     uint64_t iteration;
-    size_t bestIndex, currentIndex, nextIndex, rootIndex;
+//    size_t bestIndex, currentIndex, nextIndex, rootIndex;
     double bestUCB1, UCB1, reward;
 
     Thread* thisThread = pos.this_thread();
     TimePoint elapsed, lastOutputTime;
 
+    // Prepare the iterators
+    const auto rootIndex = mcts.begin(); // Index of the root node (fix!)
+    auto currentIndex = rootIndex;
+    auto bestIndex = currentIndex;
+    auto nextIndex = rootIndex + 1; // The next node will have this index
+
     // Create the root node
-    mcts.push_back(MctsNode(0, 0, MOVE_NONE, false, false, 0, 0.0));
+    mcts.push_back(MctsNode(rootIndex, rootIndex, MOVE_NONE, false, false, 0, 0.0));
 
     // Get moves from rootMoves
     for (const auto& rm : thisThread->rootMoves)
-        mcts[rootIndex].legalMoves.push_back(rm.pv[0]);
-
-    rootIndex = 0; // Index of the root node (fix!)
-    nextIndex = rootIndex + 1; // The next node will have this index
+        (*rootIndex).legalMoves.push_back(rm.pv[0]);
 
     lastOutputTime = now();
     giveOutput = false;
 
     iteration = 0;
     selDepth = 0;
-    currentIndex = rootIndex;
 
 
     // Now we can start the main MCTS loop, which consists of 4 steps:
@@ -1859,19 +1861,19 @@ moves_loop: // When in check, search starts here
 
         // Using the default UCB1 formula to determine the most promising
         // node for further expansion.
-        while (mcts[currentIndex].expanded())
+        while ((*currentIndex).expanded())
         {
-            assert(mcts[currentIndex].legalMoves.empty());
+            assert((*currentIndex).legalMoves.empty());
 
             bestUCB1 = REWARD_LOSS;
 
-            for (auto& idx : mcts[currentIndex].children)
+            for (auto idx : (*currentIndex).children)
             {
-                assert(mcts[idx].N());
-                assert(mcts[currentIndex].N());
+                assert((*idx).N());
+                assert((*currentIndex).N());
 
                 // Calculate the UCB! value for this child node
-                UCB1 = ucb1(mcts[idx].Q(), mcts[idx].N(), mcts[currentIndex].N());
+                UCB1 = ucb1((*idx).Q(), (*idx).N(), (*currentIndex).N());
 
                 assert(UCB1 >= REWARD_LOSS);
 
@@ -1883,13 +1885,13 @@ moves_loop: // When in check, search starts here
                 }
             }
 
-            assert(bestIndex);
+//            assert(bestIndex);
 
             // Reset the StateInfo object
             std::memset(&ss->st, 0, sizeof(StateInfo));
 
             // Make the move
-            pos.do_move(mcts[bestIndex].action(), ss->st);
+            pos.do_move((*bestIndex).action(), ss->st);
 
             // Increment the stack level
             ss++;
@@ -1915,9 +1917,9 @@ moves_loop: // When in check, search starts here
         // Hint: At least as important as in a AB-search,
         // good move-ordering looks crucial here!
 
-        if (!mcts[currentIndex].terminal()) // Don't try to expand terminal nodes!
+        if (!(*currentIndex).terminal()) // Don't try to expand terminal nodes!
         {
-            auto move = mcts[currentIndex].legalMoves.front();
+            auto move = (*currentIndex).legalMoves.front();
 
             std::memset(&ss->st, 0, sizeof(StateInfo));
             pos.do_move(move, ss->st);
@@ -1928,16 +1930,17 @@ moves_loop: // When in check, search starts here
 
             // Create the new node
             mcts.push_back(MctsNode(nextIndex, currentIndex, move, false, false, 0, 0.0));
+            thisThread->nodes.fetch_add(1, std::memory_order_relaxed);
 
             // Add index of this node as child node to the parent node
-            mcts[currentIndex].children.push_back(nextIndex);
+            (*currentIndex).children.push_back(nextIndex);
 
             // Delete the move from the list
-            mcts[currentIndex].legalMoves.erase(mcts[currentIndex].legalMoves.begin());
+            (*currentIndex).legalMoves.erase((*currentIndex).legalMoves.begin());
 
             // If there are no moves left, mark the node as fully expanded
-            if (mcts[currentIndex].legalMoves.empty())
-                mcts[currentIndex].is_expanded();
+            if ((*currentIndex).legalMoves.empty())
+                (*currentIndex).is_expanded();
 
             currentIndex = nextIndex;
             nextIndex++;
@@ -1945,11 +1948,11 @@ moves_loop: // When in check, search starts here
             // Now generate the legal moves for this new node.
             // Again, sorting the moves is very likely of big help!
             for (const auto& m : MoveList<LEGAL>(pos))
-                mcts[currentIndex].legalMoves.emplace_back(m);
+                (*currentIndex).legalMoves.emplace_back(m);
 
             // If there were no legal moves, mark the node as terminal
-            if (mcts[currentIndex].legalMoves.empty())
-                mcts[currentIndex].is_terminal();
+            if ((*currentIndex).legalMoves.empty())
+                (*currentIndex).is_terminal();
         }
 
 
@@ -1961,18 +1964,18 @@ moves_loop: // When in check, search starts here
 
         // No rollouts, just simply call eval.
         // Hint: some kind of qsearch should help here!
-        // Add TB probing here.
+        // Also, you can add TB probing here.
 
         // Check for draw by repetition, 50-move rule or
         // maximum ply reached.
         if (pos.is_draw(ss->ply) || ss->ply >= 127)
         {
-            mcts[currentIndex].is_terminal();
+            (*currentIndex).is_terminal();
             reward = REWARD_DRAW;
         }
 
         // Already terminal node?
-        else if (mcts[currentIndex].terminal())
+        else if ((*currentIndex).terminal())
             reward = pos.checkers() ? REWARD_LOSS : REWARD_DRAW;
 
         // call eval
@@ -1995,19 +1998,19 @@ moves_loop: // When in check, search starts here
             reward = REWARD_WIN - reward; // Switch side
 
             // Update the current node
-            mcts[currentIndex].updateQ(reward);
-            mcts[currentIndex].updateN();
+            (*currentIndex).updateQ(reward);
+            (*currentIndex).updateN();
 
             // Go back to the parent node
-            pos.undo_move(mcts[currentIndex].action());
+            pos.undo_move((*currentIndex).action());
             ss--;
 
-            currentIndex = mcts[currentIndex].parentId();
+            currentIndex = (*currentIndex).parentId();
         }
 
-        // We must increase the visits for the root node.
+        // We must also increase the visits for the root node.
         // Needed by the UCB1 formula!
-        mcts[currentIndex].updateN();
+        (*currentIndex).updateN();
 
         // We are back at the root!
         assert(currentIndex == rootIndex);
@@ -2015,8 +2018,7 @@ moves_loop: // When in check, search starts here
 
         // Iteration finished
         iteration++;
-        thisThread->nodes.fetch_add(1, std::memory_order_relaxed);
-        bestIndex = 0;
+        bestIndex = rootIndex;
 
         // Now check for some stop conditions
         if (iteration >= 8388600)
@@ -2056,28 +2058,28 @@ moves_loop: // When in check, search starts here
             || giveOutput)
         {
             // Assign the score and the PV to all root moves
-            for (auto& idx : mcts[rootIndex].children)
+            for (auto idx : (*rootIndex).children)
             {
-                auto move = mcts[idx].action();
+                auto move = (*idx).action();
 
                 RootMove& rm = *std::find(thisThread->rootMoves.begin(),
                                           thisThread->rootMoves.end(), move);
 
-                rm.score = reward_to_value(mcts[idx].Q() / mcts[idx].N());
-                rm.visits = int(mcts[idx].N());
+                rm.score = reward_to_value((*idx).Q() / (*idx).N());
+                rm.visits = int((*idx).N());
                 rm.selDepth = selDepth;
 
                 // Collect the PV
                 rm.pv.resize(1);
-                size_t maxVisitsIndex = idx;
+                auto maxVisitsIndex = idx;
 
-                while (!mcts[maxVisitsIndex].children.empty())
+                while (!(*maxVisitsIndex).children.empty())
                 {
-                    maxVisitsIndex = *std::max_element(mcts[maxVisitsIndex].children.begin(),
-                                                       mcts[maxVisitsIndex].children.end(),
-                                                       [&](size_t a, size_t b) { return mcts[b].N() > mcts[a].N(); });
+                    maxVisitsIndex = *std::max_element((*maxVisitsIndex).children.begin(),
+                                                       (*maxVisitsIndex).children.end(),
+                                                       [&](auto a, auto b) { return (*b).N() > (*a).N(); });
 
-                    rm.pv.push_back(mcts[maxVisitsIndex].action());
+                    rm.pv.push_back((*maxVisitsIndex).action());
                 }
 
             }

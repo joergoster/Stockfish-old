@@ -100,12 +100,12 @@ struct MctsStack {
 
 struct MctsNode {
 
-  MctsNode(size_t idx, size_t pidx, Move m, bool exp, bool term, uint64_t v, double tr) :
+  MctsNode(std::vector<MctsNode>::iterator idx, std::vector<MctsNode>::iterator pidx, Move m, bool exp, bool term, uint64_t v, double tr) :
     index(idx), parentIndex(pidx), move(m), isExpanded(exp), isTerminal(term), visits(v), totalReward(tr) {
   }
 
-  size_t id()       const { return index; }
-  size_t parentId() const { return parentIndex; }
+  std::vector<MctsNode>::iterator id()       const { return index; }
+  std::vector<MctsNode>::iterator parentId() const { return parentIndex; }
 
   double   Q() const { return totalReward; }
   uint64_t N() const { return visits; }
@@ -120,15 +120,15 @@ struct MctsNode {
   void is_expanded() { isExpanded = true; }
   void is_terminal() { isTerminal = true; }
 
-  size_t index;                 // Index of this node in the table
-  size_t parentIndex;           // Index of the parent node
-  Move move;                    // Move which led to this position
-  bool isExpanded;              // True if all child nodes have been generated
-  bool isTerminal;              // Terminal node?
-  uint64_t visits;              // Number of visits
-  double totalReward;           // Sum of all backpropagated rewards through this node
-  std::vector<size_t> children; // Holds the indices of all child nodes
-  std::vector<Move> legalMoves; // All legal moves of this position
+  std::vector<MctsNode>::iterator index;                 // Index of this node in the table
+  std::vector<MctsNode>::iterator parentIndex;           // Index of the parent node
+  Move move;                                             // Move which led to this position
+  bool isExpanded;                                       // True if all child nodes have been generated
+  bool isTerminal;                                       // Terminal node?
+  uint64_t visits;                                       // Number of visits
+  double totalReward;                                    // Sum of all backpropagated rewards through this node
+  std::vector<std::vector<MctsNode>::iterator> children; // Holds the indices of all child nodes
+  std::vector<Move> legalMoves;                          // All legal moves of this position
 };
 
 typedef std::vector<MctsNode> MctsHash;
