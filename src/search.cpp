@@ -1823,7 +1823,6 @@ moves_loop: // When in check, search starts here
     bool giveOutput;
     int selDepth;
     uint64_t iteration;
-//    size_t bestIndex, currentIndex, nextIndex, rootIndex;
     double bestUCB1, UCB1, reward;
 
     Thread* thisThread = pos.this_thread();
@@ -1885,8 +1884,6 @@ moves_loop: // When in check, search starts here
                 }
             }
 
-//            assert(bestIndex);
-
             // Reset the StateInfo object
             std::memset(&ss->st, 0, sizeof(StateInfo));
 
@@ -1945,14 +1942,22 @@ moves_loop: // When in check, search starts here
             currentIndex = nextIndex;
             nextIndex++;
 
+            // Check for draw by repetition, 50-move rule or
+            // maximum ply reached.
+            if (pos.is_draw(ss->ply) || ss->ply >= 127)
+                (*currentIndex).is_terminal();
+
             // Now generate the legal moves for this new node.
             // Again, sorting the moves is very likely of big help!
-            for (const auto& m : MoveList<LEGAL>(pos))
-                (*currentIndex).legalMoves.emplace_back(m);
+            if (!(*currentIndex).terminal())
+            {
+                for (const auto& m : MoveList<LEGAL>(pos))
+                    (*currentIndex).legalMoves.emplace_back(m);
 
-            // If there were no legal moves, mark the node as terminal
-            if ((*currentIndex).legalMoves.empty())
-                (*currentIndex).is_terminal();
+                // If there are no legal moves, mark the node as terminal
+                if ((*currentIndex).legalMoves.empty())
+                    (*currentIndex).is_terminal();
+            }
         }
 
 
@@ -1966,16 +1971,8 @@ moves_loop: // When in check, search starts here
         // Hint: some kind of qsearch should help here!
         // Also, you can add TB probing here.
 
-        // Check for draw by repetition, 50-move rule or
-        // maximum ply reached.
-        if (pos.is_draw(ss->ply) || ss->ply >= 127)
-        {
-            (*currentIndex).is_terminal();
-            reward = REWARD_DRAW;
-        }
-
         // Already terminal node?
-        else if ((*currentIndex).terminal())
+        if ((*currentIndex).terminal())
             reward = pos.checkers() ? REWARD_LOSS : REWARD_DRAW;
 
         // call eval
@@ -2033,7 +2030,7 @@ moves_loop: // When in check, search starts here
             Threads.stop = true;
 
         if (   Limits.use_time_management()
-            && !Threads.stop.load(std::memory_order_relaxed))
+            && !Threads.stop.load())
         {
             // Basic time management
             if (Time.elapsed() > Time.optimum() - 10)
@@ -2041,20 +2038,20 @@ moves_loop: // When in check, search starts here
         }
 
         // Time for another GUI update?
-        if (!Threads.stop.load(std::memory_order_relaxed))
+        if (!Threads.stop.load())
         {
             elapsed = now();
 
-            giveOutput =  Time.elapsed() <  2100 ? elapsed - lastOutputTime >= 250
+            giveOutput =  Time.elapsed() <  2100 ? elapsed - lastOutputTime >= 200
                         : Time.elapsed() < 10100 ? elapsed - lastOutputTime >= 1000
-                        : Time.elapsed() < 60100 ? elapsed - lastOutputTime >= 3000
-                                                 : elapsed - lastOutputTime >= 10000;
+                        : Time.elapsed() < 60100 ? elapsed - lastOutputTime >= 2500
+                                                 : elapsed - lastOutputTime >= 5000;
             if (giveOutput)
                 lastOutputTime = now();
         }
 
         // Update the root moves stats and send info
-        if (   Threads.stop.load(std::memory_order_relaxed)
+        if (   Threads.stop.load()
             || giveOutput)
         {
             // Assign the score and the PV to all root moves
