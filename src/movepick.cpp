@@ -18,6 +18,7 @@
 
 #include <cassert>
 
+#include "bitboard.h"
 #include "movepick.h"
 
 namespace Stockfish {
