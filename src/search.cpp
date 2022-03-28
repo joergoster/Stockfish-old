@@ -904,16 +904,10 @@ namespace {
     }
 
     // Step 11. If the position is not in TT, decrease depth by 2 or 1 depending on node type (~3 Elo)
-    if (!ttMove)
-    {
-        if (   PvNode
-            && depth >= 3)
-            depth -= 2;
-
-        else if (   cutNode
-                 && depth >= 8)
-            depth--;
-    }
+    if (   !ttMove
+        && (PvNode || cutNode)
+        &&  depth > 2)
+        depth -= PvNode ? 2 : depth > 7 ? 1 : 0;
 
 moves_loop: // When in check, search starts here
 
