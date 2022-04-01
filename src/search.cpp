@@ -1447,7 +1447,8 @@ moves_loop: // When in check, search starts here
                 ss->staticEval = bestValue = evaluate(pos);
 
             // ttValue can be used as a better position evaluation (~7 Elo)
-            if (    ttValue != VALUE_NONE
+            if (  !PvNode
+                && ttValue != VALUE_NONE
                 && (tte->bound() & (ttValue > bestValue ? BOUND_LOWER : BOUND_UPPER)))
                 bestValue = ttValue;
         }
