@@ -1288,8 +1288,15 @@ moves_loop: // When in check, search starts here
                   assert(value >= beta); // Fail high
                   break;
               }
+
           }
       }
+
+      // If we have found a mate within the specified limit,
+      // we can immediately break from the moves loop.
+      if (  !(ss->ply & 1)
+          && bestValue > VALUE_MATE - 2 * Limits.mate) // Never true if Limits.mate not set
+          break;
 
       // If the move is worse than some previously searched move, remember it to update its stats later
       if (move != bestMove)
