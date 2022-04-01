@@ -657,7 +657,11 @@ namespace {
             }
         }
 
-        return ttValue;
+        // Similar to Mate Distance Pruning, we take the TT cutoff
+        // if we cannot beat current ttValue.
+        if (   ttValue < VALUE_MATE_IN_MAX_PLY
+            || ttValue > mate_in(ss->ply+1))
+            return ttValue;
     }
 
     // Step 5. Tablebases probe
@@ -1288,7 +1292,6 @@ moves_loop: // When in check, search starts here
                   assert(value >= beta); // Fail high
                   break;
               }
-
           }
       }
 
