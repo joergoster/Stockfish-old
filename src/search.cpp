@@ -657,11 +657,7 @@ namespace {
             }
         }
 
-        // Similar to Mate Distance Pruning, we take the TT cutoff
-        // if we cannot beat current ttValue.
-        if (   ttValue < VALUE_MATE_IN_MAX_PLY
-            || ttValue > mate_in(ss->ply+1))
-            return ttValue;
+        return ttValue;
     }
 
     // Step 5. Tablebases probe
@@ -1297,8 +1293,7 @@ moves_loop: // When in check, search starts here
 
       // If we have found a mate within the specified limit,
       // we can immediately break from the moves loop.
-      if (  !(ss->ply & 1)
-          && bestValue > VALUE_MATE - 2 * Limits.mate) // Never true if Limits.mate not set
+      if (bestValue > VALUE_MATE - 2 * Limits.mate) // Never true if Limits.mate not set
           break;
 
       // If the move is worse than some previously searched move, remember it to update its stats later
