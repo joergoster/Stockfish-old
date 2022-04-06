@@ -921,19 +921,19 @@ namespace {
 moves_loop: // When in check, search starts here
 
     // Step 12. A small Probcut idea, when we are in check (~0 Elo)
-    probCutBeta = beta + 481;
-    if (   ss->inCheck
-        && !PvNode
-        && depth >= 2
+    if (  !PvNode
+        && ss->inCheck
         && ttCapture
-        && (tte->bound() & BOUND_LOWER)
+        && depth >= 2
         && tte->depth() >= depth - 3
-        && ttValue >= probCutBeta
-        && abs(ttValue) <= VALUE_KNOWN_WIN
-        && abs(beta) <= VALUE_KNOWN_WIN
-       )
-        return probCutBeta;
+        && (tte->bound() & BOUND_LOWER)
+        && abs(ttValue) <= VALUE_KNOWN_WIN)
+    {
+        probCutBeta = beta + 481;
 
+        if (ttValue >= probCutBeta)
+            return ttValue;
+    }
 
     const PieceToHistory* contHist[] = { (ss-1)->continuationHistory, (ss-2)->continuationHistory,
                                           nullptr                   , (ss-4)->continuationHistory,
