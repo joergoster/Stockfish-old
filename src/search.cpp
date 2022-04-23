@@ -110,29 +110,36 @@ void Search::init(Position& pos) {
           || std::count(Limits.searchmoves.begin(), Limits.searchmoves.end(), m))
           searchMoves.emplace_back(m);
 
-  const auto king = pos.square<KING>(~pos.side_to_move());
-
   // Now we rank the root moves for the mate search.
-  for (auto& rm : searchMoves)
+  // First, try ranking by TBs.
+  TB::rank_root_moves(pos, searchMoves);
+
+  if (!TB::RootInTB)
   {
-      // R-Mobility (kind of ?)
-      pos.do_move(rm.pv[0], rootSt);
-      rm.tbRank -= (pos.checkers() ? 20 : 16) * int(MoveList<LEGAL>(pos).size());
-      pos.undo_move(rm.pv[0]);
+      const auto king = pos.square<KING>(~pos.side_to_move());
 
-      pos.this_thread()->nodes--; // Don't count nodes here!
+      for (auto& rm : searchMoves)
+      {
+          // R-Mobility (kind of ?)
+          pos.do_move(rm.pv[0], rootSt);
+          rm.tbRank -= (pos.checkers() ? 20 : 16) * int(MoveList<LEGAL>(pos).size());
+          pos.undo_move(rm.pv[0]);
 
-      if (pos.gives_check(rm.pv[0]))
-          rm.tbRank += 6000 - 100 * distance(king, to_sq(rm.pv[0])); // Top priority!
+          pos.this_thread()->nodes--; // Don't count nodes here!
 
-      if (pos.capture(rm.pv[0]))
-          rm.tbRank +=  MVVLVA[type_of(pos.piece_on(to_sq(rm.pv[0])))]
-                      + 800 * (pos.checkers() & to_sq(rm.pv[0]));
+          if (pos.gives_check(rm.pv[0]))
+              rm.tbRank += 6000 - 100 * distance(king, to_sq(rm.pv[0])); // Top priority!
 
-      else
-          rm.tbRank += 20 * relative_rank(pos.side_to_move(), to_sq(rm.pv[0]));
+          if (pos.capture(rm.pv[0]))
+              rm.tbRank +=  MVVLVA[type_of(pos.piece_on(to_sq(rm.pv[0])))]
+                          + 800 * (pos.checkers() & to_sq(rm.pv[0]));
+
+          else
+              rm.tbRank += 20 * relative_rank(pos.side_to_move(), to_sq(rm.pv[0]));
+      }
   }
 
+  // Now, sort the moves by their rank
   std::stable_sort(searchMoves.begin(), searchMoves.end(),
      [](const RootMove &rm1, const RootMove &rm2) { return rm1.tbRank > rm2.tbRank; });
 
@@ -274,6 +281,11 @@ void Thread::search() {
               sync_cout << "info depth " << rootDepth
                         << " currmove "  << UCI::move(rootMoves[pvIdx].pv[0], rootPos.is_chess960())
                         << " currmovenumber " << pvIdx + 1 << sync_endl;
+
+          // Only search winning moves
+          if (   TB::RootInTB
+              && rootMoves[pvIdx].tbRank <= 0)
+              continue;
 
           if (   onlyChecks
               && rootMoves[pvIdx].tbRank < 3000)
@@ -557,50 +569,32 @@ string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
   return ss.str();
 }
 
-/*
+
 void Tablebases::rank_root_moves(Position& pos, Search::RootMoves& rootMoves) {
 
     RootInTB = false;
     UseRule50 = Options["Syzygy50MoveRule"];
     ProbeDepth = Options["SyzygyProbeDepth"];
     Cardinality = Options["SyzygyProbeLimit"];
-    bool dtz_available = true;
 
     // Tables with fewer pieces than SyzygyProbeLimit are searched with
     // ProbeDepth == DEPTH_ZERO
     if (Cardinality > MaxCardinality)
-    {
         Cardinality = MaxCardinality;
-        ProbeDepth = 0;
-    }
 
-    if (Cardinality >= popcount(pos.pieces()) && !pos.can_castle(ANY_CASTLING))
+    if (    Cardinality >= pos.count<ALL_PIECES>()
+        && !pos.can_castle(ANY_CASTLING))
     {
         // Rank moves using DTZ tables
         RootInTB = root_probe(pos, rootMoves);
 
+        // DTZ tables are missing; try to rank moves using WDL tables
         if (!RootInTB)
-        {
-            // DTZ tables are missing; try to rank moves using WDL tables
-            dtz_available = false;
             RootInTB = root_probe_wdl(pos, rootMoves);
-        }
     }
 
-    if (RootInTB)
-    {
-        // Sort moves according to TB rank
-        std::sort(rootMoves.begin(), rootMoves.end(),
-                  [](const RootMove &a, const RootMove &b) { return a.tbRank > b.tbRank; } );
-
-        // Probe during search only if DTZ is not available and we are winning
-        if (dtz_available || rootMoves[0].tbScore <= VALUE_DRAW)
-            Cardinality = 0;
-    }
-    else
-    {
-        // Clean up if root_probe() and root_probe_wdl() have failed
-        for (auto& m : rootMoves)
-            m.tbRank = 0;
-    }
-}*/
+    // Clean up if both, root_probe() and root_probe_wdl() have failed!
+    if (!RootInTB)
+        for (auto& rm : rootMoves)
+            rm.tbRank = 0;
+}

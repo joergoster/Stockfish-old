@@ -1515,12 +1515,6 @@ bool Tablebases::root_probe(Position& pos, Search::RootMoves& rootMoves) {
     ProbeState result;
     StateInfo st;
 
-    // Obtain 50-move counter for the root position
-    int cnt50 = pos.rule50_count();
-
-    // Check whether a position was repeated since the last zeroing move.
-    bool rep = pos.has_repeated();
-
     int dtz, bound = Options["Syzygy50MoveRule"] ? 900 : 1;
 
     // Probe and rank each move
@@ -1562,11 +1556,10 @@ bool Tablebases::root_probe(Position& pos, Search::RootMoves& rootMoves) {
         if (result == FAIL)
             return false;
 
-        // Better moves are ranked higher. Certain wins are ranked equally.
-        // Losing moves are ranked equally unless a 50-move draw is in sight.
-        int r =  dtz > 0 ? (dtz + cnt50 <= 99 && !rep ? 1000 : 1000 - (dtz + cnt50))
-               : dtz < 0 ? (-dtz * 2 + cnt50 < 100 ? -1000 : -1000 + (-dtz + cnt50))
-               : 0;
+        // Winning and losing moves are ranked by their dtz values,
+        // while drawing moves are ranked equally.
+        int r =  dtz > 0 ?  1000 - dtz
+               : dtz < 0 ? -1000 - dtz : 0;
         m.tbRank = r;
 
         // Determine the score to be displayed for this move. Assign at least
