@@ -115,7 +115,7 @@ void Search::init(Position& pos) {
   TB::rank_root_moves(pos, searchMoves);
 
   if (TB::RootInTB)
-      pos.this_thread()->tbHits.fetch_add(int(searchMoves.size()), std::memory_order_relaxed);
+      pos.this_thread()->tbHits.fetch_add(searchMoves.size(), std::memory_order_relaxed);
 
   else
   {

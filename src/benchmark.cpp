@@ -53,6 +53,15 @@ const vector<string> Defaults = {
   "n1rb4/1p3p1p/1p6/1R5K/8/p3p1PN/1PP1R3/N6k w - - 0 1",
   "1r3n2/2pB1pq1/1bR3p1/N2NR2b/KP1kpp1r/1p2p3/1PP2Q1n/8 w - - 0 1",
 
+  // Mates with checks only
+  "setoption name ChecksOnly value true",
+  // Mate in 11
+  "6r1/p1pq1p1p/1p1p1Qnk/3PrR2/2n1P1PP/P1P5/4R3/6K1 w - -",
+
+  // Mate in 12
+  "2n1QN2/2Np1pk1/1b1p1p2/1Kp1B1p1/1R3p2/2P1r3/1r1nPRb1/1B5q w - -",
+  "setoption name ChecksOnly value false",
+
   // Mate and stalemate positions
   "7k/7P/6K1/8/3B4/8/8/8 b - -",
   "8/8/8/8/8/6k1/6p1/6K1 w - -"
@@ -80,7 +89,7 @@ vector<string> setup_bench(const Position& current, istream& is) {
   // Assign default values to missing arguments
   string ttSize    = (is >> token) ? token : "16";
   string threads   = (is >> token) ? token : "1";
-  string limit     = (is >> token) ? token : "5";
+  string limit     = (is >> token) ? token : "12";
   string fenFile   = (is >> token) ? token : "default";
   string limitType = (is >> token) ? token : "mate";
 
