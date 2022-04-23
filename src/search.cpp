@@ -114,7 +114,10 @@ void Search::init(Position& pos) {
   // First, try ranking by TBs.
   TB::rank_root_moves(pos, searchMoves);
 
-  if (!TB::RootInTB)
+  if (TB::RootInTB)
+      pos.this_thread()->tbHits.fetch_add(int(searchMoves.size()), std::memory_order_relaxed);
+
+  else
   {
       const auto king = pos.square<KING>(~pos.side_to_move());
 
@@ -528,7 +531,7 @@ string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
   size_t pvIdx = pos.this_thread()->pvIdx;
   size_t multiPV = std::min((size_t)Options["MultiPV"], rootMoves.size());
   uint64_t nodesSearched = Threads.nodes_searched();
-  uint64_t tbHits = Threads.tb_hits() + (TB::RootInTB ? rootMoves.size() : 0);
+  uint64_t tbHits = Threads.tb_hits();
 
   for (size_t i = 0; i < multiPV; ++i)
   {
