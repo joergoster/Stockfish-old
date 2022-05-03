@@ -1515,7 +1515,7 @@ bool Tablebases::root_probe(Position& pos, Search::RootMoves& rootMoves) {
     ProbeState result;
     StateInfo st;
 
-    int dtz, bound = Options["Syzygy50MoveRule"] ? 900 : 1;
+    int dtz;
 
     // Probe and rank each move
     for (auto& m : rootMoves)
@@ -1561,15 +1561,6 @@ bool Tablebases::root_probe(Position& pos, Search::RootMoves& rootMoves) {
         int r =  dtz > 0 ?  1000 - dtz
                : dtz < 0 ? -1000 - dtz : 0;
         m.tbRank = r;
-
-        // Determine the score to be displayed for this move. Assign at least
-        // 1 cp to cursed wins and let it grow to 49 cp as the positions gets
-        // closer to a real win.
-        m.tbScore =  r >= bound ? VALUE_MATE - MAX_PLY - 1
-                   : r >  0     ? Value((std::max( 3, r - 800) * int(PawnValueEg)) / 200)
-                   : r == 0     ? VALUE_DRAW
-                   : r > -bound ? Value((std::min(-3, r + 800) * int(PawnValueEg)) / 200)
-                   :             -VALUE_MATE + MAX_PLY + 1;
     }
 
     return true;

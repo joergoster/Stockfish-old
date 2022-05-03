@@ -115,7 +115,7 @@ void Search::init(Position& pos) {
   TB::rank_root_moves(pos, searchMoves);
 
   if (TB::RootInTB)
-      pos.this_thread()->tbHits.fetch_add(searchMoves.size(), std::memory_order_relaxed);
+      pos.this_thread()->tbHits = searchMoves.size();
 
   else
   {
@@ -128,8 +128,6 @@ void Search::init(Position& pos) {
           rm.tbRank -= (pos.checkers() ? 20 : 16) * int(MoveList<LEGAL>(pos).size());
           pos.undo_move(rm.pv[0]);
 
-          pos.this_thread()->nodes--; // Don't count nodes here!
-
           if (pos.gives_check(rm.pv[0]))
               rm.tbRank += 6000 - 100 * distance(king, to_sq(rm.pv[0])); // Top priority!
 
@@ -140,11 +138,11 @@ void Search::init(Position& pos) {
           else
               rm.tbRank += 20 * relative_rank(pos.side_to_move(), to_sq(rm.pv[0]));
       }
-  }
 
-  // Now, sort the moves by their rank
-  std::stable_sort(searchMoves.begin(), searchMoves.end(),
-     [](const RootMove &rm1, const RootMove &rm2) { return rm1.tbRank > rm2.tbRank; });
+      // Now, sort the moves by their rank
+      std::stable_sort(searchMoves.begin(), searchMoves.end(),
+         [](const RootMove &sm1, const RootMove &sm2) { return sm1.tbRank > sm2.tbRank; });
+  }
 
   // Finally, distribute the ranked root moves among all available threads
   auto it = searchMoves.begin();
@@ -296,6 +294,7 @@ void Thread::search() {
 
           // Make, search and undo the root move
           rootPos.do_move(rootMoves[pvIdx].pv[0], rootSt);
+          nodes++;
 
           value = -::search(rootPos, ss+1, -beta, -alpha, rootDepth-1);
 
@@ -394,6 +393,7 @@ namespace {
     // For the root color we can immediately return on
     // TB draws or losses
 
+    Thread* thisThread = pos.this_thread();
     bestValue = -VALUE_INFINITE;
     moveCount = 0;
     auto rankThisMove = 0;
@@ -441,6 +441,7 @@ namespace {
             break;
 
         pos.do_move((*rm).move, st);
+        thisThread->nodes++;
         value = -search(pos, ss+1, -beta, -alpha, depth-1);
         pos.undo_move((*rm).move);
 
@@ -474,7 +475,7 @@ namespace {
         // If we have found a mate within the specified limit,
         // we can immediately break from the moves loop.
         // Note: this can only happen for the root color!
-        if (bestValue >= VALUE_MATE - pos.this_thread()->rootDepth)
+        if (bestValue >= VALUE_MATE - thisThread->rootDepth)
             break;
     }
 
@@ -543,9 +544,6 @@ string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
       Depth d = updated ? depth : depth - 1;
       Value v = updated ? rootMoves[i].score : rootMoves[i].previousScore;
 
-      bool tb = TB::RootInTB && abs(v) < VALUE_MATE - MAX_PLY;
-      v = tb ? rootMoves[i].tbScore : v;
-
       if (ss.rdbuf()->in_avail()) // Not at first line
           ss << "\n";
 
@@ -555,7 +553,7 @@ string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
          << " multipv "  << i + 1
          << " score "    << UCI::value(v);
 
-      if (!tb && i == pvIdx)
+      if (i == pvIdx)
           ss << (v >= beta ? " lowerbound" : v <= alpha ? " upperbound" : "");
 
       ss << " nodes "    << nodesSearched
@@ -585,6 +583,9 @@ void Tablebases::rank_root_moves(Position& pos, Search::RootMoves& rootMoves) {
     if (Cardinality > MaxCardinality)
         Cardinality = MaxCardinality;
 
+    if (rootMoves.size() == 0)
+        return;
+
     if (    Cardinality >= pos.count<ALL_PIECES>()
         && !pos.can_castle(ANY_CASTLING))
     {
@@ -596,8 +597,14 @@ void Tablebases::rank_root_moves(Position& pos, Search::RootMoves& rootMoves) {
             RootInTB = root_probe_wdl(pos, rootMoves);
     }
 
-    // Clean up if both, root_probe() and root_probe_wdl() have failed!
-    if (!RootInTB)
+    if (RootInTB)
+        // Sort moves according to TB rank
+        std::stable_sort(rootMoves.begin(), rootMoves.end(),
+                  [](const RootMove &a, const RootMove &b) { return a.tbRank > b.tbRank; } );
+    else
+    {
+        // Clean up if both, root_probe() and root_probe_wdl() have failed!
         for (auto& rm : rootMoves)
             rm.tbRank = 0;
+    }
 }
