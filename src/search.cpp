@@ -1838,7 +1838,7 @@ moves_loop: // When in check, search starts here
     mcts.insert(std::make_pair(pos.key(), MctsNode(MOVE_NONE, false, false, 0, 0.0)));
     thisThread->nodes++;
 
-    // Set the current node to the root entry
+    // Set the current node to the root node
     auto it = mcts.find(pos.key());
     auto node = &(it->second);
 
@@ -1891,8 +1891,8 @@ moves_loop: // When in check, search starts here
                 }
             }*/
             auto bestChild = std::max_element(node.children.begin(), node.children.end(),
-                                           [](auto a, auto b) { return ucb1(b->second.Q(), b->second.N(), node.N())
-                                                                     > ucb1(a->second.Q(), a->second.N(), node.N()); });
+                                           [](auto a, auto b) { return ucb1(b->second.Q(), b->second.N(), node.N()) >
+                                                                       ucb1(a->second.Q(), a->second.N(), node.N()); });
             // Reset the StateInfo object
             std::memset(&ss->st, 0, sizeof(StateInfo));
 
@@ -1905,9 +1905,8 @@ moves_loop: // When in check, search starts here
             // Only count new nodes created
             thisThread->nodes--;
 
-            // Point to the new node
-            it = mcts.find(pos.key());
-            node = &(it->second);
+            // Point to the child node
+            node = &(bestChild->second);
         }
 
 
@@ -1925,49 +1924,53 @@ moves_loop: // When in check, search starts here
         // Hint: At least as important as in a AB-search,
         // good move-ordering looks crucial here!
 
-        if (!(*currentIndex).terminal()) // Don't try to expand terminal nodes!
+        if (!node.is_terminal()) // Don't try to expand terminal nodes!
         {
-            auto move = (*currentIndex).legalMoves.front();
+            auto move = node.legalMoves.front();
 
             std::memset(&ss->st, 0, sizeof(StateInfo));
             pos.do_move(move, ss->st);
             ss++;
 
-            thisThread->nodes.fetch_sub(1, std::memory_order_relaxed);
+            thisThread->nodes--;
             selDepth = std::max(ss->ply, selDepth);
 
             // Create the new node
-            mcts.push_back(MctsNode(nextIndex, currentIndex, move, false, false, 0, 0.0));
+            mcts.insert(std::make_pair(pos.key(), MctsNode(move, false, false, 0, 0.0)));
             thisThread->nodes++;
 
-            // Add index of this node as child node to the parent node
-            (*currentIndex).children.push_back(nextIndex);
+            // Add iterator of this node as child node to the parent node.
+            // Node is still pointing to the parent node!
+            it = mcts.find(pos.key());
+            node.children.push_back(it);
+
+            assert(it != mcts.end());
 
             // Delete the move from the list
-            (*currentIndex).legalMoves.erase((*currentIndex).legalMoves.begin());
+            node.legalMoves.erase(node.legalMoves.begin());
 
             // If there are no moves left, mark the node as fully expanded
-            if ((*currentIndex).legalMoves.empty())
-                (*currentIndex).is_expanded();
+            if (node.legalMoves.empty())
+                node.mark_as_expanded();
 
-            currentIndex = nextIndex;
-            nextIndex++;
+            // Now we can point to the new node!
+            node = &(it->second);
 
             // Check for draw by repetition, 50-move rule or
             // maximum ply reached.
             if (pos.is_draw(ss->ply) || ss->ply >= 127)
-                (*currentIndex).is_terminal();
+                node.mark_as_terminal();
 
             // Now generate the legal moves for this new node.
             // Again, sorting the moves is very likely of big help!
-            if (!(*currentIndex).terminal())
+            if (!node.is_terminal())
             {
                 for (const auto& m : MoveList<LEGAL>(pos))
-                    (*currentIndex).legalMoves.emplace_back(m);
+                    node.legalMoves.emplace_back(m);
 
                 // If there are no legal moves, mark the node as terminal
-                if ((*currentIndex).legalMoves.empty())
-                    (*currentIndex).is_terminal();
+                if (node.legalMoves.empty())
+                    node.mark_as_terminal();
             }
         }
 
