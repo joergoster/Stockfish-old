@@ -1829,17 +1829,24 @@ moves_loop: // When in check, search starts here
     TimePoint elapsed, lastOutputTime;
 
     // Prepare the iterators
-    const auto rootIndex = mcts.begin(); // Index of the root node (fix!)
-    auto currentIndex = rootIndex;
-    auto bestIndex = currentIndex;
-    auto nextIndex = rootIndex + 1; // The next node will have this index
+//    const auto rootIndex = mcts.begin(); // Index of the root node (fix!)
+//    auto currentIndex = rootIndex;
+//    auto bestIndex = currentIndex;
+//    auto nextIndex = rootIndex + 1; // The next node will have this index
 
     // Create the root node
-    mcts.push_back(MctsNode(rootIndex, rootIndex, MOVE_NONE, false, false, 0, 0.0));
+    mcts.insert(std::make_pair(pos.key(), MctsNode(MOVE_NONE, false, false, 0, 0.0)));
+    thisThread->nodes++;
+
+    // Set the current node to the root entry
+    auto it = mcts.find(pos.key());
+    auto node = &(it->second);
+
+    assert(it != mcts.end());
 
     // Get moves from rootMoves
     for (const auto& rm : thisThread->rootMoves)
-        (*rootIndex).legalMoves.push_back(rm.pv[0]);
+        node.legalMoves.push_back(rm.pv[0]);
 
     lastOutputTime = now();
     giveOutput = false;
@@ -1850,7 +1857,7 @@ moves_loop: // When in check, search starts here
 
     // Now we can start the main MCTS loop, which consists of 4 steps:
     // Selection, Expansion, Simulation (Rollout), and Backpropagation.
-    while (!Threads.stop.load(std::memory_order_relaxed))
+    while (!Threads.stop.load())
     {
         //////////////////////////////////////
         //                                  //
@@ -1860,19 +1867,19 @@ moves_loop: // When in check, search starts here
 
         // Using the default UCB1 formula to determine the most promising
         // node for further expansion.
-        while ((*currentIndex).expanded())
+        while (node.is_expanded())
         {
-            assert((*currentIndex).legalMoves.empty());
+            assert(!node.legalMoves.empty());
 
-            bestUCB1 = REWARD_LOSS;
+/*            bestUCB1 = REWARD_LOSS;
 
-            for (auto idx : (*currentIndex).children)
+            for (auto idx : node.children)
             {
-                assert((*idx).N());
-                assert((*currentIndex).N());
+                assert(idx->second.N());
+                assert(node.N());
 
-                // Calculate the UCB! value for this child node
-                UCB1 = ucb1((*idx).Q(), (*idx).N(), (*currentIndex).N());
+                // Calculate the UCB1 value for this child node
+                UCB1 = ucb1(idx->second.Q(), idx->second.N(), node.N());
 
                 assert(UCB1 >= REWARD_LOSS);
 
@@ -1882,21 +1889,25 @@ moves_loop: // When in check, search starts here
                     bestUCB1 = UCB1;
                     bestIndex = idx;
                 }
-            }
-
+            }*/
+            auto bestChild = std::max_element(node.children.begin(), node.children.end(),
+                                           [](auto a, auto b) { return ucb1(b->second.Q(), b->second.N(), node.N())
+                                                                     > ucb1(a->second.Q(), a->second.N(), node.N()); });
             // Reset the StateInfo object
             std::memset(&ss->st, 0, sizeof(StateInfo));
 
             // Make the move
-            pos.do_move((*bestIndex).action(), ss->st);
+            pos.do_move(bestChild->second.action(), ss->st);
 
             // Increment the stack level
             ss++;
 
             // Only count new nodes created
-            thisThread->nodes.fetch_sub(1, std::memory_order_relaxed);
+            thisThread->nodes--;
 
-            currentIndex = bestIndex;
+            // Point to the new node
+            it = mcts.find(pos.key());
+            node = &(it->second);
         }
 
 
@@ -1927,7 +1938,7 @@ moves_loop: // When in check, search starts here
 
             // Create the new node
             mcts.push_back(MctsNode(nextIndex, currentIndex, move, false, false, 0, 0.0));
-            thisThread->nodes.fetch_add(1, std::memory_order_relaxed);
+            thisThread->nodes++;
 
             // Add index of this node as child node to the parent node
             (*currentIndex).children.push_back(nextIndex);
@@ -1972,7 +1983,7 @@ moves_loop: // When in check, search starts here
         // Also, you can add TB probing here.
 
         // Already terminal node?
-        if ((*currentIndex).terminal())
+        if (node.is_terminal())
             reward = pos.checkers() ? REWARD_LOSS : REWARD_DRAW;
 
         // call eval
@@ -1990,32 +2001,32 @@ moves_loop: // When in check, search starts here
         // Now we have to unwind all made moves
         // to get back to the root position and we're
         // updating every single node on this way.
-        while (currentIndex != rootIndex)
+        while (ss->ply != 0)
         {
             reward = REWARD_WIN - reward; // Switch side
 
             // Update the current node
-            (*currentIndex).updateQ(reward);
-            (*currentIndex).updateN();
+            node.updateQ(reward);
+            node.updateN();
 
             // Go back to the parent node
-            pos.undo_move((*currentIndex).action());
+            pos.undo_move(node.action());
             ss--;
 
-            currentIndex = (*currentIndex).parentId();
+            // Point to the new node
+            it = mcts.find(pos.key());
+            node = &(it->second);
         }
 
         // We must also increase the visits for the root node.
         // Needed by the UCB1 formula!
-        (*currentIndex).updateN();
+        node.updateN();
 
         // We are back at the root!
-        assert(currentIndex == rootIndex);
         assert(ss->ply == 0);
 
         // Iteration finished
         iteration++;
-        bestIndex = rootIndex;
 
         // Now check for some stop conditions
         if (iteration >= 8388600)
