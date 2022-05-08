@@ -2069,30 +2069,29 @@ moves_loop: // When in check, search starts here
             || giveOutput)
         {
             // Assign the score and the PV to all root moves
-            for (auto idx : (*rootIndex).children)
+            for (auto idx : node.children)
             {
-                auto move = (*idx).action();
+                auto move = idx->second.action();
 
                 RootMove& rm = *std::find(thisThread->rootMoves.begin(),
                                           thisThread->rootMoves.end(), move);
 
-                rm.score = reward_to_value((*idx).Q() / (*idx).N());
-                rm.visits = int((*idx).N());
+                rm.score = reward_to_value(idx->second.Q() / idx->second.N());
+                rm.visits = int(idx->second.N());
                 rm.selDepth = selDepth;
 
                 // Collect the PV
                 rm.pv.resize(1);
                 auto maxVisitsIndex = idx;
 
-                while (!(*maxVisitsIndex).children.empty())
+                while (!maxVisitsIndex->second.children.empty())
                 {
-                    maxVisitsIndex = *std::max_element((*maxVisitsIndex).children.begin(),
-                                                       (*maxVisitsIndex).children.end(),
-                                                       [&](auto a, auto b) { return (*b).N() > (*a).N(); });
+                    maxVisitsIndex = std::max_element(maxVisitsIndex->second.children.begin(),
+                                                      maxVisitsIndex->second.children.end(),
+                                                   [](auto a, auto b) { return b->second.N() > a->second.N(); });
 
-                    rm.pv.push_back((*maxVisitsIndex).action());
+                    rm.pv.push_back(maxVisitsIndex->second.action());
                 }
-
             }
 
             // Sort the root moves and update the GUI
