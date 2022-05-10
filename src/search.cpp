@@ -1846,7 +1846,7 @@ moves_loop: // When in check, search starts here
 
     // Get moves from rootMoves
     for (const auto& rm : thisThread->rootMoves)
-        node.legalMoves.push_back(rm.pv[0]);
+        node->legalMoves.push_back(rm.pv[0]);
 
     lastOutputTime = now();
     giveOutput = false;
@@ -1867,19 +1867,19 @@ moves_loop: // When in check, search starts here
 
         // Using the default UCB1 formula to determine the most promising
         // node for further expansion.
-        while (node.is_expanded())
+        while (node->is_expanded())
         {
-            assert(!node.legalMoves.empty());
+            assert(!node->legalMoves.empty());
 
 /*            bestUCB1 = REWARD_LOSS;
 
-            for (auto idx : node.children)
+            for (auto idx : node->children)
             {
                 assert(idx->second.N());
-                assert(node.N());
+                assert(node->N());
 
                 // Calculate the UCB1 value for this child node
-                UCB1 = ucb1(idx->second.Q(), idx->second.N(), node.N());
+                UCB1 = ucb1(idx->second.Q(), idx->second.N(), node->N());
 
                 assert(UCB1 >= REWARD_LOSS);
 
@@ -1890,9 +1890,9 @@ moves_loop: // When in check, search starts here
                     bestIndex = idx;
                 }
             }*/
-            auto bestChild = std::max_element(node.children.begin(), node.children.end(),
-                                           [](auto a, auto b) { return ucb1(b->second.Q(), b->second.N(), node.N()) >
-                                                                       ucb1(a->second.Q(), a->second.N(), node.N()); });
+            auto bestChild = std::max_element(node->children.begin(), node->children.end(),
+                                           [](auto a, auto b) { return ucb1(b->second.Q(), b->second.N(), node->N()) >
+                                                                       ucb1(a->second.Q(), a->second.N(), node->N()); });
             // Reset the StateInfo object
             std::memset(&ss->st, 0, sizeof(StateInfo));
 
@@ -1924,9 +1924,9 @@ moves_loop: // When in check, search starts here
         // Hint: At least as important as in a AB-search,
         // good move-ordering looks crucial here!
 
-        if (!node.is_terminal()) // Don't try to expand terminal nodes!
+        if (!node->is_terminal()) // Don't try to expand terminal nodes!
         {
-            auto move = node.legalMoves.front();
+            auto move = node->legalMoves.front();
 
             std::memset(&ss->st, 0, sizeof(StateInfo));
             pos.do_move(move, ss->st);
@@ -1942,16 +1942,16 @@ moves_loop: // When in check, search starts here
             // Add iterator of this node as child node to the parent node.
             // Node is still pointing to the parent node!
             it = mcts.find(pos.key());
-            node.children.push_back(it);
+            node->children.push_back(it);
 
             assert(it != mcts.end());
 
             // Delete the move from the list
-            node.legalMoves.erase(node.legalMoves.begin());
+            node->legalMoves.erase(node->legalMoves.begin());
 
             // If there are no moves left, mark the node as fully expanded
-            if (node.legalMoves.empty())
-                node.mark_as_expanded();
+            if (node->legalMoves.empty())
+                node->mark_as_expanded();
 
             // Now we can point to the new node!
             node = &(it->second);
@@ -1959,18 +1959,18 @@ moves_loop: // When in check, search starts here
             // Check for draw by repetition, 50-move rule or
             // maximum ply reached.
             if (pos.is_draw(ss->ply) || ss->ply >= 127)
-                node.mark_as_terminal();
+                node->mark_as_terminal();
 
             // Now generate the legal moves for this new node.
             // Again, sorting the moves is very likely of big help!
-            if (!node.is_terminal())
+            if (!node->is_terminal())
             {
                 for (const auto& m : MoveList<LEGAL>(pos))
-                    node.legalMoves.emplace_back(m);
+                    node->legalMoves.emplace_back(m);
 
                 // If there are no legal moves, mark the node as terminal
-                if (node.legalMoves.empty())
-                    node.mark_as_terminal();
+                if (node->legalMoves.empty())
+                    node->mark_as_terminal();
             }
         }
 
@@ -1986,7 +1986,7 @@ moves_loop: // When in check, search starts here
         // Also, you can add TB probing here.
 
         // Already terminal node?
-        if (node.is_terminal())
+        if (node->is_terminal())
             reward = pos.checkers() ? REWARD_LOSS : REWARD_DRAW;
 
         // call eval
@@ -2009,11 +2009,11 @@ moves_loop: // When in check, search starts here
             reward = REWARD_WIN - reward; // Switch side
 
             // Update the current node
-            node.updateQ(reward);
-            node.updateN();
+            node->updateQ(reward);
+            node->updateN();
 
             // Go back to the parent node
-            pos.undo_move(node.action());
+            pos.undo_move(node->action());
             ss--;
 
             // Point to the new node
@@ -2023,7 +2023,7 @@ moves_loop: // When in check, search starts here
 
         // We must also increase the visits for the root node.
         // Needed by the UCB1 formula!
-        node.updateN();
+        node->updateN();
 
         // We are back at the root!
         assert(ss->ply == 0);
@@ -2069,7 +2069,7 @@ moves_loop: // When in check, search starts here
             || giveOutput)
         {
             // Assign the score and the PV to all root moves
-            for (auto idx : node.children)
+            for (auto idx : node->children)
             {
                 auto move = idx->second.action();
 
