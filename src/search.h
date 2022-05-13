@@ -96,37 +96,37 @@ struct MctsStack {
 
 
 /// MctsNode holds all the info needed, like the place in the
-/// HashTable, the number of visits and the total reward etc.
+/// HashTable, proof and disproof number, etc.
 
 struct MctsNode {
 
-  MctsNode(std::vector<MctsNode>::iterator idx, std::vector<MctsNode>::iterator pidx, Move m, bool exp, bool term, uint64_t v, double tr) :
-    index(idx), parentIndex(pidx), move(m), isExpanded(exp), isTerminal(term), visits(v), totalReward(tr) {
+  MctsNode(std::vector<MctsNode>::iterator idx, std::vector<MctsNode>::iterator pidx, Move m, bool exp, bool term, int , int ) :
+    index(idx), parentIndex(pidx), move(m), isExpanded(exp), isTerminal(term), pn(v), dn(tr) {
   }
 
   std::vector<MctsNode>::iterator id()       const { return index; }
   std::vector<MctsNode>::iterator parentId() const { return parentIndex; }
 
-  double   Q() const { return totalReward; }
-  uint64_t N() const { return visits; }
+  int PN() const { return pn; }
+  int DN() const { return dn; }
 
-  Move action()   const { return move; }
-  bool expanded() const { return isExpanded; }
-  bool terminal() const { return isTerminal; }
+  Move action()      const { return move; }
+  bool is_expanded() const { return isExpanded; }
+  bool is_terminal() const { return isTerminal; }
 
-  void updateQ(double reward) { totalReward += reward; }
-  void updateN() { visits++; }
+  void update_pn(int newPN) { pn = newPN; }
+  void update_dn(int newDN) { dn = newDN; }
 
-  void is_expanded() { isExpanded = true; }
-  void is_terminal() { isTerminal = true; }
+  void mark_as_expanded() { isExpanded = true; }
+  void mark_as_terminal() { isTerminal = true; }
 
   std::vector<MctsNode>::iterator index;                 // Index of this node in the table
   std::vector<MctsNode>::iterator parentIndex;           // Index of the parent node
   Move move;                                             // Move which led to this position
   bool isExpanded;                                       // True if all child nodes have been generated
   bool isTerminal;                                       // Terminal node?
-  uint64_t visits;                                       // Number of visits
-  double totalReward;                                    // Sum of all backpropagated rewards through this node
+  int pn;                                       // Proof number
+  int dn;                                    // Disproof number
   std::vector<std::vector<MctsNode>::iterator> children; // Holds the indices of all child nodes
   std::vector<Move> legalMoves;                          // All legal moves of this position
 };
