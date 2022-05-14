@@ -68,9 +68,8 @@ struct RootMove {
   bool extract_ponder_from_tt(Position& pos);
   bool operator==(const Move& m) const { return pv[0] == m; }
   bool operator<(const RootMove& m) const { // Sort in descending order
-    return m.visits != visits ? m.visits < visits
-           : m.score != score ? m.score < score
-                              : m.previousScore < previousScore;
+    return m.score != score ? m.score < score
+                            : m.previousScore < previousScore;
   }
 
   Value score = -VALUE_INFINITE;
@@ -78,7 +77,8 @@ struct RootMove {
   Value averageScore = -VALUE_INFINITE;
   int selDepth = 0;
   int tbRank = 0;
-  int visits = 0;
+  int pn = 0;
+  int dn = 0;
   Value tbScore;
   std::vector<Move> pv;
 };
@@ -100,8 +100,8 @@ struct MctsStack {
 
 struct MctsNode {
 
-  MctsNode(std::vector<MctsNode>::iterator idx, std::vector<MctsNode>::iterator pidx, Move m, bool exp, bool term, int , int ) :
-    index(idx), parentIndex(pidx), move(m), isExpanded(exp), isTerminal(term), pn(v), dn(tr) {
+  MctsNode(std::vector<MctsNode>::iterator idx, std::vector<MctsNode>::iterator pidx, Move m, bool exp, bool term, int pnr, int dnr) :
+    index(idx), parentIndex(pidx), move(m), isExpanded(exp), isTerminal(term), pn(pnr), dn(dnr) {
   }
 
   std::vector<MctsNode>::iterator id()       const { return index; }
@@ -114,9 +114,6 @@ struct MctsNode {
   bool is_expanded() const { return isExpanded; }
   bool is_terminal() const { return isTerminal; }
 
-  void update_pn(int newPN) { pn = newPN; }
-  void update_dn(int newDN) { dn = newDN; }
-
   void mark_as_expanded() { isExpanded = true; }
   void mark_as_terminal() { isTerminal = true; }
 
@@ -125,8 +122,8 @@ struct MctsNode {
   Move move;                                             // Move which led to this position
   bool isExpanded;                                       // True if all child nodes have been generated
   bool isTerminal;                                       // Terminal node?
-  int pn;                                       // Proof number
-  int dn;                                    // Disproof number
+  int pn;                                                // Proof number
+  int dn;                                                // Disproof number
   std::vector<std::vector<MctsNode>::iterator> children; // Holds the indices of all child nodes
   std::vector<Move> legalMoves;                          // All legal moves of this position
 };

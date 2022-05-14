@@ -1829,13 +1829,13 @@ moves_loop: // When in check, search starts here
     TimePoint elapsed, lastOutputTime;
 
     // Prepare the iterators
-    const auto rootIndex = mcts.begin(); // Index of the root node (fix!)
+    const auto rootIndex = mcts.begin(); // Index of the root node
     auto currentIndex = rootIndex;
     auto bestIndex = currentIndex;
     auto nextIndex = rootIndex + 1; // The next node will have this index
 
     // Create the root node
-    mcts.push_back(MctsNode(rootIndex, rootIndex, MOVE_NONE, false, false, 0, 0.0));
+    mcts.push_back(MctsNode(rootIndex, rootIndex, MOVE_NONE, false, false, 1, 1));
 
     // Get moves from rootMoves
     for (const auto& rm : thisThread->rootMoves)
@@ -1860,7 +1860,7 @@ moves_loop: // When in check, search starts here
 
         // Using the default UCB1 formula to determine the most promising
         // node for further expansion.
-        while ((*currentIndex).expanded())
+        while ((*currentIndex).is_expanded())
         {
             assert((*currentIndex).legalMoves.empty());
 
@@ -1914,7 +1914,7 @@ moves_loop: // When in check, search starts here
         // Hint: At least as important as in a AB-search,
         // good move-ordering looks crucial here!
 
-        if (!(*currentIndex).terminal()) // Don't try to expand terminal nodes!
+        if (!(*currentIndex).is_terminal()) // Don't try to expand terminal nodes!
         {
             auto move = (*currentIndex).legalMoves.front();
 
@@ -1926,7 +1926,7 @@ moves_loop: // When in check, search starts here
             selDepth = std::max(ss->ply, selDepth);
 
             // Create the new node
-            mcts.push_back(MctsNode(nextIndex, currentIndex, move, false, false, 0, 0.0));
+            mcts.push_back(MctsNode(nextIndex, currentIndex, move, false, false, 1, 1));
             thisThread->nodes.fetch_add(1, std::memory_order_relaxed);
 
             // Add index of this node as child node to the parent node
@@ -1937,7 +1937,7 @@ moves_loop: // When in check, search starts here
 
             // If there are no moves left, mark the node as fully expanded
             if ((*currentIndex).legalMoves.empty())
-                (*currentIndex).is_expanded();
+                (*currentIndex).mark_as_expanded();
 
             currentIndex = nextIndex;
             nextIndex++;
@@ -1945,18 +1945,18 @@ moves_loop: // When in check, search starts here
             // Check for draw by repetition, 50-move rule or
             // maximum ply reached.
             if (pos.is_draw(ss->ply) || ss->ply >= 127)
-                (*currentIndex).is_terminal();
+                (*currentIndex).mark_as_terminal();
 
             // Now generate the legal moves for this new node.
             // Again, sorting the moves is very likely of big help!
-            if (!(*currentIndex).terminal())
+            if (!(*currentIndex).is_terminal())
             {
                 for (const auto& m : MoveList<LEGAL>(pos))
                     (*currentIndex).legalMoves.emplace_back(m);
 
                 // If there are no legal moves, mark the node as terminal
                 if ((*currentIndex).legalMoves.empty())
-                    (*currentIndex).is_terminal();
+                    (*currentIndex).mark_as_terminal();
             }
         }
 
@@ -1972,13 +1972,20 @@ moves_loop: // When in check, search starts here
         // Also, you can add TB probing here.
 
         // Already terminal node?
-        if ((*currentIndex).terminal())
-            reward = pos.checkers() ? REWARD_LOSS : REWARD_DRAW;
-
-        // call eval
-        else
-          reward = pos.checkers() ? value_to_reward(-4 * PawnValueEg) // A workaround
-                                  : value_to_reward(evaluate(pos));
+        if ((*currentIndex).is_terminal())
+        {
+            // If we can mate the opponent, it's a WIN!
+            // Otherwise, it's a LOSS.
+            if (pos.checkers())
+                (*currentIndex).pn = ss->ply & 1 ? 0 : INT_MAX;
+                (*currentIndex).dn = ss->ply & 1 ? INT_MAX : 0;
+            }
+            else // Treat stalemates or repetitions as a LOSS for the root side
+            {
+                (*currentIndex).pn = ss->ply & 1 ? INT_MAX : 0;
+                (*currentIndex).dn = ss->ply & 1 ? 0 : INT_MAX;
+            }
+        }
 
 
         //////////////////////////////////////
@@ -1992,22 +1999,21 @@ moves_loop: // When in check, search starts here
         // updating every single node on this way.
         while (currentIndex != rootIndex)
         {
-            reward = REWARD_WIN - reward; // Switch side
-
-            // Update the current node
-            (*currentIndex).updateQ(reward);
-            (*currentIndex).updateN();
-
+            // No need to update just created nodes
+            if (   !(*currentIndex).is_terminal()
+                &&  (*currentIndex).children.size())
+            {
+                // Update the current node depending if
+                // it is an AND node or an OR node!
+                (*currentIndex).pn =;
+                (*currentIndex).dn =;
+            }
             // Go back to the parent node
             pos.undo_move((*currentIndex).action());
             ss--;
 
             currentIndex = (*currentIndex).parentId();
         }
-
-        // We must also increase the visits for the root node.
-        // Needed by the UCB1 formula!
-        (*currentIndex).updateN();
 
         // We are back at the root!
         assert(currentIndex == rootIndex);
@@ -2018,7 +2024,7 @@ moves_loop: // When in check, search starts here
         bestIndex = rootIndex;
 
         // Now check for some stop conditions
-        if (iteration >= 8388600)
+        if (iteration >= 8388600 || (*rootIndex).pn == 0)
             Threads.stop = true;
 
         else if (   Limits.nodes
@@ -2029,14 +2035,14 @@ moves_loop: // When in check, search starts here
                  && Time.elapsed() >= Limits.movetime)
             Threads.stop = true;
 
-        if (   Limits.use_time_management()
+/*        if (   Limits.use_time_management()
             && !Threads.stop.load())
         {
             // Basic time management
             if (Time.elapsed() > Time.optimum() - 10)
                 Threads.stop = true;
         }
-
+*/
         // Time for another GUI update?
         if (!Threads.stop.load())
         {
@@ -2062,29 +2068,27 @@ moves_loop: // When in check, search starts here
                 RootMove& rm = *std::find(thisThread->rootMoves.begin(),
                                           thisThread->rootMoves.end(), move);
 
-                rm.score = reward_to_value((*idx).Q() / (*idx).N());
-                rm.visits = int((*idx).N());
-                rm.selDepth = selDepth;
-
                 // Collect the PV
                 rm.pv.resize(1);
                 auto maxVisitsIndex = idx;
 
                 while (!(*maxVisitsIndex).children.empty())
                 {
-                    maxVisitsIndex = *std::max_element((*maxVisitsIndex).children.begin(),
+                    maxVisitsIndex = *std::min_element((*maxVisitsIndex).children.begin(),
                                                        (*maxVisitsIndex).children.end(),
-                                                       [&](auto a, auto b) { return (*b).N() > (*a).N(); });
+                                                    [&](auto a, auto b) { return (*b).PN() < (*a).PN(); });
 
                     rm.pv.push_back((*maxVisitsIndex).action());
                 }
 
+                rm.score = VALUE_MATE - int(rm.pv.size());
+                rm.selDepth = selDepth;
             }
 
             // Sort the root moves and update the GUI
             std::stable_sort(thisThread->rootMoves.begin(), thisThread->rootMoves.end());
 
-            sync_cout << UCI::pv(pos, 1, -VALUE_INFINITE, VALUE_INFINITE) << sync_endl;
+            sync_cout << UCI::pv(pos, int(thisThread->rootMoves[0].pv.size()), -VALUE_INFINITE, VALUE_INFINITE) << sync_endl;
         }
 
     }
@@ -2092,8 +2096,7 @@ moves_loop: // When in check, search starts here
     // Show some detailed info about all root moves
     for (auto& rm : thisThread->rootMoves)
         std::cout << "info string Root move: " << std::setw(6) << UCI::move(rm.pv[0], pos.is_chess960())
-                  << "     Visits: "           << std::setw(8) << rm.visits
-                  << "     P: "                << std::setw(6) << std::setprecision(4) << value_to_reward(rm.score)
+                  << "     Proof number: "     << std::setw(8) << rm.pn
                   << " (" << UCI::value(rm.score) << ")" << std::endl;
 
     mcts.clear();
