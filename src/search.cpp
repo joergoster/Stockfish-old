@@ -1967,11 +1967,9 @@ moves_loop: // When in check, search starts here
         //                                  //
         //////////////////////////////////////
 
-        // No rollouts, just simply call eval.
-        // Hint: some kind of qsearch should help here!
-        // Also, you can add TB probing here.
-
         // Already terminal node?
+        // New generated internal nodes have already
+        // been initialized with pn=1 and dn=1.
         if ((*currentIndex).is_terminal())
         {
             // If we can mate the opponent, it's a WIN!
@@ -1999,20 +1997,38 @@ moves_loop: // When in check, search starts here
         // updating every single node on this way.
         while (currentIndex != rootIndex)
         {
-            // No need to update just created nodes
-            if (   !(*currentIndex).is_terminal()
-                &&  (*currentIndex).children.size())
-            {
-                // Update the current node depending if
-                // it is an AND node or an OR node!
-                (*currentIndex).pn =;
-                (*currentIndex).dn =;
-            }
             // Go back to the parent node
             pos.undo_move((*currentIndex).action());
             ss--;
 
             currentIndex = (*currentIndex).parentId();
+
+            if (ss->ply & 1) // AND node
+            {
+                int sumChildrenPN = 0
+                for (auto idx : (*currentIndex).children)
+                    sumChildrenPN += (*idx).PN();
+
+                (*currentIndex).pn = sumChildrenPN;
+
+                auto minChildDN = *std::min_element((*idx).children.begin(), (*idx).children.end(),
+                                                 [&](auto a, auto b) { return (*b).DN() < (*a).DN(); });
+
+                (*currentIndex).dn = (*minChildDN).DN();
+            }
+            else // OR node
+            {
+                auto minChildPN = *std::min_element((*idx).children.begin(), (*idx).children.end(),
+                                                 [&](auto a, auto b) { return (*b).PN() < (*a).PN(); });
+
+                (*currentIndex).pn = (*minChildPN).PN();
+
+                int sumChildrenDN = 0;
+                for (auto idx : (*currentIndex).children)
+                    sumChildrenDN += (*idx).DN();
+
+                (*currentIndex).dn = sumChildrenDN;
+            }
         }
 
         // We are back at the root!
@@ -2024,7 +2040,7 @@ moves_loop: // When in check, search starts here
         bestIndex = rootIndex;
 
         // Now check for some stop conditions
-        if (iteration >= 8388600 || (*rootIndex).pn == 0)
+        if (iteration >= 8388600 || (*rootIndex).pn == 0 || (*rootIndex).dn == 0)
             Threads.stop = true;
 
         else if (   Limits.nodes
@@ -2094,10 +2110,10 @@ moves_loop: // When in check, search starts here
     }
 
     // Show some detailed info about all root moves
-    for (auto& rm : thisThread->rootMoves)
-        std::cout << "info string Root move: " << std::setw(6) << UCI::move(rm.pv[0], pos.is_chess960())
-                  << "     Proof number: "     << std::setw(8) << rm.pn
-                  << " (" << UCI::value(rm.score) << ")" << std::endl;
+//    for (auto& rm : thisThread->rootMoves)
+//        std::cout << "info string Root move: " << std::setw(6) << UCI::move(rm.pv[0], pos.is_chess960())
+//                  << "     Proof number: "     << std::setw(8) << rm.pn
+//                  << " (" << UCI::value(rm.score) << ")" << std::endl;
 
     mcts.clear();
   }
