@@ -127,6 +127,7 @@ namespace {
                         Move* quietsSearched, int quietCount, Move* capturesSearched, int captureCount, Depth depth);
   // for MCTS
   void uct_search(Position& pos);
+  Value quiescence(Position& pos, int ply, Value alpha, Value beta, Depth depth = 0);
   double ucb1(const double& Q, const uint64_t& N, const uint64_t& parentN);
   double value_to_reward(Value v);
   Value reward_to_value(double r);
@@ -1894,7 +1895,7 @@ moves_loop: // When in check, search starts here
             ss++;
 
             // Only count new nodes created
-            thisThread->nodes.fetch_sub(1, std::memory_order_relaxed);
+            thisThread->nodes--;
 
             currentIndex = bestIndex;
         }
@@ -1922,12 +1923,10 @@ moves_loop: // When in check, search starts here
             pos.do_move(move, ss->st);
             ss++;
 
-            thisThread->nodes.fetch_sub(1, std::memory_order_relaxed);
             selDepth = std::max(ss->ply, selDepth);
 
             // Create the new node
             mcts.push_back(MctsNode(nextIndex, currentIndex, move, false, false, 0, 0.0));
-            thisThread->nodes.fetch_add(1, std::memory_order_relaxed);
 
             // Add index of this node as child node to the parent node
             (*currentIndex).children.push_back(nextIndex);
@@ -1977,8 +1976,7 @@ moves_loop: // When in check, search starts here
 
         // call eval
         else
-          reward = pos.checkers() ? value_to_reward(-4 * PawnValueEg) // A workaround
-                                  : value_to_reward(evaluate(pos));
+          reward = value_to_reward(quiescence(pos, ss->ply, -VALUE_INFINITE, VALUE_INFINITE));
 
 
         //////////////////////////////////////
@@ -2097,6 +2095,122 @@ moves_loop: // When in check, search starts here
                   << " (" << UCI::value(rm.score) << ")" << std::endl;
 
     mcts.clear();
+  }
+
+
+  // Plain alpha-beta quiescence search function in negamax style,
+  // fail-soft framework.
+
+  Value quiescence(Position& pos, int ply, Value alpha, Value beta, Depth depth) {
+
+    StateInfo st;
+    ASSERT_ALIGNED(&st, Eval::NNUE::CacheLineSize);
+
+    Value bestValue, value;
+    bool inCheck = !!pos.checkers();
+    int moveCount;
+
+    assert(alpha < beta);
+
+    // Check for draw by repetition and 50-move rule
+    if (pos.is_draw(ply))
+        return VALUE_DRAW;
+
+    // Static evaluation
+    bestValue = inCheck ? -VALUE_INFINITE : evaluate(pos);
+
+    // Stand pat
+    if (bestValue >= beta) // Never true when in check
+        return bestValue;
+
+    if (bestValue > alpha)
+        alpha = bestValue;
+
+    moveCount = 0;
+
+    std::vector<Move> legalMoves;
+    legalMoves.reserve(64);
+
+    for (auto& m : MoveList<LEGAL>(pos))
+    {
+        // When in check, we must search all legal moves!
+        if (!inCheck)
+        {
+            // Don't search quiet moves!
+            if (    pos.empty(to_sq(m))
+                && !pos.gives_check(m))
+                continue;
+
+            // Only search checking moves whe
+            if (   pos.gives_check(m)
+                && depth < 0
+                && type_of(m) != PROMOTION)
+                continue;
+
+            // To prevent search explosion, we need to stop
+            // searching re-/captures at some point.
+            if (   depth <= -4
+                && pos.capture_or_promotion(m))
+                continue;
+
+            // No need to search captures which
+            // can't raise alpha!
+            if (    pos.capture(m)
+                && !pos.see_ge(m))
+                continue;
+        }
+
+        legalMoves.emplace_back(m);
+    }
+
+    // Sort moves by MVV/LVA
+    std::sort(legalMoves.begin(), legalMoves.end(), [&pos](const Move &m1, const Move &m2) { 
+
+          Value m1LVA = PieceValue[MG][pos.piece_on(from_sq(m1))];
+          Value m1MVV = PieceValue[MG][pos.piece_on(to_sq(m1))];
+          Value m2LVA = PieceValue[MG][pos.piece_on(from_sq(m2))];
+          Value m2MVV = PieceValue[MG][pos.piece_on(to_sq(m2))];
+
+//          return m1MVV > m2MVV;
+          return m1MVV != m2MVV ? m1MVV > m2MVV
+                                : m1LVA < m2LVA;
+    } );
+
+    for (auto& move : legalMoves)
+    {
+        moveCount++;
+
+        pos.do_move(move, st);
+        pos.this_thread()->nodes--;
+
+        value = -quiescence(pos, ply+1, -beta, -alpha, depth-1);
+
+        pos.undo_move(move);
+
+        // Do we have a new best value?
+        if (value > bestValue)
+        {
+            // Beta-cutoff?
+            if (value >= beta)
+                return value;
+
+            bestValue = value;
+
+            // Update alpha
+            if (value > alpha)
+                alpha = value;
+        }
+    }
+
+    // If we have searched no moves, it's either mate (when in check), or we
+    // have reached a quiet position, or there were no winning captures to search,
+    // in which case it is safe to simply return the static evaluation!
+    if (!moveCount && inCheck)
+        bestValue = mated_in(ply);
+
+    assert(-VALUE_INFINITE < bestValue && bestValue < VALUE_INFINITE);
+
+    return bestValue;
   }
 
 
