@@ -2131,36 +2131,17 @@ moves_loop: // When in check, search starts here
     std::vector<Move> legalMoves;
     legalMoves.reserve(64);
 
-    for (auto& m : MoveList<LEGAL>(pos))
+    // When in check, generate all legal moves.
+    // Otherwise, generate only capture moves.
+    if (inCheck)
     {
-        // When in check, we must search all legal moves!
-        if (!inCheck)
-        {
-            // Don't search quiet moves!
-            if (    pos.empty(to_sq(m))
-                && !pos.gives_check(m))
-                continue;
-
-            // Only search checking moves whe
-            if (   pos.gives_check(m)
-                && depth < 0
-                && type_of(m) != PROMOTION)
-                continue;
-
-            // To prevent search explosion, we need to stop
-            // searching re-/captures at some point.
-            if (   depth <= -4
-                && pos.capture_or_promotion(m))
-                continue;
-
-            // No need to search captures which
-            // can't raise alpha!
-            if (    pos.capture(m)
-                && !pos.see_ge(m))
-                continue;
-        }
-
-        legalMoves.emplace_back(m);
+        for (auto& m : MoveList<LEGAL>(pos))
+            legalMoves.emplace_back(m);
+    }
+    else
+    {
+        for (auto& m : MoveList<CAPTURES>(pos))
+            legalMoves.emplace_back(m);
     }
 
     // Sort moves by MVV/LVA
