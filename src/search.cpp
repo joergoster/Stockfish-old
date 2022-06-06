@@ -2151,13 +2151,9 @@ moves_loop: // When in check, search starts here
             legalMoves.emplace_back(m);
 
         // Sort captures by MVV
-/*        std::sort(legalMoves.begin(), legalMoves.end(), [&pos](const Move &m1, const Move &m2) { 
-
-              Value m1MVV = PieceValue[MG][pos.piece_on(to_sq(m1))];
-              Value m2MVV = PieceValue[MG][pos.piece_on(to_sq(m2))];
-
-              return m1MVV > m2MVV;
-        } );*/
+        std::sort(legalMoves.begin(), legalMoves.end(), [&pos](const Move &m1, const Move &m2) { 
+              return PieceValue[MG][pos.piece_on(to_sq(m1))] > PieceValue[MG][pos.piece_on(to_sq(m2))];
+        });
     }
 
     for (auto& move : legalMoves)
