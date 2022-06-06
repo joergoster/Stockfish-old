@@ -127,7 +127,7 @@ namespace {
                         Move* quietsSearched, int quietCount, Move* capturesSearched, int captureCount, Depth depth);
   // for MCTS
   void uct_search(Position& pos);
-  Value quiescence(Position& pos, int ply, Value alpha, Value beta, Depth depth = 0);
+  Value quiescence(Position& pos, Value alpha, Value beta, int ply, Depth depth = 0);
   double ucb1(const double& Q, const uint64_t& N, const uint64_t& parentN);
   double value_to_reward(Value v);
   Value reward_to_value(double r);
@@ -1970,13 +1970,18 @@ moves_loop: // When in check, search starts here
         // Hint: some kind of qsearch should help here!
         // Also, you can add TB probing here.
 
-        // Already terminal node?
+        // Already terminal node? Either mate or draw!
         if ((*currentIndex).terminal())
-            reward = pos.checkers() ? REWARD_LOSS : REWARD_DRAW;
-
+        {
+            if (  !MoveList<LEGAL>(pos).size()
+                && pos.checkers())
+                reward = REWARD_LOSS;
+            else
+                reward = REWARD_DRAW; 
+        }
         // call eval
         else
-          reward = value_to_reward(quiescence(pos, ss->ply, -VALUE_INFINITE, VALUE_INFINITE));
+          reward = value_to_reward(quiescence(pos, -VALUE_INFINITE, VALUE_INFINITE, ss->ply));
 
 
         //////////////////////////////////////
@@ -2101,7 +2106,7 @@ moves_loop: // When in check, search starts here
   // Plain alpha-beta quiescence search function in negamax style,
   // fail-soft framework.
 
-  Value quiescence(Position& pos, int ply, Value alpha, Value beta, Depth depth) {
+  Value quiescence(Position& pos, Value alpha, Value beta, int ply, Depth depth) {
 
     StateInfo st;
     ASSERT_ALIGNED(&st, Eval::NNUE::CacheLineSize);
@@ -2112,10 +2117,6 @@ moves_loop: // When in check, search starts here
 
     assert(alpha < beta);
 
-    // Check for draw by repetition and 50-move rule
-    if (pos.is_draw(ply))
-        return VALUE_DRAW;
-
     // Static evaluation
     bestValue = inCheck ? -VALUE_INFINITE : evaluate(pos);
 
@@ -2123,13 +2124,14 @@ moves_loop: // When in check, search starts here
     if (bestValue >= beta) // Never true when in check
         return bestValue;
 
+    // Raise alpha here, because we can decide
+    // to simply do nothing.
     if (bestValue > alpha)
         alpha = bestValue;
 
     moveCount = 0;
-
     std::vector<Move> legalMoves;
-    legalMoves.reserve(64);
+    legalMoves.reserve(32);
 
     // When in check, generate all legal moves.
     // Otherwise, generate only capture moves.
@@ -2142,20 +2144,16 @@ moves_loop: // When in check, search starts here
     {
         for (auto& m : MoveList<CAPTURES>(pos))
             legalMoves.emplace_back(m);
+
+        // Sort captures by MVV
+/*        std::sort(legalMoves.begin(), legalMoves.end(), [&pos](const Move &m1, const Move &m2) { 
+
+              Value m1MVV = PieceValue[MG][pos.piece_on(to_sq(m1))];
+              Value m2MVV = PieceValue[MG][pos.piece_on(to_sq(m2))];
+
+              return m1MVV > m2MVV;
+        } );*/
     }
-
-    // Sort moves by MVV/LVA
-    std::sort(legalMoves.begin(), legalMoves.end(), [&pos](const Move &m1, const Move &m2) { 
-
-          Value m1LVA = PieceValue[MG][pos.piece_on(from_sq(m1))];
-          Value m1MVV = PieceValue[MG][pos.piece_on(to_sq(m1))];
-          Value m2LVA = PieceValue[MG][pos.piece_on(from_sq(m2))];
-          Value m2MVV = PieceValue[MG][pos.piece_on(to_sq(m2))];
-
-//          return m1MVV > m2MVV;
-          return m1MVV != m2MVV ? m1MVV > m2MVV
-                                : m1LVA < m2LVA;
-    } );
 
     for (auto& move : legalMoves)
     {
@@ -2164,7 +2162,7 @@ moves_loop: // When in check, search starts here
         pos.do_move(move, st);
         pos.this_thread()->nodes--;
 
-        value = -quiescence(pos, ply+1, -beta, -alpha, depth-1);
+        value = -quiescence(pos, -beta, -alpha, ply+1, depth-1);
 
         pos.undo_move(move);
 
