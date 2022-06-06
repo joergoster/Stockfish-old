@@ -1919,6 +1919,8 @@ moves_loop: // When in check, search starts here
         {
             auto move = (*currentIndex).legalMoves.front();
 
+            assert(MoveList<LEGAL>(pos).contains(move));
+
             std::memset(&ss->st, 0, sizeof(StateInfo));
             pos.do_move(move, ss->st);
             ss++;
@@ -2094,10 +2096,13 @@ moves_loop: // When in check, search starts here
 
     // Show some detailed info about all root moves
     for (auto& rm : thisThread->rootMoves)
-        std::cout << "info string Root move: " << std::setw(6) << UCI::move(rm.pv[0], pos.is_chess960())
-                  << "     Visits: "           << std::setw(8) << rm.visits
-                  << "     P: "                << std::setw(6) << std::setprecision(4) << value_to_reward(rm.score)
-                  << " (" << UCI::value(rm.score) << ")" << std::endl;
+        if (rm.visits)
+        {
+            std::cout << "info string Root move: " << std::setw(6) << UCI::move(rm.pv[0], pos.is_chess960())
+                      << "     Visits: "           << std::setw(8) << rm.visits
+                      << "     P: "                << std::setw(6) << std::setprecision(4) << value_to_reward(rm.score)
+                      << " (" << UCI::value(rm.score) << ")" << std::endl;
+        }
 
     mcts.clear();
   }
@@ -2157,6 +2162,12 @@ moves_loop: // When in check, search starts here
 
     for (auto& move : legalMoves)
     {
+        // Check for legality
+        if (!inCheck && !pos.legal(move))
+            continue;
+
+        assert(MoveList<LEGAL>(pos).contains(move));
+
         moveCount++;
 
         pos.do_move(move, st);
