@@ -2136,7 +2136,7 @@ moves_loop: // When in check, search starts here
 
     moveCount = 0;
     std::vector<Move> legalMoves;
-    legalMoves.reserve(32);
+    legalMoves.reserve(8);
 
     // When in check, generate all legal moves.
     // Otherwise, generate only capture moves.
@@ -2148,7 +2148,13 @@ moves_loop: // When in check, search starts here
     else
     {
         for (auto& m : MoveList<CAPTURES>(pos))
+        {
+            // Check for legality
+            if (!pos.legal(m))
+                continue;
+
             legalMoves.emplace_back(m);
+        }
 
         // Sort captures by MVV
         std::sort(legalMoves.begin(), legalMoves.end(), [&pos](const Move &m1, const Move &m2) { 
@@ -2158,10 +2164,6 @@ moves_loop: // When in check, search starts here
 
     for (auto& move : legalMoves)
     {
-        // Check for legality
-        if (!inCheck && !pos.legal(move))
-            continue;
-
         assert(MoveList<LEGAL>(pos).contains(move));
 
         moveCount++;
