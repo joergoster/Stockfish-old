@@ -27,8 +27,10 @@
 #include "bitboard.h"
 #include "evaluate.h"
 #include "material.h"
+#include "neuralnet.h"
 #include "pawns.h"
 #include "thread.h"
+#include "uci.h"
 
 namespace Trace {
 
@@ -825,6 +827,12 @@ namespace {
   Value Evaluation<T>::value() {
 
     assert(!pos.checkers());
+
+    if (Options["UseNNUE"])
+    {
+        Value v = Value(nnue.output());
+        return pos.side_to_move() == BLACK ? -v : v;
+    }
 
     // Probe the material hash table
     me = Material::probe(pos);

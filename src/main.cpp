@@ -33,6 +33,10 @@ namespace PSQT {
   void init();
 }
 
+// Create the NNUE; quite a hack and
+// only works with 1 Thread!
+NeuralNet nnue = NeuralNet();
+
 int main(int argc, char* argv[]) {
 
   std::cout << engine_info() << std::endl;
@@ -40,6 +44,7 @@ int main(int argc, char* argv[]) {
   UCI::init(Options);
   Tune::init();
   PSQT::init();
+  nnue.init("default.net");
   Bitboards::init();
   Position::init();
   Bitbases::init();

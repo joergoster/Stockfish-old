@@ -455,6 +455,10 @@ constexpr bool is_ok(Move m) {
   return from_sq(m) != to_sq(m); // Catch MOVE_NULL and MOVE_NONE
 }
 
+inline int input_sq(Piece pc, Square s) {
+  return int(s) + (type_of(pc) - 1 + 6 * (color_of(pc) == BLACK)) * 64;
+}
+
 /// Based on a congruential pseudo random number generator
 constexpr Key make_key(uint64_t seed) {
   return seed * 6364136223846793005ULL + 1442695040888963407ULL;

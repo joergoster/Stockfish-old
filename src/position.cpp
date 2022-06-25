@@ -200,6 +200,8 @@ Position& Position::set(const string& fenStr, bool isChess960, StateInfo* si, Th
   std::fill_n(&pieceList[0][0], sizeof(pieceList) / sizeof(Square), SQ_NONE);
   st = si;
 
+  nnue.reset_accumulator();
+
   ss >> std::noskipws;
 
   // 1. Piece placement
