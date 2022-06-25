@@ -55,14 +55,12 @@ void NeuralNet::activate(int inputSq) {
 
   for (int i = 0; i < HIDDEN_BIAS; i++)
       accumulator[i] += InputWeights[inputSq * HIDDEN_BIAS + i];
-//      accumulator[i] = HiddenBias[i] + InputWeights[inputSq * HIDDEN_BIAS + i];
 }
 
 void NeuralNet::deactivate(int inputSq) {
 
   for (int i = 0; i < HIDDEN_BIAS; i++)
       accumulator[i] -= InputWeights[inputSq * HIDDEN_BIAS + i];
-//      accumulator[i] = 0;
 }
 
 int NeuralNet::relu(int x) {

@@ -831,7 +831,9 @@ namespace {
     if (Options["UseNNUE"])
     {
         Value v = Value(nnue.output());
-        return pos.side_to_move() == BLACK ? -v : v;
+        v = std::min(v, Value(30000));
+
+        return (pos.side_to_move() == WHITE ? v : -v) + Tempo;
     }
 
     // Probe the material hash table
