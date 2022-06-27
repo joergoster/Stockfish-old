@@ -830,7 +830,7 @@ namespace {
 
     if (Options["UseNNUE"])
     {
-        Value v = Value(nnue.output());
+        Value v = pos.nnue_output();
         v = std::min(v, Value(30000));
 
         return (pos.side_to_move() == WHITE ? v : -v) + Tempo;

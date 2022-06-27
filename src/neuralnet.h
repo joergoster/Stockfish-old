@@ -32,14 +32,12 @@ constexpr int OUTPUT_BIAS    = 1;
 class NeuralNet {
 public:
   void init(const char* filename);
-  void reset_accumulator();
-  void activate(int inputSq);
-  void deactivate(int inputSq);
+  void init_accumulator(int16_t *accumulator, int size);
+  void activate(int16_t *accumulator, int size, int inputSq);
+  void deactivate(int16_t *accumulator, int size, int inputSq);
   int relu(int x);
-  int32_t output();
+  int32_t output(int16_t *accumulator, int size);
 
-  std::vector<int16_t> accumulator;
-  uint8_t InputValues[INPUT_WEIGHTS];
   int16_t InputWeights[INPUT_WEIGHTS * HIDDEN_WEIGHTS];
   int16_t HiddenBias[HIDDEN_BIAS];
   int16_t HiddenWeights[HIDDEN_WEIGHTS];

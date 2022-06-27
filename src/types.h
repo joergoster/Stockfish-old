@@ -38,11 +38,12 @@
 /// -DUSE_PEXT    | Add runtime support for use of pext asm-instruction. Works
 ///               | only in 64-bit mode and requires hardware with pext support.
 
+#include <algorithm>
 #include <cassert>
 #include <cctype>
 #include <cstdint>
 #include <cstdlib>
-#include <algorithm>
+#include <vector>
 
 #if defined(_MSC_VER)
 // Disable some silly and noisy warning from MSVC compiler

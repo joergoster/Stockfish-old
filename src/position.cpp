@@ -200,7 +200,7 @@ Position& Position::set(const string& fenStr, bool isChess960, StateInfo* si, Th
   std::fill_n(&pieceList[0][0], sizeof(pieceList) / sizeof(Square), SQ_NONE);
   st = si;
 
-  nnue.reset_accumulator();
+  nnue.init_accumulator(st->accumulator, HIDDEN_BIAS);
 
   ss >> std::noskipws;
 
@@ -216,6 +216,7 @@ Position& Position::set(const string& fenStr, bool isChess960, StateInfo* si, Th
       else if ((idx = PieceToChar.find(token)) != string::npos)
       {
           put_piece(Piece(idx), sq);
+          nnue.activate(st->accumulator, HIDDEN_BIAS, input_sq(Piece(idx), sq));
           ++sq;
       }
   }
@@ -699,6 +700,11 @@ void Position::do_move(Move m, StateInfo& newSt, bool givesCheck) {
   // our state pointer to point to the new (ready to be updated) state.
   std::memcpy(&newSt, st, offsetof(StateInfo, key));
   newSt.previous = st;
+
+  // Make a copy of the previous accumulator
+  for (int i = 0; i < HIDDEN_BIAS; i++)
+      newSt.accumulator[i] = st->accumulator[i];
+
   st = &newSt;
 
   // Increment ply counters. In particular, rule50 will be reset to zero later on
@@ -757,6 +763,9 @@ void Position::do_move(Move m, StateInfo& newSt, bool givesCheck) {
       // Update board and piece lists
       remove_piece(capsq);
 
+      // Update accumulator
+      nnue.deactivate(st->accumulator, HIDDEN_BIAS, input_sq(captured, capsq));
+
       if (type_of(m) == ENPASSANT)
           board[capsq] = NO_PIECE;
 
@@ -789,7 +798,13 @@ void Position::do_move(Move m, StateInfo& newSt, bool givesCheck) {
 
   // Move the piece. The tricky Chess960 castling is handled earlier
   if (type_of(m) != CASTLING)
+  {
       move_piece(from, to);
+
+      // Update accumulator
+      nnue.deactivate(st->accumulator, HIDDEN_BIAS, input_sq(pc, from));
+      nnue.activate(st->accumulator, HIDDEN_BIAS, input_sq(pc, to));
+  }
 
   // If the moving piece is a pawn do some special extra work
   if (type_of(pc) == PAWN)
@@ -811,6 +826,10 @@ void Position::do_move(Move m, StateInfo& newSt, bool givesCheck) {
 
           remove_piece(to);
           put_piece(promotion, to);
+
+          // Update accumulator
+          nnue.deactivate(st->accumulator, HIDDEN_BIAS, input_sq(pc, to));
+          nnue.activate(st->accumulator, HIDDEN_BIAS, input_sq(promotion, to));
 
           // Update hash keys
           k ^= Zobrist::psq[pc][to] ^ Zobrist::psq[promotion][to];
@@ -940,6 +959,15 @@ void Position::do_castling(Color us, Square from, Square& to, Square& rfrom, Squ
   rto = relative_square(us, kingSide ? SQ_F1 : SQ_D1);
   to = relative_square(us, kingSide ? SQ_G1 : SQ_C1);
 
+  if (Do)
+  {
+      // Update accumulator
+      nnue.deactivate(st->accumulator, HIDDEN_BIAS, input_sq(make_piece(us, KING), from));  // remove king
+      nnue.deactivate(st->accumulator, HIDDEN_BIAS, input_sq(make_piece(us, ROOK), rfrom)); // remove rook
+      nnue.activate(st->accumulator, HIDDEN_BIAS, input_sq(make_piece(us, KING), to));      // add king
+      nnue.activate(st->accumulator, HIDDEN_BIAS, input_sq(make_piece(us, ROOK), rto));     // add rook
+  }
+
   // Remove both pieces first since squares could overlap in Chess960
   remove_piece(Do ? from : to);
   remove_piece(Do ? rfrom : rto);
@@ -959,6 +987,11 @@ void Position::do_null_move(StateInfo& newSt) {
 
   std::memcpy(&newSt, st, sizeof(StateInfo));
   newSt.previous = st;
+
+  // Make a copy of the previous accumulator
+  for (int i = 0; i < HIDDEN_BIAS; i++)
+      newSt.accumulator[i] = st->accumulator[i];
+
   st = &newSt;
 
   if (st->epSquare != SQ_NONE)
@@ -1111,6 +1144,14 @@ bool Position::see_ge(Move m, Value threshold) const {
   }
 
   return bool(res);
+}
+
+
+/// Position::nnue_output() returns the output value of our NNUE
+
+Value Position::nnue_output() const {
+
+  return Value(nnue.output(st->accumulator, HIDDEN_BIAS));
 }
 
 

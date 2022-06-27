@@ -25,9 +25,6 @@
 
 void NeuralNet::init(const char* filename) {
 
-  for (int i = 0; i < HIDDEN_BIAS; i++)
-      accumulator.push_back(0);
-
   FILE* f = fopen(filename, "rb");
   if (f != NULL)
   {    
@@ -45,21 +42,21 @@ void NeuralNet::init(const char* filename) {
   }
 }
 
-void NeuralNet::reset_accumulator() {
+void NeuralNet::init_accumulator(int16_t *accumulator, int size) {
 
-  for (int i = 0; i < HIDDEN_BIAS; i++)
+  for (int i = 0; i < size; i++)
       accumulator[i] = HiddenBias[i];
 }
 
-void NeuralNet::activate(int inputSq) {
+void NeuralNet::activate(int16_t *accumulator, int size, int inputSq) {
 
-  for (int i = 0; i < HIDDEN_BIAS; i++)
+  for (int i = 0; i < size; i++)
       accumulator[i] += InputWeights[inputSq * HIDDEN_BIAS + i];
 }
 
-void NeuralNet::deactivate(int inputSq) {
+void NeuralNet::deactivate(int16_t *accumulator, int size, int inputSq) {
 
-  for (int i = 0; i < HIDDEN_BIAS; i++)
+  for (int i = 0; i < size; i++)
       accumulator[i] -= InputWeights[inputSq * HIDDEN_BIAS + i];
 }
 
@@ -67,11 +64,11 @@ int NeuralNet::relu(int x) {
   return std::max(x, 0);
 }
 
-int32_t NeuralNet::output() {
+int32_t NeuralNet::output(int16_t *accumulator, int size) {
 
   int32_t output = OutputBias[0];
 
-  for (int i = 0; i < HIDDEN_BIAS; i++)
+  for (int i = 0; i < size; i++)
       output += relu(accumulator[i]) * HiddenWeights[i];
 
   return output / (64 * 256);

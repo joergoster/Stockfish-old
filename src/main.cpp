@@ -33,8 +33,7 @@ namespace PSQT {
   void init();
 }
 
-// Create the NNUE; quite a hack and
-// only works with 1 Thread!
+// Create the NNUE
 NeuralNet nnue = NeuralNet();
 
 int main(int argc, char* argv[]) {
