@@ -80,10 +80,12 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
   {
       StateInfo st;
       Position p;
+
       p.set(pos.fen(), pos.is_chess960(), &st, pos.this_thread());
       Tablebases::ProbeState s1, s2;
       Tablebases::WDLScore wdl = Tablebases::probe_wdl(p, &s1);
       int dtz = Tablebases::probe_dtz(p, &s2);
+
       os << "\nTablebases WDL: " << std::setw(4) << wdl << " (" << s1 << ")"
          << "\nTablebases DTZ: " << std::setw(4) << dtz << " (" << s2 << ")";
   }
@@ -128,6 +130,7 @@ void Position::init() {
   std::memset(cuckoo, 0, sizeof(cuckoo));
   std::memset(cuckooMove, 0, sizeof(cuckooMove));
   int count = 0;
+
   for (Piece pc : Pieces)
       for (Square s1 = SQ_A1; s1 <= SQ_H8; ++s1)
           for (Square s2 = Square(s1 + 1); s2 <= SQ_H8; ++s2)
@@ -146,6 +149,7 @@ void Position::init() {
                   }
                   count++;
              }
+
   assert(count == 3668);
 }
 
@@ -339,7 +343,6 @@ void Position::set_check_info(StateInfo* si) const {
 void Position::set_state(StateInfo* si) const {
 
   si->key = si->materialKey = 0;
-  si->pawnKey = Zobrist::noPawns;
   si->nonPawnMaterial[WHITE] = si->nonPawnMaterial[BLACK] = VALUE_ZERO;
   si->checkersBB = attackers_to(square<KING>(sideToMove)) & pieces(~sideToMove);
 
@@ -351,10 +354,8 @@ void Position::set_state(StateInfo* si) const {
       Piece pc = piece_on(s);
       si->key ^= Zobrist::psq[pc][s];
 
-      if (type_of(pc) == PAWN)
-          si->pawnKey ^= Zobrist::psq[pc][s];
-
-      else if (type_of(pc) != KING)
+      if (   type_of(pc) != KING
+          && type_of(pc) != PAWN)
           si->nonPawnMaterial[color_of(pc)] += PieceValue[MG][pc];
   }
 
@@ -755,7 +756,7 @@ void Position::do_move(Move m, StateInfo& newSt, bool givesCheck) {
               assert(piece_on(capsq) == make_piece(them, PAWN));
           }
 
-          st->pawnKey ^= Zobrist::psq[captured][capsq];
+//          st->pawnKey ^= Zobrist::psq[captured][capsq];
       }
       else
           st->nonPawnMaterial[them] -= PieceValue[MG][captured];
@@ -772,7 +773,6 @@ void Position::do_move(Move m, StateInfo& newSt, bool givesCheck) {
       // Update material hash key and prefetch access to materialTable
       k ^= Zobrist::psq[captured][capsq];
       st->materialKey ^= Zobrist::psq[captured][pieceCount[captured]];
-      prefetch(thisThread->materialTable[st->materialKey]);
 
       // Reset rule 50 counter
       st->rule50 = 0;
@@ -833,16 +833,12 @@ void Position::do_move(Move m, StateInfo& newSt, bool givesCheck) {
 
           // Update hash keys
           k ^= Zobrist::psq[pc][to] ^ Zobrist::psq[promotion][to];
-          st->pawnKey ^= Zobrist::psq[pc][to];
           st->materialKey ^=  Zobrist::psq[promotion][pieceCount[promotion]-1]
                             ^ Zobrist::psq[pc][pieceCount[pc]];
 
           // Update material
           st->nonPawnMaterial[us] += PieceValue[MG][promotion];
       }
-
-      // Update pawn hash key
-      st->pawnKey ^= Zobrist::psq[pc][from] ^ Zobrist::psq[pc][to];
 
       // Reset rule 50 draw counter
       st->rule50 = 0;
@@ -1005,12 +1001,10 @@ void Position::do_null_move(StateInfo& newSt) {
 
   ++st->rule50;
   st->pliesFromNull = 0;
+  st->repetition = 0;
 
   sideToMove = ~sideToMove;
-
   set_check_info(st);
-
-  st->repetition = 0;
 
   assert(pos_is_ok());
 }

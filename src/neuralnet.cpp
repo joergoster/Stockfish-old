@@ -28,12 +28,16 @@ void NeuralNet::init(const char* filename) {
   FILE* f = fopen(filename, "rb");
   if (f != NULL)
   {    
-      fread(InputWeights  , sizeof(int16_t), INPUT_WEIGHTS * HIDDEN_WEIGHTS, f);
-      fread(HiddenBias    , sizeof(int16_t), HIDDEN_BIAS, f);
-      fread(HiddenWeights , sizeof(int16_t), HIDDEN_WEIGHTS, f);
-      fread(OutputBias    , sizeof(int32_t), OUTPUT_BIAS, f);
+      size_t values = 0;
+
+      values += fread(InputWeights  , sizeof(int16_t), INPUT_WEIGHTS * HIDDEN_WEIGHTS, f);
+      values += fread(HiddenBias    , sizeof(int16_t), HIDDEN_BIAS, f);
+      values += fread(HiddenWeights , sizeof(int16_t), HIDDEN_WEIGHTS, f);
+      values += fread(OutputBias    , sizeof(int32_t), OUTPUT_BIAS, f);
 
       fclose(f);
+
+      std::cout << "info string Network with " << values << " values loaded!" << std::endl;
   }
   else
   {
@@ -71,6 +75,6 @@ int32_t NeuralNet::output(int16_t *accumulator, int size) {
   for (int i = 0; i < size; i++)
       output += relu(accumulator[i]) * HiddenWeights[i];
 
-  return output / (64 * 256);
+  return output / (32 * 256);
 }
 

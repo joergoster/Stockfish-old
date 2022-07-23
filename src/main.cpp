@@ -21,17 +21,12 @@
 #include <iostream>
 
 #include "bitboard.h"
-#include "endgame.h"
 #include "position.h"
 #include "search.h"
 #include "thread.h"
 #include "tt.h"
 #include "uci.h"
 #include "syzygy/tbprobe.h"
-
-namespace PSQT {
-  void init();
-}
 
 // Create the NNUE
 NeuralNet nnue = NeuralNet();
@@ -42,12 +37,9 @@ int main(int argc, char* argv[]) {
 
   UCI::init(Options);
   Tune::init();
-  PSQT::init();
   nnue.init("default.net");
   Bitboards::init();
   Position::init();
-  Bitbases::init();
-  Endgames::init();
   Threads.set(size_t(Options["Threads"]));
   Search::clear(); // After threads are up
 

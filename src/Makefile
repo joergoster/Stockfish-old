@@ -36,9 +36,9 @@ BINDIR = $(PREFIX)/bin
 PGOBENCH = ./$(EXE) bench
 
 ### Source and object files
-SRCS = benchmark.cpp bitbase.cpp bitboard.cpp endgame.cpp evaluate.cpp main.cpp \
-	material.cpp misc.cpp movegen.cpp movepick.cpp neuralnet.cpp pawns.cpp position.cpp psqt.cpp \
-	search.cpp thread.cpp timeman.cpp tt.cpp uci.cpp ucioption.cpp tune.cpp syzygy/tbprobe.cpp
+SRCS = benchmark.cpp bitboard.cpp evaluate.cpp main.cpp misc.cpp movegen.cpp \
+	movepick.cpp neuralnet.cpp position.cpp search.cpp thread.cpp \
+	timeman.cpp tt.cpp uci.cpp ucioption.cpp tune.cpp syzygy/tbprobe.cpp
 
 OBJS = $(notdir $(SRCS:.cpp=.o))
 
@@ -154,7 +154,7 @@ endif
 ### ==========================================================================
 
 ### 3.1 Selecting compiler (default = gcc)
-CXXFLAGS += -Wall -Wcast-qual -fno-exceptions -std=c++11 $(EXTRACXXFLAGS)
+CXXFLAGS += -Wall -Wcast-qual -fno-exceptions -std=c++17 $(EXTRACXXFLAGS)
 DEPENDFLAGS += -std=c++11
 LDFLAGS += $(EXTRALDFLAGS)
 
