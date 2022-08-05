@@ -900,19 +900,11 @@ namespace {
             }
     }
 
-    // Step 11. If the position is not in TT, decrease depth by 3.
-    // Use qsearch if depth is equal or below zero (~4 Elo)
-    if (    PvNode
-        && !ttMove)
-        depth -= 3;
-
-    if (depth <= 0)
-        return qsearch<PV>(pos, ss, alpha, beta);
-
-    if (    cutNode
-        &&  depth >= 8
-        && !ttMove)
-        depth--;
+    // Step 11. If the position is not in TT, decrease depth by 2 or 1.
+    if (   !ttMove
+        && (PvNode || cutNode)
+        &&  depth > 2)
+        depth -= PvNode ? 2 : depth > 7 ? 1 : 0;
 
 moves_loop: // When in check, search starts here
 
@@ -1007,18 +999,18 @@ moves_loop: // When in check, search starts here
               || givesCheck)
           {
               // Futility pruning for captures (~0 Elo)
-              if (   !pos.empty(to_sq(move))
+              if (   !PvNode
                   && !givesCheck
-                  && !PvNode
-                  && lmrDepth < 6
                   && !ss->inCheck
+                  && !pos.empty(to_sq(move))
+                  && lmrDepth < 6
                   && ss->staticEval + 281 + 179 * lmrDepth + PieceValue[EG][pos.piece_on(to_sq(move))]
                    + captureHistory[movedPiece][to_sq(move)][type_of(pos.piece_on(to_sq(move)))] / 6 < alpha)
                   continue;
 
               // SEE based pruning (~9 Elo)
-              if (!pos.see_ge(move, Value(-203) * depth))
-                  continue;
+//              if (!pos.see_ge(move, Value(-203) * depth))
+//                  continue;
           }
           else
           {
@@ -1142,6 +1134,9 @@ moves_loop: // When in check, search starts here
               || (cutNode && (ss-1)->moveCount > 1)))
       {
           Depth r = reduction(improving, depth, moveCount, delta, thisThread->rootDelta);
+
+          if (givesCheck && r > 2)
+              r--;
 
           // Decrease reduction if position is or has been on the PV
           // and node is not likely to fail low. (~3 Elo)
@@ -1306,6 +1301,10 @@ moves_loop: // When in check, search starts here
       else
          ss->cutoffCnt = 0;
 
+      // If we have found a mate within the specified limit,
+      // we can immediately break from the moves loop.
+      if (bestValue > VALUE_MATE - 2 * Limits.mate) // Never true if Limits.mate not set
+          break;
 
       // If the move is worse than some previously searched move, remember it to update its stats later
       if (move != bestMove)
