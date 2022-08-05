@@ -32,6 +32,8 @@ namespace {
     QSEARCH_TT, QCAPTURE_INIT, QCAPTURE, QCHECK_INIT, QCHECK
   };
 
+  Bitboard threatened, threatenedByPawn, threatenedByMinor, threatenedByRook;
+
   // partial_insertion_sort() sorts moves in descending order up to and including
   // a given limit. The order of moves smaller than the limit is left unspecified.
   void partial_insertion_sort(ExtMove* begin, ExtMove* end, int limit) {
@@ -98,6 +100,22 @@ MovePicker::MovePicker(const Position& p, Move ttm, Value th, Depth d, const Cap
                              && pos.see_ge(ttm, threshold));
 }
 
+/// MovePicker::quiet_init() computes some attack info used for
+/// scoring quiet moves evading a possible capture.
+void MovePicker::quiet_init() {
+
+  Color us = pos.side_to_move();
+
+  threatenedByPawn  = pos.attacks_by<PAWN>(~us);
+  threatenedByMinor = pos.attacks_by<KNIGHT>(~us) | pos.attacks_by<BISHOP>(~us) | threatenedByPawn;
+  threatenedByRook  = pos.attacks_by<ROOK>(~us) | threatenedByMinor;
+
+  // Pieces threatened by pieces of lesser value
+  threatened =  (pos.pieces(us, QUEEN) & threatenedByRook)
+              | (pos.pieces(us, ROOK)  & threatenedByMinor)
+              | (pos.pieces(us, KNIGHT, BISHOP) & threatenedByPawn);
+}
+
 /// MovePicker::score() assigns a numerical value to each move in a list, used
 /// for sorting. Captures are ordered by Most Valuable Victim (MVV), preferring
 /// captures with a good history. Quiets moves are ordered using the histories.
@@ -106,32 +124,8 @@ void MovePicker::score() {
 
   static_assert(Type == CAPTURES || Type == QUIETS || Type == EVASIONS, "Wrong type");
 
-  Bitboard threatened, threatenedByPawn, threatenedByMinor, threatenedByRook;
-  if constexpr (Type == QUIETS)
-  {
-      Color us = pos.side_to_move();
-      // squares threatened by pawns
-      threatenedByPawn  = pos.attacks_by<PAWN>(~us);
-      // squares threatened by minors or pawns
-      threatenedByMinor = pos.attacks_by<KNIGHT>(~us) | pos.attacks_by<BISHOP>(~us) | threatenedByPawn;
-      // squares threatened by rooks, minors or pawns
-      threatenedByRook  = pos.attacks_by<ROOK>(~us) | threatenedByMinor;
-
-      // pieces threatened by pieces of lesser material value
-      threatened =  (pos.pieces(us, QUEEN) & threatenedByRook)
-                  | (pos.pieces(us, ROOK)  & threatenedByMinor)
-                  | (pos.pieces(us, KNIGHT, BISHOP) & threatenedByPawn);
-  }
-  else
-  {
-      // Silence unused variable warnings
-      (void) threatened;
-      (void) threatenedByPawn;
-      (void) threatenedByMinor;
-      (void) threatenedByRook;
-  }
-
   for (auto& m : *this)
+  {
       if constexpr (Type == CAPTURES)
           m.value =  6 * int(PieceValue[MG][pos.piece_on(to_sq(m))])
                    +     (*captureHistory)[pos.moved_piece(m)][to_sq(m)][type_of(pos.piece_on(to_sq(m)))];
@@ -153,12 +147,18 @@ void MovePicker::score() {
       {
           if (pos.capture(m))
               m.value =  PieceValue[MG][pos.piece_on(to_sq(m))]
-                       - Value(type_of(pos.moved_piece(m)));
+                       - Value(type_of(pos.moved_piece(m)))
+                       + 4000 * int(pos.checkers() & to_sq(m));
           else
               m.value =      (*mainHistory)[pos.side_to_move()][from_to(m)]
                        + 2 * (*continuationHistory[0])[pos.moved_piece(m)][to_sq(m)]
                        - (1 << 28);
       }
+
+
+      if (pos.gives_check(m))
+          m.value += 20000 - 400 * distance(pos.square<KING>(~pos.side_to_move()), to_sq(m));
+  }
 }
 
 /// MovePicker::select() returns the next move satisfying a predicate function.
@@ -202,6 +202,7 @@ top:
 
       score<CAPTURES>();
       partial_insertion_sort(cur, endMoves, -3000 * depth);
+
       ++stage;
       goto top;
 
@@ -229,6 +230,7 @@ top:
                                     && !pos.capture(*cur)
                                     &&  pos.pseudo_legal(*cur); }))
           return *(cur - 1);
+
       ++stage;
       [[fallthrough]];
 
@@ -238,6 +240,7 @@ top:
           cur = endBadCaptures;
           endMoves = generate<QUIETS>(pos, cur);
 
+          quiet_init();
           score<QUIETS>();
           partial_insertion_sort(cur, endMoves, -3000 * depth);
       }
@@ -267,6 +270,7 @@ top:
       endMoves = generate<EVASIONS>(pos, cur);
 
       score<EVASIONS>();
+
       ++stage;
       [[fallthrough]];
 
@@ -300,6 +304,7 @@ top:
   }
 
   assert(false);
+
   return MOVE_NONE; // Silence warning
 }
 
