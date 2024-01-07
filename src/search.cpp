@@ -435,10 +435,20 @@ void Thread::search() {
       }
 
       // Have we found a "mate in x"?
+      // Note, we don't check for 'mated in x' cases!
       if (   Limits.mate
-          && bestValue >= VALUE_MATE_IN_MAX_PLY
-          && VALUE_MATE - bestValue <= 2 * Limits.mate
-          && int(rootMoves[0].pv.size()) == 2 * Limits.mate - 1)
+          && bestValue > VALUE_MATE - 2 * Limits.mate
+          && int(rootMoves[0].pv.size()) == 2 * Limits.mate - 1) // Ensure full PV length
+          Threads.stop = true;
+
+      // Don't start a new iteration if 70% of available nodes
+      // have already been consumed.
+      if (Limits.nodes && Threads.nodes_searched() > uint64_t(Limits.nodes * 70 / 100))
+          Threads.stop = true;
+
+      // Don't start a new iteration if 70% of available movetime
+      // has already been consumed.
+      if (Limits.movetime && Time.elapsed() >= Limits.movetime * 70 / 100)
           Threads.stop = true;
 
       if (!mainThread)
@@ -1777,8 +1787,8 @@ void MainThread::check_time() {
   if (--callsCnt > 0)
       return;
 
-  // When using nodes, ensure checking rate is not lower than 0.1% of nodes
-  callsCnt = Limits.nodes ? std::min(1024, int(Limits.nodes / 1024)) : 1024;
+  // Reset checking rate
+  callsCnt = 1024;
 
   static TimePoint lastInfoTime = now();
 
@@ -1795,9 +1805,8 @@ void MainThread::check_time() {
   if (ponder)
       return;
 
-  if (   (Limits.use_time_management() && (elapsed > Time.maximum() - 10 || stopOnPonderhit))
-      || (Limits.movetime && elapsed >= Limits.movetime)
-      || (Limits.nodes && Threads.nodes_searched() >= (uint64_t)Limits.nodes))
+  if (   Limits.use_time_management()
+      && (elapsed > Time.maximum() - 10 || stopOnPonderhit))
       Threads.stop = true;
 }
 
