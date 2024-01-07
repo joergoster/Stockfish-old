@@ -589,8 +589,7 @@ namespace {
         // would be at best mate_in(ss->ply+1), but if alpha is already bigger because
         // a shorter mate was found upward in the tree then there is no need to search
         // because we will never beat the current alpha.
-        beta = std::min(mate_in(ss->ply+1), beta);
-        if (alpha >= beta)
+        if (alpha >= mate_in(ss->ply+1))
             return alpha;
     }
     else
@@ -1413,8 +1412,8 @@ moves_loop: // When in check, search starts here
 
     assert(0 <= ss->ply && ss->ply < MAX_PLY);
 
-    beta = std::min(mate_in(ss->ply+1), beta);
-    if (alpha >= beta)
+    // Mate distance pruning
+    if (alpha >= mate_in(ss->ply+1))
         return alpha;
 
     // Decide whether or not to include checks: this fixes also the type of
