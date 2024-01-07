@@ -436,19 +436,18 @@ void Thread::search() {
 
       // Have we found a "mate in x"?
       // Note, we don't check for 'mated in x' cases!
-      if (   Limits.mate
-          && bestValue > VALUE_MATE - 2 * Limits.mate
+      if (   bestValue > VALUE_MATE - 2 * Limits.mate
           && int(rootMoves[0].pv.size()) == 2 * Limits.mate - 1) // Ensure full PV length
           Threads.stop = true;
 
-      // Don't start a new iteration if 70% of available nodes
+      // Don't start a new iteration if 80% of available nodes
       // have already been consumed.
-      if (Limits.nodes && Threads.nodes_searched() > uint64_t(Limits.nodes * 70 / 100))
+      if (Limits.nodes && Threads.nodes_searched() > uint64_t(Limits.nodes * 80 / 100))
           Threads.stop = true;
 
-      // Don't start a new iteration if 70% of available movetime
+      // Don't start a new iteration if 80% of available movetime
       // has already been consumed.
-      if (Limits.movetime && Time.elapsed() >= Limits.movetime * 70 / 100)
+      if (Limits.movetime && Time.elapsed() >= Limits.movetime * 80 / 100)
           Threads.stop = true;
 
       if (!mainThread)
@@ -599,7 +598,7 @@ namespace {
         // would be at best mate_in(ss->ply+1), but if alpha is already bigger because
         // a shorter mate was found upward in the tree then there is no need to search
         // because we will never beat the current alpha.
-        if (alpha >= mate_in(ss->ply+1))
+        if (alpha >= mate_in(ss->ply+1)) // from Crystal!
             return alpha;
     }
     else
