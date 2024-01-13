@@ -212,35 +212,53 @@ void ThreadPool::start_thinking(Position& pos, StateListPtr& states,
   main()->start_searching();
 }
 
+/// ThreadPool::get_best_thread() picks the best thread at the end
+/// of a search.
+
 Thread* ThreadPool::get_best_thread() const {
 
-    Thread* bestThread = front();
-    std::map<Move, int64_t> votes;
-    Value minScore = VALUE_NONE;
+    Thread* bestThread = Threads.front();
+    Thread* worstThread = Threads.front();
+    Value maxScore = -VALUE_INFINITE;
+    Value minScore =  VALUE_INFINITE;
 
-    // Find minimum score of all threads
+    // Find minimum and maximum score of all threads
     for (Thread* th: *this)
-        minScore = std::min(minScore, th->rootMoves[0].score);
-
-    // Vote according to score and depth, and select the best thread
-    for (Thread* th : *this)
     {
-        votes[th->rootMoves[0].pv[0]] +=
-            (th->rootMoves[0].score - minScore + 14) * int(th->completedDepth);
+        // We don't want to use invalid scores!
+        Value thScore = th->rootMoves[0].score != -VALUE_INFINITE ? th->rootMoves[0].score
+                                                                  : th->rootMoves[0].previousScore;
 
-        if (abs(bestThread->rootMoves[0].score) >= VALUE_TB_WIN_IN_MAX_PLY)
+        // On equal scores prefer the thread with no fail-high/-low pv
+        if (   thScore < minScore
+            || (   thScore == minScore
+                && th->rootMoves[0].pv.size() > bestThread->rootMoves[0].pv.size()))
         {
-            // Make sure we pick the shortest mate / TB conversion or stave off mate the longest
-            if (th->rootMoves[0].score > bestThread->rootMoves[0].score)
-                bestThread = th;
+            minScore = thScore;
+            worstThread = th;
         }
-        else if (   th->rootMoves[0].score >= VALUE_TB_WIN_IN_MAX_PLY
-                 || (   th->rootMoves[0].score > VALUE_TB_LOSS_IN_MAX_PLY
-                     && votes[th->rootMoves[0].pv[0]] > votes[bestThread->rootMoves[0].pv[0]]))
+
+        if (   thScore > maxScore
+            || (   thScore == maxScore
+                && th->rootMoves[0].pv.size() > bestThread->rootMoves[0].pv.size()))
+        {
+            maxScore = thScore;
             bestThread = th;
+        }
     }
 
-    return bestThread;
+    assert(minScore > -VALUE_INFINITE);
+    assert(maxScore <  VALUE_INFINITE);
+
+    // TB loss or Mated score
+    if (minScore <= VALUE_TB_LOSS_IN_MAX_PLY)
+        return worstThread;
+
+    // TB win or Mate score
+    if (maxScore >= VALUE_TB_WIN_IN_MAX_PLY)
+        return bestThread;
+
+    return Threads.front();
 }
 
 
