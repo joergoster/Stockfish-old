@@ -320,10 +320,13 @@ void Thread::search() {
       if (mainThread)
           totBestMoveChanges /= 2;
 
-      // Save the last iteration's scores before first PV line is searched and
-      // all the move scores except the (new) PV are set to -VALUE_INFINITE.
+      // Save the last iteration's scores and PVs before first PV line is searched
+      // and all the move scores except the (new) PV are set to -VALUE_INFINITE.
       for (RootMove& rm : rootMoves)
+      {
           rm.previousScore = rm.score;
+          rm.previousPv = rm.pv;
+      }
 
       size_t pvFirst = 0;
       pvLast = 0;
@@ -440,14 +443,14 @@ void Thread::search() {
           && int(rootMoves[0].pv.size()) == 2 * Limits.mate - 1) // Ensure full PV length
           Threads.stop = true;
 
-      // Don't start a new iteration if 80% of available nodes
+      // Don't start a new iteration if 90% of available nodes
       // have already been consumed.
-      if (Limits.nodes && Threads.nodes_searched() > uint64_t(Limits.nodes * 80 / 100))
+      if (Limits.nodes && Threads.nodes_searched() > uint64_t(Limits.nodes * 9 / 10))
           Threads.stop = true;
 
-      // Don't start a new iteration if 80% of available movetime
+      // Don't start a new iteration if 90% of available movetime
       // has already been consumed.
-      if (Limits.movetime && Time.elapsed() >= Limits.movetime * 80 / 100)
+      if (Limits.movetime && Time.elapsed() >= Limits.movetime * 9 / 10)
           Threads.stop = true;
 
       if (!mainThread)
@@ -1239,7 +1242,15 @@ moves_loop: // When in check, search starts here
       // the search cannot be trusted, and we return immediately without
       // updating best move, PV and TT.
       if (Threads.stop.load(std::memory_order_relaxed))
+      {
+          // At root, reset all scores of all root moves
+          // searched so far, as they cannot be trusted!
+          if (rootNode)
+              for (auto& rm : thisThread->rootMoves)
+                  rm.score = -VALUE_INFINITE;
+
           return VALUE_ZERO;
+      }
 
       if (rootNode)
       {
@@ -1864,8 +1875,12 @@ string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
          << " time "     << elapsed
          << " pv";
 
-      for (Move m : rootMoves[i].pv)
-          ss << " " << UCI::move(m, pos.is_chess960());
+      if (updated)
+          for (Move m : rootMoves[i].pv)
+              ss << " " << UCI::move(m, pos.is_chess960());
+      else
+          for (Move m : rootMoves[i].previousPv)
+              ss << " " << UCI::move(m, pos.is_chess960());
   }
 
   return ss.str();
