@@ -270,6 +270,7 @@ void Thread::search() {
   double timeReduction = 1, totBestMoveChanges = 0;
   Color us = rootPos.side_to_move();
   int iterIdx = 0;
+  int threadCount = Threads.size();
 
   std::memset(ss-7, 0, 10 * sizeof(Stack));
   for (int i = 7; i > 0; i--)
@@ -443,14 +444,15 @@ void Thread::search() {
           && int(rootMoves[0].pv.size()) == 2 * Limits.mate - 1) // Ensure full PV length
           Threads.stop = true;
 
-      // Don't start a new iteration if 90% of available nodes
-      // have already been consumed.
-      if (Limits.nodes && Threads.nodes_searched() > uint64_t(Limits.nodes * 9 / 10))
+      // Don't start a new iteration if 74 % up to 98 % of available nodes,
+      // depending on number of threads, have already been consumed.
+      if (   Limits.nodes
+          && Threads.nodes_searched() > uint64_t(Limits.nodes * (74 + std::min(4 * msb(threadCount), 24)) / 100))
           Threads.stop = true;
 
       // Don't start a new iteration if 90% of available movetime
       // has already been consumed.
-      if (Limits.movetime && Time.elapsed() >= Limits.movetime * 9 / 10)
+      if (Limits.movetime && Time.elapsed() >= Limits.movetime * (74 + std::min(4 * msb(threadCount), 24)) / 100)
           Threads.stop = true;
 
       if (!mainThread)
@@ -1243,11 +1245,12 @@ moves_loop: // When in check, search starts here
       // updating best move, PV and TT.
       if (Threads.stop.load(std::memory_order_relaxed))
       {
-          // At root, reset all scores of all root moves
+          // At root, reset scores of all root moves
           // searched so far, as they cannot be trusted!
+          // Finished PV lines are being preserved, though.
           if (rootNode)
-              for (auto& rm : thisThread->rootMoves)
-                  rm.score = -VALUE_INFINITE;
+              for (size_t i = thisThread->pvIdx; i < thisThread->rootMoves.size(); i++)
+                  thisThread->rootMoves[i].score = -VALUE_INFINITE;
 
           return VALUE_ZERO;
       }
@@ -1862,7 +1865,7 @@ string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
       if (Options["UCI_ShowWDL"])
           ss << UCI::wdl(v, pos.game_ply());
 
-      if (!tb && i == pvIdx)
+      if (!tb && updated && i == pvIdx)
           ss << (v >= beta ? " lowerbound" : v <= alpha ? " upperbound" : "");
 
       ss << " nodes "    << nodesSearched
