@@ -313,7 +313,7 @@ void Thread::search() {
   int searchAgainCounter = 0;
 
   // Iterative deepening loop until requested to stop or the target depth is reached
-  while (   ++rootDepth < MAX_PLY - 1
+  while (   ++rootDepth < MAX_PLY
          && !Threads.stop
          && !(Limits.depth && mainThread && rootDepth > Limits.depth))
   {
@@ -556,7 +556,7 @@ namespace {
 
     assert(-VALUE_INFINITE <= alpha && alpha < beta && beta <= VALUE_INFINITE);
     assert(PvNode || (alpha == beta - 1));
-    assert(0 < depth && depth < MAX_PLY);
+    assert(0 < depth && depth <= MAX_PLY);
     assert(!(PvNode && cutNode));
 
     Move pv[MAX_PLY+1], capturesSearched[32], quietsSearched[64];
