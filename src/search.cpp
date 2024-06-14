@@ -1821,6 +1821,13 @@ void MainThread::check_time() {
   if (   Limits.use_time_management()
       && (elapsed > Time.maximum() - 10 || stopOnPonderhit))
       Threads.stop = true;
+
+  // The next 2 conditions act as a failsafe against a stuck search
+  else if (Limits.movetime && elapsed > Limits.movetime * 2)
+      Threads.stop = true;
+
+  else if (Limits.nodes && Threads.nodes_searched() > uint64_t(Limits.nodes) * 2)
+      Threads.stop = true;
 }
 
 
