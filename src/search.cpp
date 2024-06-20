@@ -541,13 +541,15 @@ namespace {
     // Check if we have an upcoming move which draws by repetition, or
     // if the opponent had an alternative move earlier to this position.
     if (  !rootNode
-        && alpha < VALUE_DRAW
+        && alpha < VALUE_DRAW - 1 // alpha < value_draw()
         && pos.has_game_cycle(ss->ply))
     {
-        alpha = value_draw(pos.this_thread());
+        if (VALUE_DRAW + 1 >= beta) // Assume the best result from value_draw()
+            return VALUE_DRAW + 1;
 
-        if (alpha >= beta)
-            return alpha;
+        assert(PvNode);
+
+        alpha = VALUE_DRAW - 2; // Ensure the drawing move will raise alpha!
     }
 
     // Dive into quiescence search when the depth reaches zero
