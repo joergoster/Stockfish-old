@@ -101,7 +101,7 @@ void TranspositionTable::clear() {
                        len    = idx != Options["Threads"] - 1 ?
                                 stride : clusterCount - start;
 
-          std::memset(&table[start], 0, len * sizeof(Cluster));
+          std::memset(reinterpret_cast<void*>(&table[start]), 0, len * sizeof(Cluster));
       });
   }
 

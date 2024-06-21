@@ -19,6 +19,8 @@
 #ifndef TT_H_INCLUDED
 #define TT_H_INCLUDED
 
+#include <cstring>
+
 #include "misc.h"
 #include "types.h"
 
@@ -36,6 +38,8 @@ namespace Stockfish {
 /// eval value 16 bit
 
 struct TTEntry {
+
+  TTEntry(TTEntry* tte) { std::memcpy(this, tte, sizeof(TTEntry)); }
 
   Move  move()  const { return (Move )move16; }
   Value value() const { return (Value)value16; }
