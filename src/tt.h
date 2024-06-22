@@ -39,6 +39,7 @@ namespace Stockfish {
 
 struct TTEntry {
 
+  TTEntry() = default;
   TTEntry(TTEntry* tte) { std::memcpy(this, tte, sizeof(TTEntry)); }
 
   Move  move()  const { return (Move )move16; }
